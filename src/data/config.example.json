@@ -1,0 +1,60 @@
+{
+  "_comment": "Zeus Python sample-client config. Copy to config.json and fill in your keys. config.json is git-ignored so your secrets stay local.",
+
+  "zeus": {
+    "url": "http://host.docker.internal:8080",
+    "auth_mode": "none",
+    "username": "",
+    "password": "",
+    "bearer_token": "",
+    "session_id": "",
+    "notes": "",
+    "scope_credentials": {
+      "beer-sample/_default": { "username": "", "password": "" }
+    },
+    "scope_contracts": {
+      "beer-sample/_default": {
+        "contract_id": "",
+        "contract_hash": ""
+      }
+    },
+    "enable_durable_sessions": true
+  },
+
+  "llm_provider": {
+    "label": "xAI Grok",
+    "base_url": "https://api.x.ai/v1",
+    "api_key": "",
+    "models": [
+      "grok-4-1-fast-non-reasoning",
+      "grok-4-1-fast-reasoning",
+      "grok-4",
+      "grok-3-mini"
+    ]
+  },
+
+  "chat_requests_sync": {
+    "scopes": "from_samples",
+    "modes": "auto",
+    "on_startup": false
+  },
+
+  "default_api_version": "v2",
+  "default_mode": "analytics",
+  "default_sample": "beer-sample",
+  "samples": {
+    "beer-sample": { "bucket": "beer-sample", "scope": "_default", "collection": "_default" },
+    "travel-sample": { "bucket": "travel-sample", "scope": "_default", "collection": "_default" }
+  },
+
+  "test_cases": [
+    {
+      "name": "Beer sample smoke",
+      "description": "Basic analytics questions on beer-sample",
+      "prompts": [
+        "How many breweries are in the dataset?",
+        "List the top 5 beers by ABV"
+      ]
+    }
+  ]
+}
