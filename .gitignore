@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.env
+config.json
+chats.jsonl
+*.whl
+
+# Make chat_requests directory persistent in git, but ignore all files inside it
+src/data/chat_requests/*
+!src/data/chat_requests/.gitkeep
+
+# Grok artifacts
+terminals/
+mcps/
