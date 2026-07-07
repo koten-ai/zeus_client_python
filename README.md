@@ -182,6 +182,39 @@ In the normal flow you do **not** compute hashes on the client. Verify a standar
 
 `compute_contract_hash` remains for offline diagnostics and legacy unstamped files only.
 
+## Structured responses
+
+Pass `structured=True` to `run_agent` to receive schema-filtered Zeus rows alongside the natural-language answer:
+
+```python
+answer, trace, turns, meta, structured = await run_agent(
+    zcfg["url"], zcfg,
+    provider["base_url"], provider["api_key"], provider["models"][0],
+    "v2", "analytics",
+    sample["bucket"], sample["scope"], sample["collection"],
+    "List the top Colorado breweries by name.",
+    prior_turns=[],
+    structured=True,
+)
+
+print(structured.answer)       # same as answer (summary from return verb)
+print(structured.zeus_data)    # [{"id": "n_...", "name": "...", ...}, ...]
+print(structured.decomposition)  # structured query understanding (if model emitted it)
+print(structured.warnings)     # dropped unknown fields, missing schema, etc.
+```
+
+`zeus_data` rows are extracted from the last successful Zeus data tool call in `trace["tool_calls"]` (`find`, `search`, `pipeline`, `project`, etc.) and filtered to fields allowed by:
+
+1. `output_schema` argument to `run_agent` (highest precedence), e.g. `{"entity_type": "Hotel", "fields": ["id", "name", "rating"]}`
+2. `guidance.injections.output_schema` in the loaded chat_request (operator-defined, hash-excluded)
+3. MINI-SCHEMA from the scope brief (`get_mini_schema`)
+
+Reserved fields `id`, `doc_key`, and `entity_type` are always kept. FK join columns like `brewery_id.name` are kept when the prefix matches an `entity_fk` in MINI-SCHEMA. Unknown fields are dropped and listed in `structured.warnings` (also appended to `trace["notes"]` as `[WARN] …`).
+
+You can also call `extract_structured_response(answer, trace, chat_req)` directly after a normal `run_agent` turn without re-running the agent.
+
+Default `structured=False` preserves the original 4-tuple return value for backward compatibility.
+
 ## Crawl / Walk / Run
 
 Subclass `AgentHooks` and pass `hooks=MyHooks()` to `run_agent` to observe or steer the loop without forking core logic:
@@ -198,7 +231,8 @@ Key exports from `import zeus_client`:
 
 | Symbol | Purpose |
 |--------|---------|
-| `run_agent` | One user turn: LLM + Zeus tools + session/trace |
+| `run_agent` | One user turn: LLM + Zeus tools + session/trace; optional `structured=True` for `zeus_data` |
+| `StructuredAgentResponse`, `extract_structured_response` | Parse trace into schema-filtered rows |
 | `AgentHooks`, `AgentDecision` | Crawl/Walk/Run hook points |
 | `load_config`, `save_config`, `resolve_zeus_config`, `resolve_llm_provider_config` | Config management |
 | `sync_chat_requests`, `SyncResult` | Pull stamped catalogs from Zeus |

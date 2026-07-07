@@ -265,3 +265,45 @@ async def test_run_agent_prior_turns_delta(patched_loop, monkeypatch):
         "b", "s", "c", "new question", prior,
     )
     assert captured["delta"][-1]["content"] == "new question"
+
+
+@pytest.mark.asyncio
+async def test_run_agent_structured_returns_five_tuple(patched_loop, monkeypatch):
+    from tests.fixtures.catalog_brief import base_chat_req
+
+    async def fake_catalog(*_a, **_k):
+        return base_chat_req(), "local"
+
+    async def llm_answer(*_a, **_k):
+        return "summary text", True, None
+
+    monkeypatch.setattr(loop_mod, "load_chat_request", fake_catalog)
+    monkeypatch.setattr(loop_mod, "run_llm_round", llm_answer)
+    monkeypatch.setattr(loop_mod, "execute_tool_calls", lambda *_a: (None, False, {}))
+
+    result = await loop_mod.run_agent(
+        "http://zeus", {"auth_mode": "none"}, "http://llm", "key", "model", "v2",
+        "analytics", "beer-sample", "_default", "_default", "find beers", [],
+        structured=True,
+    )
+    assert len(result) == 5
+    answer, trace, messages, meta, structured = result
+    assert answer == "summary text"
+    assert structured.answer == "summary text"
+    assert structured.zeus_data == []
+    assert trace["structured_response"]["zeus_data_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_run_agent_structured_false_returns_four_tuple(patched_loop, monkeypatch):
+    async def llm_answer(*_a, **_k):
+        return "plain", True, None
+
+    monkeypatch.setattr(loop_mod, "run_llm_round", llm_answer)
+    monkeypatch.setattr(loop_mod, "execute_tool_calls", lambda *_a: (None, False, {}))
+
+    result = await loop_mod.run_agent(
+        "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
+        "b", "s", "c", "q", [], structured=False,
+    )
+    assert len(result) == 4

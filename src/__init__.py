@@ -2,6 +2,7 @@
 
 from zeus_client.agent.hooks import AgentDecision, AgentHooks
 from zeus_client.agent.loop import run_agent
+from zeus_client.agent.response import StructuredAgentResponse, extract_structured_response
 from zeus_client.config import (
     load_config,
     resolve_llm_provider_config,
@@ -54,6 +55,8 @@ class ZeusClient:
 __all__ = [
     "AgentDecision",
     "AgentHooks",
+    "StructuredAgentResponse",
+    "extract_structured_response",
     "BASE_DIR",
     "MAX_ROUNDS",
     "USER_CONFIG_DIR",

@@ -8,6 +8,7 @@ from zeus_client.contract_hash import compute_contract_hash, extract_stamped_has
 
 from zeus_client.agent.audit import run_runtime_contract_audit
 from zeus_client.agent.hooks import AgentHooks
+from zeus_client.agent.response import extract_structured_response
 from zeus_client.agent.session_phase import commit_session_turn, setup_contract_and_session
 from zeus_client.agent.tool_round import execute_tool_calls, run_llm_round
 from zeus_client.constants import MAX_ROUNDS, normalize_api_version
@@ -159,8 +160,15 @@ async def run_agent(
     optimized=True, provider_id=None, conv_id=None,
     zeus_session_id: str = "", zeus_round: int = 0,
     hooks: Optional[AgentHooks] = None,
+    structured: bool = False,
+    output_schema=None,
 ):
-    """Run one user-question turn (LLM + Zeus dispatches)."""
+    """Run one user-question turn (LLM + Zeus dispatches).
+
+    When ``structured=True``, returns a 5-tuple with a
+    :class:`~zeus_client.agent.response.StructuredAgentResponse` as the last
+    element (schema-filtered ``zeus_data`` rows plus decomposition metadata).
+    """
     api_version = normalize_api_version(api_version)
     logger.debug(
         f"run_agent: START conv_id={conv_id} mode={mode} api={api_version} "
@@ -250,5 +258,18 @@ async def run_agent(
         tc.trace, user_msg, tc.stamped_h, tc.current_content_h,
         tc.contract_hash, tc.contract_id,
     )
+
+    if structured:
+        structured_response = extract_structured_response(
+            answer, tc.trace, tc.chat_req, output_schema=output_schema,
+        )
+        for w in structured_response.warnings:
+            tc.trace["notes"].append(f"[WARN] {w}")
+        tc.trace["structured_response"] = {
+            "zeus_data_count": len(structured_response.zeus_data),
+            "entity_type": structured_response.entity_type,
+            "source_tool": structured_response.source_tool,
+        }
+        return answer, tc.trace, tc.messages[1:], session_meta, structured_response
 
     return answer, tc.trace, tc.messages[1:], session_meta
