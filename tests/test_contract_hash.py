@@ -60,6 +60,33 @@ def test_resolve_session_contract_hash_stamped_match():
     assert src == "stamped_matches_payload"
 
 
+def test_trailing_newline_plus_scope_brief_merge_stable():
+    """Live brief merge + strip must not change hash when base prompt has no trailing ws.
+
+    Regression: a trailing ``\\n`` on messages[0].content was kept in the stamp
+    (no brief) but removed by strip-for-hash after merge_scope_brief (brief
+    present), producing 409 contract_mismatch on /v1/session.
+    """
+    from copy import deepcopy
+
+    from zeus_client.zeus.catalog import merge_scope_brief
+
+    base = {
+        "messages": [{"role": "system", "content": "rules only"}],
+        "instructions": {"system_prompt": "marker only"},
+        "verbs": [{"type": "function", "function": {"name": "find"}}],
+        "contract": {"hash": "md5:placeholder"},
+    }
+    h0 = compute_contract_hash(base)
+    drifted = deepcopy(base)
+    drifted["messages"][0]["content"] = "rules only\n"
+    assert compute_contract_hash(drifted) != h0
+
+    merged = merge_scope_brief(base, "## SCOPE BRIEF\nscope: demo/_default\nmode: analytics")
+    assert compute_contract_hash(merged) == h0
+    assert "## SCOPE BRIEF" in merged["messages"][0]["content"]
+
+
 def test_extract_stamped_hash_priority():
     doc = {
         "contract": {"hash": "md5:TO_BE_FILLED"},

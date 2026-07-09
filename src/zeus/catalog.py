@@ -150,6 +150,11 @@ def merge_scope_brief(chat_req, brief):
     For standardized 5TH/v4 shape (with top-level "instructions"), also keep
     instructions.system_prompt in sync so that MINI-SCHEMA / SCOPE BRIEF is
     visible no matter which copy the assembler or downstream code reads.
+
+    Hash note: strip-for-hash truncates at ``## SCOPE BRIEF`` / ``## MINI-SCHEMA``
+    and rstrips the remaining prefix. Catalog system prompts should therefore
+    not carry trailing whitespace, or the no-brief stamp will disagree with the
+    post-merge hash Zeus computes on session create (409 contract_mismatch).
     """
     if not brief:
         return chat_req
@@ -158,13 +163,15 @@ def merge_scope_brief(chat_req, brief):
     if messages:
         current = messages[0].get("content") or ""
         if "## SCOPE BRIEF" not in current and "## MINI-SCHEMA" not in current:
-            messages[0]["content"] = current.rstrip() + "\n\n" + brief.strip()
+            # rstrip base so post-strip hash matches a no-brief stamp of the
+            # same rules text (server strip also TrimsRight whitespace).
+            messages[0]["content"] = current.rstrip(" \t\n\r") + "\n\n" + brief.strip()
     # Standardized v4 shape support: also inject into instructions.system_prompt
     instr = out.get("instructions") or {}
     if isinstance(instr, dict):
         sp = instr.get("system_prompt") or ""
         if sp and "## SCOPE BRIEF" not in sp and "## MINI-SCHEMA" not in sp:
-            instr["system_prompt"] = sp.rstrip() + "\n\n" + brief.strip()
+            instr["system_prompt"] = sp.rstrip(" \t\n\r") + "\n\n" + brief.strip()
             out["instructions"] = instr
     return out
 

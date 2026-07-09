@@ -10,7 +10,7 @@ from pathlib import Path
 
 from zeus_client.config import resolve_zeus_config
 from zeus_client.constants import scope_chat_requests_subdir, user_chat_requests_dir
-from zeus_client.contract_hash import compute_contract_hash
+from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash
 from zeus_client.logging_setup import logger
 from zeus_client.zeus.auth import resolve_zeus_auth
 from zeus_client.zeus.catalog import (
@@ -124,6 +124,48 @@ def _doc_fingerprint(doc: dict) -> str:
         return json.dumps(doc, sort_keys=True, separators=(",", ":"))
 
 
+def _is_stamped_standardized(doc: dict) -> bool:
+    """True for Verify-stamped V2 envelopes (verbs/_format + real contract.hash)."""
+    if not isinstance(doc, dict):
+        return False
+    if not extract_stamped_hash(doc):
+        return False
+    return bool(doc.get("verbs") or doc.get("_format") == "zeus.chat_request.v2")
+
+
+def _is_legacy_tools_catalog(doc: dict) -> bool:
+    """True for unstamped tools-only snapshots (V1 shape, often mis-served as V2)."""
+    if not isinstance(doc, dict):
+        return False
+    if extract_stamped_hash(doc):
+        return False
+    if doc.get("verbs") or doc.get("_format") == "zeus.chat_request.v2":
+        return False
+    return bool(doc.get("tools"))
+
+
+def _should_preserve_local_catalog(local_path: Path, remote_doc: dict) -> str:
+    """Return a skip reason when a good local snapshot must not be clobbered.
+
+    Startup sync can pull Zeus live templates that are still V1-shaped
+    (``tools`` + ``find_nodes``, no stamp). Overwriting a Verify-stamped
+    standardized catalog with those causes audit FAIL + 404s on V2 routes.
+    """
+    if not local_path.is_file():
+        return ""
+    try:
+        local = json.loads(local_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not _is_stamped_standardized(local):
+        return ""
+    if _is_legacy_tools_catalog(remote_doc):
+        return "preserve_stamped_local (remote is unstamped tools-only / V1-shaped)"
+    if not extract_stamped_hash(remote_doc):
+        return "preserve_stamped_local (remote has no embedded contract hash)"
+    return ""
+
+
 async def sync_chat_requests(
     cfg: dict,
     *,
@@ -165,6 +207,25 @@ async def sync_chat_requests(
                 out = scope_dir / filename
                 doc_hash = _doc_fingerprint(doc)
                 prev = prior_files.get(key) if isinstance(prior_files.get(key), dict) else {}
+
+                preserve_reason = _should_preserve_local_catalog(out, doc)
+                if preserve_reason:
+                    rel_existing = str(out.relative_to(dest)) if out.is_file() else filename
+                    logger.warning(
+                        "sync_chat_requests: skip %s — %s",
+                        key,
+                        preserve_reason,
+                    )
+                    result.skipped.append({
+                        "scope": f"{bucket}/{scope}",
+                        "mode": mode,
+                        "path": rel_existing,
+                        "hash": prev.get("hash") or _doc_fingerprint(
+                            json.loads(out.read_text(encoding="utf-8")),
+                        ),
+                        "reason": preserve_reason,
+                    })
+                    continue
 
                 if (
                     not force
