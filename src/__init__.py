@@ -38,6 +38,7 @@ from zeus_client.zeus.session import (
     post_session_trace,
     rehydrate_session,
 )
+from zeus_client.trace.tool_order import build_tool_order
 
 
 class ZeusClient:
@@ -58,6 +59,7 @@ __all__ = [
     "StructuredAgentResponse",
     "extract_structured_response",
     "BASE_DIR",
+    "build_tool_order",
     "MAX_ROUNDS",
     "USER_CONFIG_DIR",
     "ZeusClient",
