@@ -1,8 +1,13 @@
-"""Trace pipeline spans."""
+"""Trace pipeline spans and tool-order helpers."""
 import json
 
 from zeus_client.trace.pipeline import _pipeline_step_costs as pipeline_step_costs
 from zeus_client.trace.pipeline import pipeline_step_spans
+from zeus_client.trace.tool_order import (
+    build_tool_order,
+    build_v1_tool_order_from_chats,
+    tool_names_from_step,
+)
 
 
 def test_pipeline_step_spans_ignores_non_dict_steps():
@@ -72,3 +77,73 @@ def test_pipeline_py_step_costs_branches():
 def test_pipeline_step_costs_ok_status_skips_error_branch():
     raw = json.dumps({"status": "ok", "meta": {"step_costs": []}})
     assert pipeline_step_costs({"name": "pipeline", "result": raw}) == []
+
+
+def test_tool_names_from_step_non_tool_and_simple():
+    assert tool_names_from_step({"type": "llm"}) == []
+    assert tool_names_from_step({"type": "tool", "name": "find"}) == ["find"]
+    assert tool_names_from_step({"type": "tool"}) == []
+
+
+def test_tool_names_from_step_pipeline_variants():
+    step = {
+        "type": "tool",
+        "name": "pipeline",
+        "args": {"steps": [{"name": "a", "verb": "find"}, {"name": "b", "verb": "get"}]},
+        "pipeline_step_costs": [{"as": "a"}, {"name": "b"}],
+    }
+    assert tool_names_from_step(step) == ["find", "get"]
+
+    step2 = {
+        "type": "tool",
+        "name": "pipeline",
+        "pipeline_json": {"steps": [{"name": "x", "verb": "describe"}]},
+        "result": json.dumps({"meta": {"step_costs": [{"as": "x"}]}}),
+    }
+    assert tool_names_from_step(step2) == ["describe"]
+
+    step3 = {
+        "type": "tool",
+        "name": "pipeline",
+        "args": {"steps": [{"name": "only", "verb": "search"}]},
+    }
+    assert tool_names_from_step(step3) == ["search"]
+
+
+def test_build_v1_tool_order_from_chats():
+    chats = {
+        "c1": {
+            "created": 1,
+            "traces": [{
+                "api_version": "v1",
+                "trace": {"steps": [
+                    {"type": "tool", "name": "find_nodes"},
+                    {"type": "tool", "name": "pipeline", "args": {
+                        "steps": [{"name": "inner", "verb": "traverse"}],
+                    }, "pipeline_step_costs": [{"as": "inner"}]},
+                ]},
+            }],
+            "turns": [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "tool_calls": [{"function": {"name": "get_stats"}}]},
+            ],
+        },
+        "c2": {
+            "created": 2,
+            "traces": [{"api_version": "v2", "trace": {"steps": []}}],
+            "turns": [],
+        },
+    }
+    assert build_v1_tool_order_from_chats(chats) == ["find_nodes", "traverse", "get_stats"]
+
+
+def test_build_v1_tool_order_from_chats_empty():
+    assert build_v1_tool_order_from_chats() == []
+    assert build_v1_tool_order_from_chats({}) == []
+
+
+def test_build_tool_order_includes_v2():
+    out = build_tool_order()
+    assert "v1" in out and "v2" in out
+    assert out["v1"] == []
+    assert "find" in out["v2"]
