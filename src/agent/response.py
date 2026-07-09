@@ -65,6 +65,36 @@ def _entity_type_from_args(name: str, args: dict) -> Optional[str]:
     return None
 
 
+def _entity_type_from_rows(rows: list[dict]) -> Optional[str]:
+    """If all dict rows agree on a non-empty entity_type field, return it."""
+    found: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        et = row.get("entity_type")
+        if isinstance(et, str) and et.strip():
+            found.add(et.strip())
+    if len(found) == 1:
+        return next(iter(found))
+    return None
+
+
+def _entity_type_from_prior_tools(tool_calls: list, before_index: int) -> Optional[str]:
+    """Walk earlier successful data tools for entity_type (common after find → get)."""
+    for i in range(before_index - 1, -1, -1):
+        tc = tool_calls[i]
+        if not isinstance(tc, dict) or tc.get("status") != 200:
+            continue
+        name = tc.get("name") or ""
+        if name not in _DATA_TOOLS:
+            continue
+        args = tc.get("args") if isinstance(tc.get("args"), dict) else {}
+        et = _entity_type_from_args(name, args)
+        if et:
+            return et
+    return None
+
+
 def _dict_rows(value: Any) -> list[dict]:
     if isinstance(value, list):
         return [r for r in value if isinstance(r, dict)]
@@ -141,8 +171,9 @@ def _extract_rows_from_result(result_json: Any, tool_name: str = "", args: Optio
 
 def _select_row_source(trace: dict, return_payload: dict) -> tuple[list[dict], Optional[str], Optional[str]]:
     tool_calls = trace.get("tool_calls") or []
-    for tc in reversed(tool_calls):
-        if tc.get("status") != 200:
+    for idx in range(len(tool_calls) - 1, -1, -1):
+        tc = tool_calls[idx]
+        if not isinstance(tc, dict) or tc.get("status") != 200:
             continue
         name = tc.get("name") or ""
         if name not in _DATA_TOOLS:
@@ -152,13 +183,18 @@ def _select_row_source(trace: dict, return_payload: dict) -> tuple[list[dict], O
         rows = _extract_rows_from_result(result_json, name, args)
         if rows:
             entity_type = _entity_type_from_args(name, args)
+            if not entity_type:
+                entity_type = _entity_type_from_rows(rows)
+            if not entity_type:
+                entity_type = _entity_type_from_prior_tools(tool_calls, idx)
             return rows, name, entity_type
 
     evidence = return_payload.get("evidence")
     if isinstance(evidence, list):
         rows = _dict_rows(evidence)
         if rows:
-            return rows, "return", None
+            entity_type = _entity_type_from_rows(rows)
+            return rows, "return", entity_type
 
     return [], None, None
 
@@ -296,6 +332,9 @@ def extract_structured_response(
     raw_rows, source_tool, entity_type = _select_row_source(trace, return_payload)
     if not entity_type:
         entity_type = _entity_type_from_decomposition(decomposition)
+    if not entity_type and raw_rows:
+        # Last resort: row payload may carry entity_type even when tools/args did not.
+        entity_type = _entity_type_from_rows(raw_rows)
 
     allowed, fk_prefixes, schema_warnings = resolve_field_allowlist(
         chat_req, entity_type, output_schema,

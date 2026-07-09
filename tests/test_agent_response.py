@@ -250,3 +250,128 @@ def test_entity_type_from_decomposition_when_tool_lacks_it():
     resp = extract_structured_response("ok", trace, base_chat_req())
     assert resp.entity_type == "Beer"
     assert resp.zeus_data[0]["name"] == "X"
+
+
+def test_get_inherits_entity_type_from_prior_find():
+    """find then get is the common hydrate pattern; get args have no entity_type."""
+    trace = {
+        "steps": [{"type": "return", "args": {"summary": "hydrated beers"}}],
+        "tool_calls": [
+            {
+                "name": "find",
+                "status": 200,
+                "args": {"entity_type": "Beer", "return": "rows"},
+                "result_json": {
+                    "result": {
+                        "items": [
+                            {"id": "n_1", "name": "IPA"},
+                            {"id": "n_2", "name": "Stout"},
+                        ]
+                    }
+                },
+            },
+            {
+                "name": "get",
+                "status": 200,
+                "args": {"ids": ["n_1", "n_2"], "include": ["name", "abv"]},
+                "result_json": {
+                    "result": {
+                        "items": [
+                            {"id": "n_1", "name": "IPA", "abv": 6.5, "secret": "x"},
+                            {"id": "n_2", "name": "Stout", "abv": 5.0},
+                        ]
+                    }
+                },
+            },
+        ],
+    }
+    resp = extract_structured_response("hydrated beers", trace, base_chat_req())
+    assert resp.source_tool == "get"
+    assert resp.entity_type == "Beer"
+    assert len(resp.zeus_data) == 2
+    assert resp.zeus_data[0] == {"id": "n_1", "name": "IPA", "abv": 6.5}
+    assert "secret" not in resp.zeus_data[0]
+    assert not any("entity_type unknown" in w for w in resp.warnings)
+
+
+def test_entity_type_from_row_field_when_get_has_no_prior_tool():
+    trace = {
+        "steps": [],
+        "tool_calls": [
+            {
+                "name": "get",
+                "status": 200,
+                "args": {"ids": ["n_1"]},
+                "result_json": {
+                    "result": {
+                        "items": [
+                            {
+                                "id": "n_1",
+                                "entity_type": "Beer",
+                                "name": "Porter",
+                                "abv": 5.5,
+                                "noise": 1,
+                            }
+                        ]
+                    }
+                },
+            },
+        ],
+    }
+    resp = extract_structured_response("porter", trace, base_chat_req())
+    assert resp.source_tool == "get"
+    assert resp.entity_type == "Beer"
+    assert resp.zeus_data == [
+        {"id": "n_1", "entity_type": "Beer", "name": "Porter", "abv": 5.5}
+    ]
+    assert not any("entity_type unknown" in w for w in resp.warnings)
+
+
+def test_multi_entity_output_schema_uses_inferred_entity_type():
+    """Demo-style multi-key output_schema must not require a single default entity."""
+    override = {
+        "Hotel": ["id", "name", "city"],
+        "Beer": ["id", "name", "abv"],
+        "Airport": ["id", "name", "faa"],
+    }
+    trace = {
+        "steps": [],
+        "tool_calls": [
+            {
+                "name": "find",
+                "status": 200,
+                "args": {"entity_type": "Hotel"},
+                "result_json": {
+                    "result": {
+                        "items": [{"id": "h1", "name": "Plaza", "city": "Paris"}]
+                    }
+                },
+            },
+            {
+                "name": "get",
+                "status": 200,
+                "args": {"ids": ["h1"], "include": ["name", "city"]},
+                "result_json": {
+                    "result": {
+                        "items": [
+                            {
+                                "id": "h1",
+                                "name": "Plaza",
+                                "city": "Paris",
+                                "hotel_details": {"rooms": 10},
+                            }
+                        ]
+                    }
+                },
+            },
+        ],
+    }
+    resp = extract_structured_response(
+        "hotels",
+        trace,
+        base_chat_req(),
+        output_schema=override,
+    )
+    assert resp.entity_type == "Hotel"
+    assert resp.zeus_data == [{"id": "h1", "name": "Plaza", "city": "Paris"}]
+    assert any("hotel_details" in w for w in resp.warnings)
