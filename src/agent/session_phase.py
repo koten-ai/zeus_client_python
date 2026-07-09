@@ -1,7 +1,11 @@
 """Durable session create/rehydrate and turn commit."""
 import uuid
 
-from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash
+from zeus_client.contract_hash import (
+    compute_contract_hash,
+    extract_stamped_hash,
+    resolve_session_contract_hash,
+)
 from zeus_client.logging_setup import logger
 from zeus_client.zeus.contracts import resolve_contract_for_scope
 from zeus_client.zeus.session import (
@@ -19,7 +23,8 @@ async def setup_contract_and_session(
 ):
     """Resolve contract binding and create or rehydrate a durable session."""
     enable_sessions = bool(zcfg.get("enable_durable_sessions", True))
-    contract_id, contract_hash = resolve_contract_for_scope(zcfg, bucket, scope, mode)
+    contract_id, bound_contract_hash = resolve_contract_for_scope(zcfg, bucket, scope, mode)
+    contract_hash = bound_contract_hash
     logger.debug(
         f"run_agent: resolve_contract_for_scope -> contract_id={contract_id} "
         f"hash={(contract_hash or '')[:18]}… enable_sessions={enable_sessions}"
@@ -81,7 +86,7 @@ async def setup_contract_and_session(
                 trace["notes"].append(
                     f"client_hash_of_chat_request_object_being_sent_in_create_payload: {current_content_h}"
                 )
-                if contract_hash and used_h and used_h != contract_hash:
+                if bound_contract_hash and used_h and used_h != bound_contract_hash:
                     trace["notes"].append(
                         "Note: bound contract_hash differs from the hash computed from the "
                         "loaded chat_req content."
@@ -91,6 +96,25 @@ async def setup_contract_and_session(
                 trace["notes"].append(f"hash_compute_failed: {e}")
         else:
             trace["notes"].append("contract: none (no contract_id configured; using contract_status=none)")
+
+        session_hash, hash_src = resolve_session_contract_hash(
+            bound_contract_hash, stamped_h, current_content_h,
+        )
+        contract_hash = session_hash
+        if contract_id and session_hash:
+            trace["notes"].append(
+                f"session_contract_hash: {session_hash} (source: {hash_src})"
+            )
+        if (
+            bound_contract_hash
+            and session_hash
+            and bound_contract_hash != session_hash
+        ):
+            trace["notes"].append(
+                "Note: config scope_contracts hash differs from payload hash; "
+                f"using payload hash on session APIs (bound={bound_contract_hash} "
+                f"payload={session_hash}). Re-sync catalog and align scope_contracts."
+            )
 
         sid = (zeus_session_id or "").strip()
         current_server_round = int(zeus_round or 0)
@@ -174,6 +198,7 @@ async def setup_contract_and_session(
         "this_user_round": this_user_round,
         "contract_id": contract_id,
         "contract_hash": contract_hash,
+        "bound_contract_hash": bound_contract_hash,
         "enable_sessions": enable_sessions,
         "stamped_h": stamped_h,
         "current_content_h": current_content_h,

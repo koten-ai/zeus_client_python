@@ -137,6 +137,28 @@ def compute_contract_hash(chat_request: dict) -> str:
     return "md5:" + digest
 
 
+def resolve_session_contract_hash(
+    bound_hash: str,
+    stamped_hash: str,
+    payload_hash: str,
+) -> tuple[str, str]:
+    """Pick ``contract_hash`` for ``/v1/session`` APIs.
+
+    Zeus compares ``contract_hash`` to the hash of the ``chat_request`` body.
+    Config bindings and embedded stamps are advisory; when they drift from the
+    payload we must send the payload hash or session create returns 409 drift.
+    """
+    if payload_hash:
+        if stamped_hash and stamped_hash == payload_hash:
+            return payload_hash, "stamped_matches_payload"
+        if bound_hash and bound_hash == payload_hash:
+            return payload_hash, "config_matches_payload"
+        return payload_hash, "payload_hash"
+    if stamped_hash:
+        return stamped_hash, "stamped_fallback"
+    return bound_hash or "", "config_fallback"
+
+
 def extract_stamped_hash(doc: dict) -> str:
     """Happy-path extractor for the authoritative server hash from a stamped
     standardized 5TH chat_request (the output of /verify or a publish that
