@@ -3,6 +3,7 @@ import zeus_client.contract_hash as ch
 from zeus_client.contract_hash import (
     compute_contract_hash,
     extract_stamped_hash,
+    resolve_session_contract_hash,
     _canonicalize,
     _strip_for_hash,
     _strip_scope_brief,
@@ -45,6 +46,18 @@ def test_compute_contract_hash_html_escape():
     doc = {"messages": [{"role": "system", "content": "a & b < c > d"}]}
     h = compute_contract_hash(doc)
     assert h.startswith("md5:")
+
+
+def test_resolve_session_contract_hash_prefers_payload_on_drift():
+    h, src = resolve_session_contract_hash("md5:bound", "md5:stamped", "md5:payload")
+    assert h == "md5:payload"
+    assert src == "payload_hash"
+
+
+def test_resolve_session_contract_hash_stamped_match():
+    h, src = resolve_session_contract_hash("md5:bound", "md5:same", "md5:same")
+    assert h == "md5:same"
+    assert src == "stamped_matches_payload"
 
 
 def test_extract_stamped_hash_priority():

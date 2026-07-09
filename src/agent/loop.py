@@ -38,6 +38,7 @@ class TurnContext:
     this_user_round: int = 1
     contract_id: str = ""
     contract_hash: str = ""
+    bound_contract_hash: str = ""
     enable_sessions: bool = True
     stamped_h: str = ""
     current_content_h: str = ""
@@ -191,6 +192,7 @@ async def run_agent(
     tc.this_user_round = sess["this_user_round"]
     tc.contract_id = sess["contract_id"]
     tc.contract_hash = sess["contract_hash"]
+    tc.bound_contract_hash = sess.get("bound_contract_hash") or tc.contract_hash
     tc.enable_sessions = sess["enable_sessions"]
     tc.stamped_h = sess.get("stamped_h") or tc.stamped_h
     tc.current_content_h = sess.get("current_content_h") or tc.current_content_h
@@ -256,7 +258,7 @@ async def run_agent(
 
     run_runtime_contract_audit(
         tc.trace, user_msg, tc.stamped_h, tc.current_content_h,
-        tc.contract_hash, tc.contract_id,
+        tc.bound_contract_hash, tc.contract_id,
     )
 
     if structured:

@@ -129,9 +129,12 @@ async def test_new_session_create_success(http_client, monkeypatch):
     )
     assert result["sid"] == "sess-new-123"
     assert result["this_user_round"] == 1
+    assert result["contract_hash"] == "md5:computed"
+    assert result["bound_contract_hash"] == "md5:h"
     assert trace["session"]["created"] is True
     assert trace["session"]["contract_status"] == "match"
     assert any("WARNING: embedded stamped hash" in n for n in trace["notes"])
+    assert any("using payload hash on session APIs" in n for n in trace["notes"])
 
 
 @pytest.mark.asyncio
@@ -194,7 +197,7 @@ async def test_new_session_create_failure_409_without_payload_hash(http_client):
         "", 0, trace, "", "", HEADERS,
     )
     assert result["sid"] == ""
-    assert not any("payload_hash" in n for n in trace["notes"])
+    assert not any("Zeus computed payload_hash" in n for n in trace["notes"])
 
 
 @pytest.mark.asyncio
