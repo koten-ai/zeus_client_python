@@ -170,3 +170,43 @@ async def test_sync_chat_requests_collects_errors(
     assert not result.synced
     assert len(result.errors) == 1
     assert "HTTP 500" in result.errors[0]["error"]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_sync_preserves_stamped_local_over_legacy_tools_remote(
+    patch_paths, http_client, sample_config_with_contracts,
+):
+    """Do not clobber a Verify-stamped V2 catalog with an unstamped tools-only pull."""
+    user_dir = patch_paths["user_chat_req_dir"]
+    scope_dir = user_dir / "beer-sample__default"
+    scope_dir.mkdir(parents=True)
+    local = {
+        "_format": "zeus.chat_request.v2",
+        "contract": {"hash": "md5:stampedlocal00000000000000000001"},
+        "_hash": "md5:stampedlocal00000000000000000001",
+        "verbs": [{"type": "function", "function": {"name": "find"}}],
+        "messages": [{"role": "system", "content": "stamped rules"}],
+    }
+    path = scope_dir / "chat_request_analytics_v2.json"
+    path.write_text(json.dumps(local), encoding="utf-8")
+
+    remote = {
+        "_mode": "analytics",
+        "tools": [{"type": "function", "function": {"name": "find_nodes"}}],
+        "messages": [{"role": "system", "content": "legacy find_nodes catalog"}],
+    }
+    respx.get(f"{ZEUS_URL}/v1/ai/chat_request.json").mock(
+        return_value=httpx.Response(200, json=remote),
+    )
+
+    result = await sync_chat_requests(
+        {**sample_config_with_contracts, "chat_requests_sync": {"modes": ["analytics"]}},
+        force=True,
+    )
+    assert not result.synced
+    assert len(result.skipped) == 1
+    assert "preserve_stamped_local" in (result.skipped[0].get("reason") or "")
+    kept = json.loads(path.read_text(encoding="utf-8"))
+    assert kept["contract"]["hash"] == "md5:stampedlocal00000000000000000001"
+    assert kept.get("verbs")
