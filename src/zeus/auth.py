@@ -76,6 +76,7 @@ async def resolve_zeus_auth(zeus_url, zcfg, bucket=None, scope=None, force=False
         scope_creds = (zcfg.get("scope_credentials") or {}).get(f"{bucket}/{scope}") or {}
         user = scope_creds.get("username") or zcfg.get("username") or ""
         pwd = scope_creds.get("password") or zcfg.get("password") or ""
+        logger.debug(f"basic auth: resolved credentials for {bucket}/{scope} user={user} passw={pwd}")
         if not user:
             logger.error(f"no credentials found for scope {bucket}/{scope}")
             raise RuntimeError(
