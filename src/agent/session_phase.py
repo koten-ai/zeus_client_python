@@ -37,7 +37,7 @@ async def setup_contract_and_session(
     else:
         logger.info(
             "run_agent: NO contract binding resolved for this scope/mode — "
-            "/v1/session will be called with empty contract_id/hash"
+            "/v2/session will be called with empty contract_id/hash"
         )
     trace["contract"] = {"id": contract_id, "hash": contract_hash or ""}
 
@@ -127,7 +127,7 @@ async def setup_contract_and_session(
             )
             init_conv = [{"role": "user", "content": user_msg}]
             trace["notes"].append(
-                f"about to POST /v1/session with contract_id={contract_id} "
+                f"about to POST /v2/session with contract_id={contract_id} "
                 f"contract_hash={contract_hash}"
             )
             cstatus, cbody, c_url, creq = await create_zeus_session(
@@ -150,7 +150,7 @@ async def setup_contract_and_session(
                 )
             else:
                 err_detail = str(cbody)[:300] if cbody else f"HTTP {cstatus}"
-                create_req_note = f" (Zeus req_id for the failed /v1/session: {creq})" if creq else ""
+                create_req_note = f" (Zeus req_id for the failed /v2/session: {creq})" if creq else ""
                 session_notes.append(f"session create failed {cstatus}: {err_detail}{create_req_note}")
                 trace["session"] = {
                     "created": False, "id": "", "round": 1,

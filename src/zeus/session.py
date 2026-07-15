@@ -12,7 +12,8 @@ async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_has
     """Phase C: open a durable session (round 1 head + shard). Returns
     (status, body_or_text, url, req_id). On success body contains
     session_id, round, hash, contract_status, max_rounds."""
-    url = f"{zeus_url}/v1/session"
+    # Durable session routes are V2-only (Zeus RELEASE_NOTES ZE-35).
+    url = f"{zeus_url}/v2/session"
     payload = {
         "contract_id": contract_id or "",
         "contract_hash": contract_hash or "",
@@ -47,7 +48,7 @@ async def continue_session_turn(zeus_url, session_id, client_round, chat_request
     if not session_id:
         logger.warning("continue_session_turn: called with empty session_id")
         return 0, "no session_id", "", ""
-    url = f"{zeus_url}/v1/session/{session_id}/turn"
+    url = f"{zeus_url}/v2/session/{session_id}/turn"
     payload = {
         "round": int(client_round),
         "chat_request": chat_request or {},
@@ -83,7 +84,7 @@ async def post_session_trace(zeus_url, session_id, client_round, req_id,
     if not session_id or client_round <= 0:
         logger.warning("post_session_trace: bad params (no sid or round<=0)")
         return 0, "bad trace params", "", ""
-    url = f"{zeus_url}/v1/session/trace"
+    url = f"{zeus_url}/v2/session/trace"
     payload = {
         "session_id": session_id,
         "round": int(client_round),
@@ -121,7 +122,7 @@ async def rehydrate_session(zeus_url, session_id, rounds=6, zeus_headers=None):
     Returns the aggregated SessionDoc (with Conversation list) or None."""
     if not session_id:
         return None
-    url = f"{zeus_url}/v1/session/{session_id}?rounds={int(rounds)}"
+    url = f"{zeus_url}/v2/session/{session_id}?rounds={int(rounds)}"
     headers = zeus_headers or {}
     try:
         r = await client().get(url, headers=headers, timeout=TOOL_TIMEOUT)

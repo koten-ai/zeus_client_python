@@ -80,10 +80,10 @@ async def dispatch_zeus_call(api_version, zeus_url, bucket, scope, collection, n
 
 # ── Zeus session + contract + trace (per CHAT_REQUEST_CONTRACT_AND_SESSION_TRACE_IDEA.md) ──
 # These implement the durable middle-man contract for external chats:
-#   - POST /v1/session  (bind contract_id+hash + chat_request rules + initial conv) → sid + contract_status
-#   - GET  /v1/session/{sid}?rounds=N  (scatter/gather rehydrate)
-#   - POST /v1/session/{sid}/turn  (CAS+round guard + append immutable shard)
-#   - POST /v1/session/trace (delta + join on X-Zeus-Req-Id for Detective attribution)
+#   - POST /v2/session  (bind contract_id+hash + chat_request rules + initial conv) → sid + contract_status
+#   - GET  /v2/session/{sid}?rounds=N  (scatter/gather rehydrate)
+#   - POST /v2/session/{sid}/turn  (CAS+round guard + append immutable shard)
+#   - POST /v2/session/trace (delta + join on X-Zeus-Req-Id for Detective attribution)
 # Correlation headers (X-Zeus-Chat-Id etc) are sent on every tool dispatch so
 # the tracebundle + external traces can be joined in /admin/debug/req/{req_id}.
 # contract_status (match|drift|none) is returned on create/trace and recorded
