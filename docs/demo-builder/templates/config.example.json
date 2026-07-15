@@ -1,0 +1,58 @@
+{
+  "build_version": "",
+  "_comment": "Demo Builder Kit template. Travel values match demo_travel_sample/config.example.json. For other domains replace bucket/mode/schema via DOMAIN_CUSTOMIZATION.md. Never commit secrets.",
+
+  "zeus": {
+    "url": "http://host.docker.internal:8080",
+    "auth_mode": "basic",
+    "username": "demo_1",
+    "password": "",
+    "bearer_token": "",
+    "session_id": "",
+    "scope_credentials": {
+      "travel-sample/_default": { "username": "demo_1", "password": "" }
+    },
+    "scope_contracts": {
+      "travel-sample/_default": {
+        "travel_booking": {
+          "contract_id": "travel_booking_v2",
+          "contract_hash": ""
+        },
+        "analytics": {
+          "contract_id": "analytics_v4",
+          "contract_hash": ""
+        }
+      }
+    },
+    "enable_durable_sessions": true
+  },
+
+  "llm_provider": {
+    "label": "xAI Grok",
+    "base_url": "https://api.x.ai/v1",
+    "api_key": "",
+    "models": [
+      "grok-4-1-fast-non-reasoning",
+      "grok-4-1-fast-reasoning",
+      "grok-4",
+      "grok-3-mini"
+    ]
+  },
+
+  "chat_requests_sync": {
+    "scopes": "from_contracts",
+    "modes": ["travel_booking", "analytics"],
+    "on_startup": true
+  },
+
+  "default_api_version": "v2",
+  "default_mode": "travel_booking",
+  "default_sample": "travel-sample",
+  "samples": {
+    "travel-sample": {
+      "bucket": "travel-sample",
+      "scope": "_default",
+      "collection": "_default"
+    }
+  }
+}

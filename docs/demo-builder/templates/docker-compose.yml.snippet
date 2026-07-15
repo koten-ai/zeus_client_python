@@ -1,0 +1,22 @@
+# Demo Builder Kit — docker-compose snippet
+# Adjust service name, build context, and ZEUS_URL for your environment.
+
+services:
+  demo:
+    build:
+      context: ..
+      dockerfile: demo_<domain>/Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      ZEUS_URL: http://host.docker.internal:8080
+      ZEUS_CLIENT_CONFIG_DIR: /app
+      ZEUS_CHAT_REQUESTS_DIR: /app/data/chat_requests
+    volumes:
+      # Mount config with secrets (do not bake keys into the image)
+      - ./config.json:/app/config.json:ro
+      # Optional hot-reload for local dev
+      # - ./src:/app/src
+      # - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,26 @@
+"""Concrete zeus_data allowlist for demo cards (recipe R06).
+
+Passed as output_schema to run_agent(structured=True).
+Replace entity types and fields for your domain.
+"""
+from __future__ import annotations
+
+# Card-facing fields only — not full document dumps.
+_CARD_FIELDS = (
+    "id",
+    "name",
+    "title",
+    "description",
+    "summary",
+    "image",
+    "image_url",
+    "url",
+    # TODO: add domain fields
+)
+
+# entity_type → allowed field names
+DEMO_OUTPUT_SCHEMA: dict[str, list[str]] = {
+    # "Hotel": list(_CARD_FIELDS),
+    # "Destination": list(_CARD_FIELDS),
+    "REPLACE_ENTITY": list(_CARD_FIELDS),
+}
