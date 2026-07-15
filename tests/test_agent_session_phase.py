@@ -64,7 +64,7 @@ async def test_matching_stamped_hash_no_warning(http_client, monkeypatch):
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:same"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         201, json={"session_id": "sess-match", "round": 1, "contract_status": "match"},
     ))
     monkeypatch.setattr(
@@ -88,7 +88,7 @@ async def test_bound_hash_differs_from_loaded(http_client, monkeypatch):
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:bound"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         201, json={"session_id": "sess-diff", "round": 1, "contract_status": "match"},
     ))
     monkeypatch.setattr(
@@ -111,7 +111,7 @@ async def test_new_session_create_success(http_client, monkeypatch):
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:h"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         201,
         json={"session_id": "sess-new-123", "round": 1, "contract_status": "match"},
         headers={"X-Zeus-Req-Id": "creq-ok"},
@@ -144,7 +144,7 @@ async def test_new_session_create_failure_409_regex_exception(http_client, monke
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:h"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         409, text='{"error":"payload_hash","payload_hash":"md5:zeus"}', headers={"X-Zeus-Req-Id": "creq-x"},
     ))
 
@@ -171,7 +171,7 @@ async def test_new_session_create_failure_409_payload_hash_no_regex_match(http_c
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:h"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         409, text='{"error":"payload_hash missing md5 form"}', headers={"X-Zeus-Req-Id": "creq-nomatch"},
     ))
     result = await setup_contract_and_session(
@@ -189,7 +189,7 @@ async def test_new_session_create_failure_409_without_payload_hash(http_client):
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:h"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         409, text='{"error":"conflict"}', headers={"X-Zeus-Req-Id": "creq-409"},
     ))
     result = await setup_contract_and_session(
@@ -208,7 +208,7 @@ async def test_new_session_create_failure_409_extracts_payload_hash(http_client)
     }
     trace = _trace()
     err_body = '{"error":"conflict","payload_hash":"md5:zeus-extracted"}'
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         409, text=err_body, headers={"X-Zeus-Req-Id": "creq-extract"},
     ))
     result = await setup_contract_and_session(
@@ -227,7 +227,7 @@ async def test_new_session_create_failure_with_409_payload_hash(http_client):
     }
     trace = _trace()
     err_body = '{"error":"conflict","payload_hash":"md5:zeus-computed"}'
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         409, text=err_body, headers={"X-Zeus-Req-Id": "creq-fail"},
     ))
 
@@ -245,7 +245,7 @@ async def test_new_session_create_failure_with_409_payload_hash(http_client):
 async def test_no_contract_id_session_still_created(http_client):
     zcfg = {"enable_durable_sessions": True}
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         200, json={"session_id": "sess-no-contract", "round": 1, "contract_status": "none"},
     ))
     result = await setup_contract_and_session(
@@ -263,7 +263,7 @@ async def test_hash_compute_exception_non_fatal(monkeypatch, http_client):
         "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "h"}},
     }
     trace = _trace()
-    respx.post(f"{ZEUS_URL}/v1/session").mock(return_value=httpx.Response(
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
         200, json={"session_id": "s1", "round": 1, "contract_status": "match"},
     ))
     monkeypatch.setattr(
@@ -284,7 +284,7 @@ async def test_rehydrate_existing_session_success(http_client, monkeypatch):
     zcfg = {"enable_durable_sessions": True}
     trace = _trace()
     sid = "existing-sid-99"
-    respx.get(f"{ZEUS_URL}/v1/session/{sid}?rounds=6").mock(return_value=httpx.Response(
+    respx.get(f"{ZEUS_URL}/v2/session/{sid}?rounds=6").mock(return_value=httpx.Response(
         200, json={"round": 2, "conversation": [{"role": "user"}, {"role": "assistant"}]},
     ))
     result = await setup_contract_and_session(
@@ -301,7 +301,7 @@ async def test_rehydrate_failure_continues(http_client):
     zcfg = {"enable_durable_sessions": True}
     trace = _trace()
     sid = "stale-sid"
-    respx.get(f"{ZEUS_URL}/v1/session/{sid}?rounds=6").mock(return_value=httpx.Response(404))
+    respx.get(f"{ZEUS_URL}/v2/session/{sid}?rounds=6").mock(return_value=httpx.Response(404))
     result = await setup_contract_and_session(
         ZEUS_URL, zcfg, BUCKET, SCOPE, "auto", _chat_req(), "hi",
         sid, 1, trace, "", "", HEADERS,
@@ -327,8 +327,8 @@ async def test_commit_just_created_session(http_client):
         "session": {"created": True, "contract_status": "match"},
     }
     sid = "sess-commit"
-    respx.post(f"{ZEUS_URL}/v1/session/trace").mock(return_value=httpx.Response(200, json={}))
-    turn_route = respx.post(f"{ZEUS_URL}/v1/session/{sid}/turn").mock(
+    respx.post(f"{ZEUS_URL}/v2/session/trace").mock(return_value=httpx.Response(200, json={}))
+    turn_route = respx.post(f"{ZEUS_URL}/v2/session/{sid}/turn").mock(
         return_value=httpx.Response(200, json={"round": 2}, headers={"X-Zeus-Req-Id": "turn-req"}),
     )
     delta = [
@@ -350,8 +350,8 @@ async def test_commit_just_created_session(http_client):
 async def test_commit_existing_session_turn(http_client):
     trace = {"notes": [], "session": {"created": False, "contract_status": "match"}}
     sid = "sess-existing"
-    respx.post(f"{ZEUS_URL}/v1/session/trace").mock(return_value=httpx.Response(500, text="trace-fail"))
-    respx.post(f"{ZEUS_URL}/v1/session/{sid}/turn").mock(return_value=httpx.Response(400, text="bad"))
+    respx.post(f"{ZEUS_URL}/v2/session/trace").mock(return_value=httpx.Response(500, text="trace-fail"))
+    respx.post(f"{ZEUS_URL}/v2/session/{sid}/turn").mock(return_value=httpx.Response(400, text="bad"))
     meta = await commit_session_turn(
         ZEUS_URL, sid, True, 3, "cid", "hash", {}, [{"role": "assistant", "content": "x"}],
         [{"role": "user"}], [("req-x", "get", 500, "err", "http://z")], trace, HEADERS,
@@ -366,8 +366,8 @@ async def test_commit_existing_session_turn(http_client):
 async def test_commit_skips_empty_req_id(http_client):
     trace = {"notes": [], "session": {"created": False, "contract_status": "match"}}
     sid = "sess-skip-rid"
-    respx.post(f"{ZEUS_URL}/v1/session/trace").mock(return_value=httpx.Response(200, json={}))
-    respx.post(f"{ZEUS_URL}/v1/session/{sid}/turn").mock(return_value=httpx.Response(200, json={}))
+    respx.post(f"{ZEUS_URL}/v2/session/trace").mock(return_value=httpx.Response(200, json={}))
+    respx.post(f"{ZEUS_URL}/v2/session/{sid}/turn").mock(return_value=httpx.Response(200, json={}))
     meta = await commit_session_turn(
         ZEUS_URL, sid, True, 1, "cid", "hash", {}, [{"role": "assistant", "content": "x"}],
         [], [("", "find", 200, "ok", "http://z/find"), ("req-ok", "get", 200, "ok", "http://z/get")],

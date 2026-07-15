@@ -65,7 +65,7 @@ def test_trailing_newline_plus_scope_brief_merge_stable():
 
     Regression: a trailing ``\\n`` on messages[0].content was kept in the stamp
     (no brief) but removed by strip-for-hash after merge_scope_brief (brief
-    present), producing 409 contract_mismatch on /v1/session.
+    present), producing 409 contract_mismatch on /v2/session.
     """
     from copy import deepcopy
 

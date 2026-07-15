@@ -628,7 +628,7 @@ def tools_from_chat_request(chat_req: dict) -> list:
 
     Standardized V2 catalogs carry ``verbs``; legacy shapes may use ``tools``.
     Resolve at LLM-call time only — do not copy verbs→tools during load, because
-    adding ``tools`` changes the contract hash Zeus computes on /v1/session.
+    adding ``tools`` changes the contract hash Zeus computes on /v2/session.
     """
     if not isinstance(chat_req, dict):
         return []

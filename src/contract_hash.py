@@ -142,7 +142,7 @@ def resolve_session_contract_hash(
     stamped_hash: str,
     payload_hash: str,
 ) -> tuple[str, str]:
-    """Pick ``contract_hash`` for ``/v1/session`` APIs.
+    """Pick ``contract_hash`` for ``/v2/session`` APIs.
 
     Zeus compares ``contract_hash`` to the hash of the ``chat_request`` body.
     Config bindings and embedded stamps are advisory; when they drift from the
@@ -170,7 +170,7 @@ def extract_stamped_hash(doc: dict) -> str:
       - also looks inside a possible "stamped_chat_request" wrapper
 
     When present, middle-man code should use this directly for the
-    contract_hash sent on /v1/session (and traces). No local recompute,
+    contract_hash sent on /v2/session (and traces). No local recompute,
     no drift risk from strip differences. Only fall back to
     compute_contract_hash for completely unstamped/legacy files or offline mode.
 

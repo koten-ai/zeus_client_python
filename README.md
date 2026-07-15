@@ -31,7 +31,7 @@ flowchart LR
 
 1. **Auth** — `resolve_zeus_auth` mints or reuses Zeus session headers (per scope when configured).
 2. **Load catalog** — `load_chat_request` resolves a stamped `chat_request` from the user sync dir, then bundled package data. If the on-disk file has no `## SCOPE BRIEF`, the client borrows the live brief from Zeus and merges it in (brief content is stripped before hashing).
-3. **Contract + session** — `resolve_contract_for_scope` binds `contract_id` / `contract_hash` from config. When durable sessions are enabled, the client creates a new `/v1/session` or rehydrates an existing one, preferring the server-stamped hash embedded in the catalog file.
+3. **Contract + session** — `resolve_contract_for_scope` binds `contract_id` / `contract_hash` from config. When durable sessions are enabled, the client creates a new `/v2/session` or rehydrates an existing one, preferring the server-stamped hash embedded in the catalog file.
 4. **LLM rounds** — multi-round tool loop: provider chat completion → Zeus dispatch (V1 tools or V2 verbs) → optional hook interception.
 5. **Commit turn** — per-dispatch trace shards plus a turn shard via `post_session_trace` / `continue_session_turn`.
 6. **Audit** — runtime contract checks appended to `trace["notes"]`.
@@ -129,7 +129,7 @@ Zeus settings live under a single top-level `zeus` object. Use `resolve_zeus_con
 | `session_id` | Reuse an existing Zeus session when `auth_mode` is `session` |
 | `scope_credentials` | Per-scope basic auth, keyed by `bucket/scope` |
 | `scope_contracts` | Per-scope contract bindings (`contract_id`, `contract_hash`, mode keys) |
-| `enable_durable_sessions` | Create/rehydrate `/v1/session` across agent turns |
+| `enable_durable_sessions` | Create/rehydrate `/v2/session` across agent turns |
 
 Runtime URL override (not written back to `config.json`):
 
@@ -326,15 +326,15 @@ Returned as JSON when `httpx` fails (status `0`). Zeus HTTP `4xx`/`5xx` return t
 
 | `error` code / message | Likely cause | Fix |
 |------------------------|--------------|-----|
-| `session_create_failed` | Transport error on `POST /v1/session` | Check Zeus URL, auth, and session collections (`[redacted-server-script]` on server) |
-| `session_turn_failed` | Transport error on `POST /v1/session/{id}/turn` | Same; confirm `session_id` is valid |
-| `session_trace_failed` | Transport error on `POST /v1/session/trace` | Same; trace posting is best-effort |
+| `session_create_failed` | Transport error on `POST /v2/session` | Check Zeus URL, auth, and session collections (`[redacted-server-script]` on server) |
+| `session_turn_failed` | Transport error on `POST /v2/session/{id}/turn` | Same; confirm `session_id` is valid |
+| `session_trace_failed` | Transport error on `POST /v2/session/trace` | Same; trace posting is best-effort |
 | `no session_id` | `continue_session_turn` called with empty id | Ensure session create succeeded or pass `zeus_session_id` from prior `session_meta` |
 | `bad trace params` | Missing session id or `round <= 0` for trace post | Fix session state before commit |
 | HTTP `409` + `payload_hash` in body | Client `contract_hash` does not match Zeus-computed hash | Re-verify catalog in Zeus UI, sync stamped file, align `scope_contracts` hash with stamped `contract.hash` |
 | `trace {status}` / `turn {status}` in `trace["session_error"]` | Trace or turn shard POST returned non-success | Inspect Zeus logs via `X-Zeus-Req-Id`; check round numbering and session expiry |
 | `contract_mismatch` / `Session tracking failed` (server text) | Bound contract drifted from server expectation | Sync fresh stamped catalog; update `scope_contracts`; see runtime audit in `trace["notes"]` |
-| Rehydrate failed (note only) | `GET /v1/session/{id}` empty or error | Session may have expired; omit `zeus_session_id` to create a new session |
+| Rehydrate failed (note only) | `GET /v2/session/{id}` empty or error | Session may have expired; omit `zeus_session_id` to create a new session |
 
 Set `zeus.enable_durable_sessions: false` to skip session APIs when the server lacks session support.
 
