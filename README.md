@@ -182,6 +182,39 @@ In the normal flow you do **not** compute hashes on the client. Verify a standar
 
 `compute_contract_hash` remains for offline diagnostics and legacy unstamped files only.
 
+### Lint catalog rules (open-surface conflicts)
+
+Operators can inject unbounded rules into **hash-excluded** surfaces (`guidance.*`, especially `guidance.injections.business_logic` and `guidance.optimal_paths`). Over time those rules can contradict each other. The client ships a **read-only** heuristic linter (ZC-35) that scores open-rule consistency without rewriting contract-locked content.
+
+| Layer | Paths | Linter role |
+|-------|-------|-------------|
+| **Contract-locked** (hashed) | `instructions.*`, `masq`, `verbs` / `tools`, `messages[*].content` before SCOPE BRIEF | Never rewritten; not “fixed” by the tool |
+| **Open inserts** (hash-excluded) | entire `guidance` tree, `contract`, `metadata`, `_*`, post-brief injects | Primary conflict inventory |
+
+```python
+from zeus_client import lint_chat_request, hash_policy_summary
+
+report = lint_chat_request(chat_req)
+print(report.conflict_score, report.severity)  # 0–100, none|low|medium|high
+for f in report.findings:
+    print(f.severity, f.check_id, f.message, f.path_a, f.path_b)
+
+print(hash_policy_summary())  # locked vs open path tables
+```
+
+CLI:
+
+```bash
+python scripts/lint_chat_request.py path/to/chat_request.json
+python scripts/lint_chat_request.py path/to/chat_request.json --json
+python scripts/lint_chat_request.py --policy
+python scripts/lint_chat_request.py path/to/chat_request.json --fail-on high  # CI gate
+```
+
+When `guidance.debug` is true, `run_agent` also attaches a compact report to `trace["catalog_lint"]` and a one-line note (never blocks the turn).
+
+Heuristic checks include always/never modality pairs, exclusive preferred tools, structured `deny_when` vs `require` clashes, duplicate rules, optimal_paths pipeline shape, and MINI-SCHEMA orphans. This is complementary to contract verify and to runtime `audit_rows_against_rules`.
+
 ## Structured responses
 
 Pass `structured=True` to `run_agent` to receive schema-filtered Zeus rows alongside the natural-language answer:
@@ -239,6 +272,7 @@ Key exports from `import zeus_client`:
 | `load_chat_request`, `list_chat_requests` | Catalog loading and discovery |
 | `resolve_contract_for_scope` | Contract binding |
 | `compute_contract_hash`, `extract_stamped_hash` | Stamped hash read + offline fallback |
+| `lint_chat_request`, `ConflictReport`, `Finding`, `hash_policy_summary` | Open-rule conflict lint (ZC-35) |
 | `resolve_zeus_auth`, `invalidate_zeus_session` | Zeus authentication |
 | `dispatch_zeus_call`, `dispatch_zeus_tool`, `dispatch_zeus_v2_verb` | Zeus API calls |
 | `create_zeus_session`, `continue_session_turn` | Durable sessions |

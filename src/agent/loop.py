@@ -21,6 +21,7 @@ from zeus_client.zeus.catalog import (
     load_chat_request,
     tools_from_chat_request,
 )
+from zeus_client.zeus.lint import lint_chat_request
 
 
 @dataclass
@@ -92,6 +93,17 @@ async def setup_turn_context(
     if _bl:
         chat_req = apply_injected_business_logic(chat_req)
         trace["notes"].append(f"business_logic: {len(_bl)} injected rule(s) merged")
+
+    # Opt-in open-rule conflict lint (ZC-35). guidance is hash-excluded; debug
+    # mode is the author-facing signal to surface catalog consistency notes.
+    # Never blocks the turn and never rewrites locked content.
+    if bool((chat_req.get("guidance") or {}).get("debug")):
+        try:
+            lint_report = lint_chat_request(chat_req)
+            trace["catalog_lint"] = lint_report.to_dict()
+            trace["notes"].append(lint_report.summary_line())
+        except Exception as exc:
+            trace["notes"].append(f"catalog_lint_failed: {exc}")
 
     stamped_h = ""
     current_content_h = ""

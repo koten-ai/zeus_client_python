@@ -24,6 +24,12 @@ from zeus_client.logging_setup import logger
 from zeus_client.toon import to_toon
 from zeus_client.zeus.auth import invalidate_zeus_session, resolve_zeus_auth
 from zeus_client.zeus.catalog import list_chat_requests, load_chat_request
+from zeus_client.zeus.lint import (
+    ConflictReport,
+    Finding,
+    hash_policy_summary,
+    lint_chat_request,
+)
 from zeus_client.zeus.sync import SyncResult, sync_chat_requests
 from zeus_client.zeus.contracts import resolve_contract_for_scope
 from zeus_client.zeus.dispatch import (
@@ -79,6 +85,10 @@ __all__ = [
     "load_chat_request",
     "load_config",
     "logger",
+    "ConflictReport",
+    "Finding",
+    "hash_policy_summary",
+    "lint_chat_request",
     "normalize_api_version",
     "post_session_trace",
     "rehydrate_session",
