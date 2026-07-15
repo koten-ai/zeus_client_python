@@ -29,6 +29,30 @@ logger = logging.getLogger(__name__)
 SCOPE_BRIEF_MARKER = "\n\n## SCOPE BRIEF"
 MINI_SCHEMA_MARKER = "\n\n## MINI-SCHEMA"
 
+# Mirrors server / v4 _hash_policy and _strip_for_hash below. Used by the
+# catalog conflict linter (ZC-35) and docs so "locked vs open" stays in one place.
+HASH_EXCLUDED_ROOTS: tuple[str, ...] = (
+    "guidance",   # advisory: optimal_paths, injections.business_logic, debug, …
+    "contract",   # stamp metadata only
+    "metadata",   # advisory
+    "_*",         # underscore-prefixed operator/tooling keys
+)
+# Runtime string suffixes after these markers are also stripped for hash.
+HASH_EXCLUDED_STRING_MARKERS: tuple[str, ...] = (
+    SCOPE_BRIEF_MARKER.strip(),
+    MINI_SCHEMA_MARKER.strip(),
+)
+# JSON-pointer style paths that participate in the contract hash (locked rules).
+LOCKED_POINTERS: tuple[str, ...] = (
+    "/instructions/system_prompt",
+    "/instructions/verb_usage_guide",
+    "/instructions/verb_order",
+    "/instructions/response_expectations",
+    "/masq",
+    "/verbs",
+    "/messages/*/content",
+)
+
 
 def _strip_scope_brief(content: str) -> str:
     if not isinstance(content, str):
