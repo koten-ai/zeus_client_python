@@ -1,0 +1,81 @@
+"""Domain search wrapper around zeus_client.run_agent.
+
+Recipes R05–R08. Replace TODO domain pieces.
+"""
+from __future__ import annotations
+
+# TODO: wire async_runner.run_coro for Flask; or call _search_async directly from FastAPI
+
+
+DOMAIN_PROMPT_PREFIX = (
+    # TODO: domain-specific instructions for the LLM
+    "Find results that match these preferences. "
+    "Use Zeus V2 tools to retrieve real data.\n\n"
+    "User preferences:\n"
+)
+
+
+async def _search_async(query: str, chat_id: str | None) -> dict:
+    from zeus_client import (
+        load_config,
+        normalize_api_version,
+        resolve_llm_provider_config,
+        resolve_zeus_config,
+        run_agent,
+    )
+
+    cfg = await load_config()
+    zcfg = resolve_zeus_config(cfg)
+    zeus_url = (zcfg.get("url") or "").rstrip("/")
+    if not zeus_url:
+        raise ValueError("no Zeus URL configured (edit config.json)")
+
+    provider = resolve_llm_provider_config(cfg)
+    api_key = provider.get("api_key") or ""
+    if not api_key:
+        raise ValueError("llm_provider has no api_key set (edit config.json)")
+
+    model = (provider.get("models") or ["gpt-4o"])[0]
+    api_version = normalize_api_version(cfg.get("default_api_version", "v2"))
+    mode = cfg.get("default_mode", "REPLACE_MODE")
+    sample = cfg.get("default_sample", "REPLACE_SAMPLE")
+    triple = cfg.get("samples", {}).get(sample, {})
+    bucket = triple.get("bucket", sample)
+    scope = triple.get("scope", "_default")
+    collection = triple.get("collection", "_default")
+
+    message = DOMAIN_PROMPT_PREFIX + query.strip()
+    # TODO: load prior_turns, zeus_session_id, zeus_round from chat_store
+
+    answer, trace, new_turns, session_meta, structured = await run_agent(
+        zeus_url,
+        zcfg,
+        provider.get("base_url", "").rstrip("/"),
+        api_key,
+        model,
+        api_version,
+        mode,
+        bucket,
+        scope,
+        collection,
+        message,
+        prior_turns=[],  # TODO
+        optimized=True,
+        conv_id=chat_id or "",
+        zeus_session_id="",  # TODO
+        zeus_round=0,  # TODO
+        structured=True,
+        output_schema=None,  # TODO: DEMO_OUTPUT_SCHEMA
+    )
+
+    # TODO: persist turns + session_meta; map structured.zeus_data → results[]
+    return {
+        "chat_id": chat_id,
+        "query": query,
+        "answer": answer,
+        "results": [],
+        "trace": trace,
+        "session_id": session_meta.get("session_id"),
+        "session_round": session_meta.get("round"),
+        "structured_response": structured,
+    }

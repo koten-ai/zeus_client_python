@@ -368,6 +368,21 @@ After each turn, checks are appended as `[PASS]` / `[FAIL]` lines. Common failur
 
 If the audit itself throws, `trace["notes"]` contains `runtime_audit_failed: …` (non-fatal).
 
+## Demo Builder Kit
+
+Build productized demos (NL search UI, agent loop, result cards, trace panel, Docker) using this library:
+
+| Resource | Location |
+|----------|----------|
+| **Kit (this repo)** | [`docs/demo-builder/`](docs/demo-builder/) |
+| Entry for agents | [`docs/demo-builder/AGENTS.md`](docs/demo-builder/AGENTS.md) |
+| Recipes + config | [`RECIPES.md`](docs/demo-builder/RECIPES.md), [`CONFIG.md`](docs/demo-builder/CONFIG.md) |
+| HTTP contract | [`API_CONTRACT.md`](docs/demo-builder/API_CONTRACT.md) |
+| Reference app | Sibling monorepo **TravelPlan** (`demo_travel_sample`) |
+| GitBook | Site section **Demo** → **Python** (content path `demo/python` in `koten_docs`) |
+
+Minimal programmatic agent (no UI): [`examples/minimal_agent.py`](examples/minimal_agent.py).
+
 ## Build and publish
 
 ```bash
