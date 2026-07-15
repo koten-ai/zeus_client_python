@@ -1,0 +1,270 @@
+# Demo Builder Kit — OpenAPI for TravelPlan-compatible demo HTTP API
+# Source of truth narrative: ../API_CONTRACT.md
+
+openapi: 3.0.3
+info:
+  title: Zeus Demo App API
+  version: 0.1.0
+  description: |
+    Minimal HTTP contract for Demo Builder Kit demos (TravelPlan-compatible).
+    See docs/demo-builder/API_CONTRACT.md for field semantics and examples.
+
+paths:
+  /:
+    get:
+      summary: Search UI
+      responses:
+        "200":
+          description: HTML UI with injected ZeusTraceConfig.toolOrder
+
+  /api/search:
+    post:
+      summary: Run one agent search turn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+            examples:
+              first_turn:
+                value:
+                  query: warm beaches in Europe under $2000
+              follow_up:
+                value:
+                  query: cheaper options
+                  chat_id: travel_a1b2c3d4e5f6
+      responses:
+        "200":
+          description: Search result payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSuccess"
+        "400":
+          description: Validation or config error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                empty_query:
+                  value:
+                    error: empty query
+                missing_key:
+                  value:
+                    error: llm_provider has no api_key set (edit config.json)
+        "502":
+          description: Network error to Zeus or LLM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                network:
+                  value:
+                    error: "network error: Connection refused"
+
+  /api/tool-order:
+    get:
+      summary: Tool order axes for the trace panel
+      responses:
+        "200":
+          description: v1/v2 tool name lists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolOrder"
+
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: Natural-language preferences (trimmed; empty → 400)
+        chat_id:
+          type: string
+          nullable: true
+          description: Prior conversation id for multi-turn; omit to start new
+
+    SearchSuccess:
+      type: object
+      required:
+        - chat_id
+        - query
+        - answer
+        - structured_answer
+        - structured_response
+        - results
+        - trace
+        - tool_order
+        - target
+        - api_version
+        - mode
+        - model
+        - provider
+        - zeus_connection
+        - zeus_url
+        - session_id
+        - session_round
+        - contract_status
+      properties:
+        chat_id:
+          type: string
+        query:
+          type: string
+        answer:
+          description: LLM answer (usually markdown string)
+        structured_answer:
+          nullable: true
+          description: Parsed markdown structure or null
+          oneOf:
+            - type: object
+            - type: "null"
+        structured_response:
+          $ref: "#/components/schemas/StructuredResponse"
+        results:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ResultCard"
+        trace:
+          type: object
+          description: Full agent trace from run_agent (pass-through to chat-trace panel)
+          additionalProperties: true
+        tool_order:
+          $ref: "#/components/schemas/ToolOrder"
+        target:
+          type: string
+          description: "bucket/scope/collection"
+          example: travel-sample/_default/_default
+        api_version:
+          type: string
+          example: v2
+        mode:
+          type: string
+          example: travel_booking
+        model:
+          type: string
+        provider:
+          type: string
+          example: xai
+        zeus_connection:
+          type: string
+          example: default
+        zeus_url:
+          type: string
+        session_id:
+          type: string
+        session_round:
+          type: number
+        contract_status:
+          nullable: true
+          oneOf:
+            - type: string
+            - type: "null"
+
+    ResultCard:
+      type: object
+      required: [name, description, image]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        image:
+          type: string
+        location:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        price:
+          type: string
+        url:
+          type: string
+        area:
+          type: string
+      additionalProperties:
+        type: string
+
+    StructuredResponse:
+      type: object
+      required: [answer, zeus_data, warnings]
+      properties:
+        answer:
+          type: string
+        zeus_data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        decomposition:
+          nullable: true
+          oneOf:
+            - type: object
+            - type: "null"
+        return_payload:
+          nullable: true
+          oneOf:
+            - type: object
+            - type: "null"
+        entity_type:
+          nullable: true
+          oneOf:
+            - type: string
+            - type: "null"
+        source_tool:
+          nullable: true
+          oneOf:
+            - type: string
+            - type: "null"
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ToolOrder:
+      type: object
+      required: [v1, v2]
+      properties:
+        v1:
+          type: array
+          items:
+            type: string
+        v2:
+          type: array
+          items:
+            type: string
+          example:
+            - describe
+            - explain
+            - get
+            - find
+            - set
+            - order
+            - enrich
+            - project
+            - traverse
+            - pipeline
+            - search
+            - analyze
+            - return
+
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          minLength: 1

@@ -1,0 +1,41 @@
+"""Minimal HTTP API — Flask sketch (recipe R09).
+
+For FastAPI (R02b): use async routes and call _search_async directly.
+Align response fields with docs/demo-builder/API_CONTRACT.md.
+"""
+from __future__ import annotations
+
+# from flask import Flask, jsonify, render_template, request
+# from my_package.async_runner import startup
+# from my_package.search import run_search
+# from my_package.zeus_config import configure_zeus_client
+
+
+def create_app():
+    # configure_zeus_client()
+    # startup()
+    # app = Flask(__name__, template_folder=..., static_folder=...)
+    #
+    # @app.get("/")
+    # def index():
+    #     return render_template("index.html")
+    #
+    # @app.post("/api/search")
+    # def api_search():
+    #     body = request.get_json(silent=True) or {}
+    #     query = (body.get("query") or "").strip()
+    #     if not query:
+    #         return jsonify({"error": "empty query"}), 400
+    #     result = run_search(query, body.get("chat_id"))
+    #     if result.get("error"):
+    #         status = 502 if "network error" in result["error"] else 400
+    #         return jsonify(result), status
+    #     return jsonify(result)
+    #
+    # @app.get("/api/tool-order")
+    # def api_tool_order():
+    #     from zeus_client import build_tool_order
+    #     return jsonify(build_tool_order(CHATS))
+    #
+    # return app
+    raise NotImplementedError("Uncomment and wire package imports")
