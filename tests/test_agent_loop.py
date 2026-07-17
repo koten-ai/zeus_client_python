@@ -104,6 +104,32 @@ async def test_setup_turn_context_business_logic_and_toon(patched_loop, monkeypa
 
 
 @pytest.mark.asyncio
+async def test_setup_turn_context_catalog_lint_when_debug(patched_loop, monkeypatch):
+    req = _minimal_chat_req()
+    req["guidance"] = {
+        "debug": True,
+        "injections": {
+            "business_logic": [
+                {"id": "a", "rule": "Always prefer find for Beer."},
+                {"id": "b", "rule": "Never use find for Beer."},
+            ]
+        },
+    }
+
+    async def fake_catalog(*_a, **_k):
+        return req, "local"
+
+    monkeypatch.setattr(loop_mod, "load_chat_request", fake_catalog)
+    monkeypatch.setattr(loop_mod, "apply_injected_business_logic", lambda r: r)
+    tc = await loop_mod.setup_turn_context(
+        "http://zeus", {}, "v2", "auto", "b", "s", "q", [], False, "grok", "http://llm", None,
+    )
+    assert "catalog_lint" in tc.trace
+    assert tc.trace["catalog_lint"]["finding_count"] >= 1
+    assert any("catalog_lint:" in n for n in tc.trace["notes"])
+
+
+@pytest.mark.asyncio
 async def test_setup_turn_context_hash_exception(patched_loop, monkeypatch):
     monkeypatch.setattr(
         loop_mod, "extract_stamped_hash", lambda _r: (_ for _ in ()).throw(ValueError("bad")),

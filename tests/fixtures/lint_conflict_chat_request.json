@@ -1,0 +1,141 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_comment": "ZC-35 fixture: intentionally conflicting open rules for lint tests",
+  "contract": {
+    "hash": "md5:deadbeefdeadbeefdeadbeefdeadbeef",
+    "id": "lint_fixture"
+  },
+  "instructions": {
+    "system_prompt": "BASE RULES (locked — linter must not rewrite).",
+    "verb_order": ["find", "search", "project", "pipeline", "return"]
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "BASE RULES (locked — linter must not rewrite).\n\n## SCOPE BRIEF\n\nscope: beer-sample/_default\nmode: auto\n\n## MINI-SCHEMA (per entity_type — derived from the scope's EntityMap)\n\n### Beer  (fields: 3)\n  - abv                    number       [gsi]\n  - name                   scalar_ent   [gsi]\n  - state                  scalar_ent   [gsi]\n"
+    }
+  ],
+  "verbs": [
+    {
+      "function": {
+        "name": "find",
+        "description": "find nodes",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "search",
+        "description": "search",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "project",
+        "description": "project",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "pipeline",
+        "description": "pipeline",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "return",
+        "description": "return",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    }
+  ],
+  "guidance": {
+    "debug": true,
+    "injections": {
+      "business_logic": [
+        {
+          "id": "r_always_find",
+          "rule": "Always prefer find for Beer lookups; never use search for Beer."
+        },
+        {
+          "id": "r_never_find",
+          "rule": "Never use find for Beer; always prefer search for Beer entity queries."
+        },
+        {
+          "id": "r_deny",
+          "entity_type": "Beer",
+          "fields": ["abv"],
+          "rule": "Deny high ABV beers",
+          "deny_when": {"abv": {">": 7}}
+        },
+        {
+          "id": "r_require",
+          "entity_type": "Beer",
+          "fields": ["abv"],
+          "rule": "Require very high ABV",
+          "require": {"abv": {">=": 8}}
+        },
+        {
+          "id": "r_orphan",
+          "entity_type": "Wine",
+          "fields": ["vintage"],
+          "rule": "Only French wines."
+        },
+        {
+          "id": "r_dup",
+          "rule": "Be concise in final answers."
+        },
+        {
+          "id": "r_dup2",
+          "rule": "Be concise in final answers."
+        }
+      ]
+    },
+    "optimal_paths": [
+      {
+        "intent": "rows lookup via find",
+        "when_to_use": "Most common case for show me Beer rows",
+        "intent_pattern": {
+          "output": "rows",
+          "target_entity_types": ["Beer", "*"]
+        },
+        "pipeline": [
+          {"verb": "find", "as": "cands", "params": {"entity_type": "Beer"}},
+          {"verb": "project", "as": "result", "params": {"ids": "@cands"}}
+        ],
+        "return": ["result"]
+      },
+      {
+        "intent": "rows lookup via search",
+        "when_to_use": "Most common case for show me Beer rows with free text",
+        "intent_pattern": {
+          "output": "rows",
+          "target_entity_types": ["Beer"]
+        },
+        "pipeline": [
+          {"verb": "search", "as": "hits", "params": {"entity_type": "Beer"}},
+          {"verb": "project", "as": "result", "params": {"ids": "@hits"}}
+        ],
+        "return": ["result"]
+      },
+      {
+        "intent": "broken pipeline shape",
+        "when_to_use": "Broken example for structural checks",
+        "pipeline": [
+          {"verb": "teleport", "params": {}},
+          {"verb": "find", "as": "x", "params": {}}
+        ],
+        "return": ["find"]
+      }
+    ]
+  },
+  "metadata": {"tags": ["lint-fixture"]}
+}
