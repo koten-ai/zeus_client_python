@@ -8,6 +8,7 @@ SYMBOLS = [
     "compute_contract_hash", "extract_stamped_hash", "client", "logger",
     "BASE_DIR", "MAX_ROUNDS", "normalize_api_version", "to_toon", "resolve_zeus_auth",
     "dispatch_zeus_call", "create_zeus_session", "rehydrate_session", "ZeusClient",
+    "lint_chat_request", "ConflictReport", "Finding", "hash_policy_summary",
 ]
 
 
