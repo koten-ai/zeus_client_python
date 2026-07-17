@@ -21,7 +21,7 @@ from zeus_client.zeus.catalog import (
     load_chat_request,
     tools_from_chat_request,
 )
-from zeus_client.zeus.lint import lint_chat_request
+from zeus_client.zeus.lint import lint_catalog_assembled, resolve_lint_config
 
 
 @dataclass
@@ -94,16 +94,19 @@ async def setup_turn_context(
         chat_req = apply_injected_business_logic(chat_req)
         trace["notes"].append(f"business_logic: {len(_bl)} injected rule(s) merged")
 
-    # Opt-in open-rule conflict lint (ZC-35). guidance is hash-excluded; debug
-    # mode is the author-facing signal to surface catalog consistency notes.
+    # Assemble-time catalog lint (ZC-35 soft + ZC-36 hard / open-vs-locked).
+    # Cached by (contract_hash, open_rules_hash); not re-run every tool round.
     # Never blocks the turn and never rewrites locked content.
-    if bool((chat_req.get("guidance") or {}).get("debug")):
-        try:
-            lint_report = lint_chat_request(chat_req)
-            trace["catalog_lint"] = lint_report.to_dict()
+    # Enable via guidance.debug, guidance.catalog_lint.mode, or ZEUS_CATALOG_LINT_MODE.
+    try:
+        lint_cfg = resolve_lint_config(chat_req)
+        if lint_cfg.should_run_in_agent():
+            lint_report = lint_catalog_assembled(chat_req, config=lint_cfg)
+            if lint_cfg.attach_full_report_to_trace() or lint_report.hard_finding_count or lint_report.open_vs_locked_count:
+                trace["catalog_lint"] = lint_report.to_dict()
             trace["notes"].append(lint_report.summary_line())
-        except Exception as exc:
-            trace["notes"].append(f"catalog_lint_failed: {exc}")
+    except Exception as exc:
+        trace["notes"].append(f"catalog_lint_failed: {exc}")
 
     stamped_h = ""
     current_content_h = ""

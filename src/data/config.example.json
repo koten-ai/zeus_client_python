@@ -39,6 +39,16 @@
     "on_startup": false
   },
 
+  "_comment_catalog_lint": "Optional client-wide defaults. Prefer guidance.catalog_lint on each chat_request for per-catalog control. Env: ZEUS_CATALOG_LINT_MODE, ZEUS_CATALOG_LINT_FAIL_ON.",
+  "catalog_lint": {
+    "mode": "off",
+    "hard_conflicts": true,
+    "soft_nl": true,
+    "open_vs_locked": true,
+    "deep_llm": false,
+    "fail_on": "none"
+  },
+
   "default_api_version": "v2",
   "default_mode": "analytics",
   "default_sample": "beer-sample",
