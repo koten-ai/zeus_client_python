@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-from zeus_client.contract_hash import extract_stamped_hash
+from zeus_client.contract_hash import extract_stamped_hash, heal_trailing_ws_stamp_drift
 from zeus_client.constants import (
     AUTH_TIMEOUT,
     bundled_chat_requests_dir,
@@ -687,6 +687,10 @@ async def load_chat_request(zeus_url, api_version, mode, bucket, scope, zeus_hea
 
     doc = await asyncio.to_thread(lambda: json.loads(path.read_text()))
     doc = _normalize_chat_request_shape(doc)
+    # Heal before brief merge: trailing system-prompt whitespace is kept in a
+    # no-brief stamp but TrimRight'd after live SCOPE BRIEF injection, which
+    # otherwise fails "Embedded hash matches compute on loaded object".
+    doc = heal_trailing_ws_stamp_drift(doc)
     embedded_h = extract_stamped_hash(doc)
     has_contract = bool(embedded_h)
     logger.info(f"loaded catalog from {path.name} (has_embedded_contract={has_contract})")
