@@ -87,6 +87,55 @@ def test_trailing_newline_plus_scope_brief_merge_stable():
     assert "## SCOPE BRIEF" in merged["messages"][0]["content"]
 
 
+def test_heal_trailing_ws_stamp_drift_rewrites_stamp_and_stabilizes_merge():
+    """Stamp of rules text with trailing newline must match post-brief-merge hash after heal."""
+    from copy import deepcopy
+
+    from zeus_client.contract_hash import heal_trailing_ws_stamp_drift
+    from zeus_client.zeus.catalog import merge_scope_brief
+
+    clean = {
+        "messages": [{"role": "system", "content": "rules only"}],
+        "instructions": {"system_prompt": "marker only"},
+        "verbs": [{"type": "function", "function": {"name": "find"}}],
+    }
+    h_clean = compute_contract_hash(clean)
+
+    dirty = deepcopy(clean)
+    dirty["messages"][0]["content"] = "rules only\n"
+    h_dirty = compute_contract_hash(dirty)
+    assert h_dirty != h_clean
+    dirty["contract"] = {"hash": h_dirty, "builder": "test@verify"}
+    dirty["_hash"] = h_dirty
+
+    # Without heal: brief merge changes the content hash vs embedded stamp.
+    merged_dirty = merge_scope_brief(deepcopy(dirty), "## SCOPE BRIEF\nscope: demo/_default")
+    assert compute_contract_hash(merged_dirty) == h_clean
+    assert extract_stamped_hash(merged_dirty) == h_dirty
+    assert extract_stamped_hash(merged_dirty) != compute_contract_hash(merged_dirty)
+
+    healed = heal_trailing_ws_stamp_drift(dirty)
+    assert extract_stamped_hash(healed) == h_clean
+    assert compute_contract_hash(healed) == h_clean
+    assert healed["messages"][0]["content"] == "rules only"
+    assert healed.get("_hash") == h_clean
+
+    merged = merge_scope_brief(healed, "## SCOPE BRIEF\nscope: demo/_default")
+    assert extract_stamped_hash(merged) == compute_contract_hash(merged) == h_clean
+
+
+def test_heal_trailing_ws_stamp_drift_skips_unrelated_stamp_mismatch():
+    from zeus_client.contract_hash import heal_trailing_ws_stamp_drift
+
+    doc = {
+        "messages": [{"role": "system", "content": "rules only\n"}],
+        "contract": {"hash": "md5:not-the-real-compute"},
+    }
+    out = heal_trailing_ws_stamp_drift(doc)
+    assert out is doc
+    assert extract_stamped_hash(out) == "md5:not-the-real-compute"
+
+
 def test_extract_stamped_hash_priority():
     doc = {
         "contract": {"hash": "md5:TO_BE_FILLED"},
