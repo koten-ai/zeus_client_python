@@ -184,22 +184,45 @@ In the normal flow you do **not** compute hashes on the client. Verify a standar
 
 ### Lint catalog rules (open-surface conflicts)
 
-Operators can inject unbounded rules into **hash-excluded** surfaces (`guidance.*`, especially `guidance.injections.business_logic` and `guidance.optimal_paths`). Over time those rules can contradict each other. The client ships a **read-only** heuristic linter (ZC-35) that scores open-rule consistency without rewriting contract-locked content.
+Operators can inject unbounded rules into **hash-excluded** surfaces (`guidance.*`, especially `guidance.injections.business_logic` and `guidance.optimal_paths`). Over time those rules can contradict each other. The client ships a **read-only** linter:
 
-| Layer | Paths | Linter role |
-|-------|-------|-------------|
-| **Contract-locked** (hashed) | `instructions.*`, `masq`, `verbs` / `tools`, `messages[*].content` before SCOPE BRIEF | Never rewritten; not “fixed” by the tool |
+| Version | What it does |
+|---------|----------------|
+| **V1 (ZC-35)** | Soft / advisory NL heuristics (always/never, duplicates, optimal_paths hygiene) |
+| **V2 (ZC-36)** | Structured open-rule effects + deterministic **hard** conflicts, **open-vs-locked** checks, assemble-time **cache** |
+
+| Surface | Paths | Linter role |
+|---------|-------|-------------|
+| **Contract-locked** (hashed) | `instructions.*`, `masq`, `verbs` / `tools`, `messages[*].content` before SCOPE BRIEF | Never rewritten; open-vs-locked may *flag* opposition |
 | **Open inserts** (hash-excluded) | entire `guidance` tree, `contract`, `metadata`, `_*`, post-brief injects | Primary conflict inventory |
 
+Structured open rules (hard lint source of truth) look like:
+
+```json
+{
+  "id": "ban-find-beer",
+  "effect": "forbid_tool",
+  "tool": "find",
+  "when": { "entity_type": "Beer" },
+  "source": "plugin",
+  "kind": "routing",
+  "rule": "Do not use find for Beer."
+}
+```
+
 ```python
-from zeus_client import lint_chat_request, hash_policy_summary
+from zeus_client import lint_chat_request, lint_catalog_assembled, hash_policy_summary
 
 report = lint_chat_request(chat_req)
-print(report.conflict_score, report.severity)  # 0–100, none|low|medium|high
+print(report.conflict_score, report.severity)  # score secondary; hard counts primary
+print(report.hard_finding_count, report.soft_finding_count, report.open_vs_locked_count)
 for f in report.findings:
-    print(f.severity, f.check_id, f.message, f.path_a, f.path_b)
+    print(f.layer, f.severity, f.check_id, f.message)
 
-print(hash_policy_summary())  # locked vs open path tables
+# Assemble-time (cached by contract hash + open rules hash)
+report = lint_catalog_assembled(chat_req)  # respects guidance.catalog_lint / env
+
+print(hash_policy_summary())
 ```
 
 CLI:
@@ -208,12 +231,21 @@ CLI:
 python scripts/lint_chat_request.py path/to/chat_request.json
 python scripts/lint_chat_request.py path/to/chat_request.json --json
 python scripts/lint_chat_request.py --policy
-python scripts/lint_chat_request.py path/to/chat_request.json --fail-on high  # CI gate
+python scripts/lint_chat_request.py --schema          # structured open-rule schema
+python scripts/lint_chat_request.py path/to/chat_request.json --fail-on hard  # CI
 ```
 
-When `guidance.debug` is true, `run_agent` also attaches a compact report to `trace["catalog_lint"]` and a one-line note (never blocks the turn).
+Config (per catalog `guidance.catalog_lint`, or env `ZEUS_CATALOG_LINT_MODE` / `ZEUS_CATALOG_LINT_FAIL_ON`):
 
-Heuristic checks include always/never modality pairs, exclusive preferred tools, structured `deny_when` vs `require` clashes, duplicate rules, optimal_paths pipeline shape, and MINI-SCHEMA orphans. This is complementary to contract verify and to runtime `audit_rows_against_rules`.
+```text
+mode: off | assemble | debug | ci
+hard_conflicts / soft_nl / open_vs_locked: bool
+fail_on: none | hard | high | medium | low   # chat never fails; CI uses hard
+```
+
+When `guidance.debug` is true (or mode is `assemble`/`debug`/`ci`), `run_agent` runs assemble-time lint **once per catalog fingerprint** (cached), attaches `trace["catalog_lint"]` in debug/ci or when hard findings exist, and never blocks the turn on soft findings.
+
+See `.grok/guides/CHAT_REQUEST_CONFLICT_LINT.md` for V1 vs V2 detail, migration from free-text, and limitations of locked-side extraction.
 
 ## Structured responses
 
@@ -272,7 +304,7 @@ Key exports from `import zeus_client`:
 | `load_chat_request`, `list_chat_requests` | Catalog loading and discovery |
 | `resolve_contract_for_scope` | Contract binding |
 | `compute_contract_hash`, `extract_stamped_hash` | Stamped hash read + offline fallback |
-| `lint_chat_request`, `ConflictReport`, `Finding`, `hash_policy_summary` | Open-rule conflict lint (ZC-35) |
+| `lint_chat_request`, `lint_catalog_assembled`, `ConflictReport`, `Finding`, `CatalogLintConfig`, `hash_policy_summary`, `structured_rule_schema` | Open-rule conflict lint (ZC-35/ZC-36) |
 | `resolve_zeus_auth`, `invalidate_zeus_session` | Zeus authentication |
 | `dispatch_zeus_call`, `dispatch_zeus_tool`, `dispatch_zeus_v2_verb` | Zeus API calls |
 | `create_zeus_session`, `continue_session_turn` | Durable sessions |
@@ -395,7 +427,7 @@ After each turn, checks are appended as `[PASS]` / `[FAIL]` lines. Common failur
 | Check | Likely cause | Fix |
 |-------|--------------|-----|
 | Source file has real embedded contract | Placeholder `TO_BE_FILLED` hash in catalog | Verify with Zeus and sync stamped file |
-| Embedded hash matches compute on loaded object | Local edits changed catalog after stamping | Re-sync or re-verify; avoid mutating stamped fields |
+| Embedded hash matches compute on loaded object | Catalog rules edited after stamping, **or** system prompt has trailing whitespace while a live SCOPE BRIEF was merged (stamp keeps the newline; post-merge hash TrimRights it) | Prefer re-verify/re-sync after edits. Trailing-whitespace-only drift is healed on load (`heal_trailing_ws_stamp_drift`); align `scope_contracts` with the post-heal / post-merge hash |
 | Bound contract_hash matches payload hash | `scope_contracts` hash differs from loaded catalog | Update binding to stamped hash |
 | Session created with `contract_status=match` | Drift or no contract configured | Align contract id/hash; or intentionally run without contract |
 | No contract_mismatch / drift error | Server rejected contract on session create | See session `409` / `payload_hash` fixes above |

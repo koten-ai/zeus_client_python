@@ -228,3 +228,105 @@ def extract_stamped_hash(doc: dict) -> str:
                 return h
     logger.debug("extract_stamped_hash: no (real) stamped hash found in doc or wrappers")
     return ""
+
+
+_TRAILING_WS = " \t\n\r"
+
+
+def _rstrip_system_prompt_surfaces(doc: dict) -> tuple[dict, bool]:
+    """Return a shallow-normalized copy with trailing ws stripped from system text.
+
+    Only touches surfaces that participate in the contract hash as rules text:
+    ``messages[0].content`` and ``instructions.system_prompt``. Leaves content
+    alone when a SCOPE BRIEF / MINI-SCHEMA marker is already present (strip-for-hash
+    already TrimRights the prefix in that path).
+    """
+    from copy import deepcopy
+
+    if not isinstance(doc, dict):
+        return doc, False
+    out = deepcopy(doc)
+    changed = False
+
+    messages = out.get("messages")
+    if isinstance(messages, list) and messages and isinstance(messages[0], dict):
+        content = messages[0].get("content")
+        if isinstance(content, str) and content:
+            if SCOPE_BRIEF_MARKER.strip() not in content and MINI_SCHEMA_MARKER.strip() not in content:
+                stripped = content.rstrip(_TRAILING_WS)
+                if stripped != content:
+                    messages[0]["content"] = stripped
+                    changed = True
+
+    instr = out.get("instructions")
+    if isinstance(instr, dict):
+        sp = instr.get("system_prompt")
+        if isinstance(sp, str) and sp:
+            if SCOPE_BRIEF_MARKER.strip() not in sp and MINI_SCHEMA_MARKER.strip() not in sp:
+                stripped = sp.rstrip(_TRAILING_WS)
+                if stripped != sp:
+                    instr["system_prompt"] = stripped
+                    out["instructions"] = instr
+                    changed = True
+
+    return out, changed
+
+
+def _rewrite_embedded_hash(doc: dict, old_hash: str, new_hash: str) -> None:
+    """Update known stamp locations in-place when healing trailing-ws drift."""
+    if not isinstance(doc, dict) or not old_hash or not new_hash or old_hash == new_hash:
+        return
+    cb = doc.get("contract")
+    if isinstance(cb, dict) and (cb.get("hash") or "").strip() == old_hash:
+        cb["hash"] = new_hash
+    if (doc.get("_hash") or "").strip() == old_hash:
+        doc["_hash"] = new_hash
+    if (doc.get("hash") or "").strip() == old_hash:
+        doc["hash"] = new_hash
+
+
+def heal_trailing_ws_stamp_drift(doc: dict) -> dict:
+    """Heal stamp vs runtime hash drift caused only by trailing system-prompt whitespace.
+
+    Zeus ``stripScopeBrief`` TrimRights the rules prefix only when a SCOPE BRIEF
+    marker is present. Catalogs stamped *without* a brief keep a trailing
+    newline in the digest; after live brief merge the same rules hash without
+    that newline. Session create uses the post-merge payload hash (and can
+    still match), but the runtime audit fails
+    ``Embedded hash matches compute on loaded object``.
+
+    When the embedded stamp equals ``compute(raw)`` and rstripping system-prompt
+    surfaces alone changes the digest, rewrite the embedded stamp to the
+    normalized hash and rstrip those surfaces so load + brief merge stays
+    stable. Does not rewrite stamps that already disagree for other reasons.
+    """
+    if not isinstance(doc, dict):
+        return doc
+    stamped = extract_stamped_hash(doc)
+    if not stamped:
+        return doc
+    try:
+        h_raw = compute_contract_hash(doc)
+    except Exception:
+        return doc
+    if stamped != h_raw:
+        return doc
+
+    normalized, changed = _rstrip_system_prompt_surfaces(doc)
+    if not changed:
+        return doc
+    try:
+        h_norm = compute_contract_hash(normalized)
+    except Exception:
+        return doc
+    if not h_norm or h_norm == h_raw:
+        return doc
+
+    _rewrite_embedded_hash(normalized, stamped, h_norm)
+    logger.info(
+        "heal_trailing_ws_stamp_drift: rewrote stamp %s -> %s "
+        "(trailing system-prompt whitespace; aligns stamp with post-brief-merge hash)",
+        stamped,
+        h_norm,
+    )
+    return normalized

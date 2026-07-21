@@ -1,0 +1,66 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_comment": "ZC-36 fixture: open forbid_tool vs locked prefer of same tool",
+  "contract": {
+    "hash": "md5:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "id": "lint_open_vs_locked_fixture"
+  },
+  "instructions": {
+    "system_prompt": "Always prefer find for entity lookups. Prefer find for Beer and Brewery queries. Use search only for free-text.",
+    "verb_usage_guide": "prefer find for structured filters; never use teleport.",
+    "verb_order": ["find", "search", "return"]
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "Always prefer find for entity lookups.\n\n## SCOPE BRIEF\n\nscope: beer-sample/_default\n"
+    }
+  ],
+  "verbs": [
+    {
+      "function": {
+        "name": "find",
+        "description": "find nodes",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "search",
+        "description": "search",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "return",
+        "description": "return",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    }
+  ],
+  "guidance": {
+    "catalog_lint": {
+      "mode": "assemble",
+      "hard_conflicts": true,
+      "soft_nl": false,
+      "open_vs_locked": true
+    },
+    "injections": {
+      "business_logic": [
+        {
+          "id": "plugin-ban-find",
+          "effect": "forbid_tool",
+          "tool": "find",
+          "when": {"entity_type": "Beer"},
+          "source": "plugin",
+          "kind": "routing",
+          "rule": "Plugin forbids find for Beer."
+        }
+      ]
+    }
+  }
+}
