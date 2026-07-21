@@ -1,10 +1,82 @@
-# Guide: Chat Request Conflict Lint (ZC-35)
+# Guide: Chat Request Conflict Lint (ZC-35 V1 + ZC-36 V2)
 
-**Date**: 2026-07-15  
-**Feature**: Detect conflicting business rules in `chat_request*.json` (debug score / linter)  
-**Status**: Active  
-**Jira**: [ZC-35](https://kotenai.atlassian.net/browse/ZC-35)  
+**Date**: 2026-07-17  
+**Feature**: Detect conflicting business rules in `chat_request*.json`  
+**Status**: Active (V2 MVP)  
+**Jira**: [ZC-36](https://kotenai.atlassian.net/browse/ZC-36) (V2), [ZC-35](https://kotenai.atlassian.net/browse/ZC-35) (V1 soft)  
 **Related**: README “Lint catalog rules”, `src/zeus/lint.py`, `src/contract_hash.py`, `scripts/lint_chat_request.py`
+
+---
+
+## 0. V1 vs V2 (read this first)
+
+| | V1 (ZC-35) | V2 (ZC-36) |
+|--|------------|------------|
+| Detector | Client heuristics (regex always/never, tool tokens, dups) | **Hard**: structured effects; **Soft**: keep heuristics; Deep LLM offline only (not default) |
+| When | CLI on demand; agent every turn if `guidance.debug` | **Once per catalog assembly** (cache); not every tool round-trip |
+| Who | Client code only | Client hard/soft; Zeus still owns contract hash |
+| Blocks chat? | Never | Never on soft; CI may `--fail-on hard` |
+| Contract-locked | Not rewritten | Still not rewritten; **open vs locked flagged** |
+| Score | 0–100 from heuristics | **Hard findings primary**; score secondary / calibrated |
+
+**Product goal:** Structure + assemble-time + provenance + open-vs-locked; NL is a side smoke detector — not the foundation.
+
+V1 remains the **soft / low-confidence** layer. Do not treat a 0–100 score as a chat gate.
+
+### V2 layers
+
+1. **Layer 0 — Provenance** — every open insert should carry `id`, `path`, optional `source` / `kind` / `plugin`.
+2. **Layer 1 — Structured open rules (hard)** — `effect` + `tool` + `when` atoms; deterministic conflict matrix.
+3. **Layer 2 — Soft NL (V1)** — always/never, duplicates, optimal_paths hygiene; `confidence: low|medium`.
+4. **Layer 3 — Open vs locked** — open structured rules that oppose locked prefer/forbid stances (best-effort extraction from locked prose).
+
+### Structured open-rule schema (migration)
+
+Prefer authoring structured atoms; keep free-text `rule` as rationale during the compat period:
+
+```json
+{
+  "id": "prefer-find-beer",
+  "effect": "prefer_tool",
+  "tool": "find",
+  "when": { "entity_type": "Beer" },
+  "priority": 10,
+  "source": "operator",
+  "kind": "routing",
+  "rule": "Prefer find for Beer lookups."
+}
+```
+
+Known `effect` values: `prefer_tool`, `forbid_tool`, `require_tool`, `allow_tool`.
+
+CLI schema dump: `python scripts/lint_chat_request.py --schema`  
+Library: `from zeus_client import structured_rule_schema`.
+
+### Config / kill switches
+
+```text
+guidance.catalog_lint:
+  mode: off | assemble | debug | ci
+  hard_conflicts: true
+  soft_nl: true
+  open_vs_locked: true
+  deep_llm: false          # reserved; never default-on
+  fail_on: none | hard | high | medium | low
+```
+
+Env: `ZEUS_CATALOG_LINT_MODE`, `ZEUS_CATALOG_LINT_FAIL_ON`.
+
+| Goal | How |
+|------|-----|
+| No check during chat | `mode: off` (default unless `guidance.debug`) |
+| Authoring / session start | `mode: assemble` or `debug` |
+| CI gate | `mode: ci`, `--fail-on hard` |
+| Never block user turn on soft NL | Product invariant (agent never fails the turn) |
+
+### Assemble-time cache
+
+Cache key = `hash(locked contract material) + hash(open rule atoms) + config flags`.  
+Entry points: `lint_catalog_assembled(chat_req)` (agent uses this). Invalidate by changing open rules or stamp hash. Soft NL is not re-run every tool round.
 
 ---
 
@@ -14,43 +86,46 @@
 
 Zeus Client loads stamped V2 `chat_request` catalogs and lets operators/plugins inject **unbounded** business rules into hash-excluded surfaces (`guidance.*`). Over time those open rules can contradict each other, for example:
 
-- “Always prefer `find` for Beer” vs “Never use `find` for Beer”
+- Structured: `prefer_tool:find` vs `forbid_tool:find` for the same `entity_type`
+- Open `forbid_tool:find` while locked cart says “prefer find”
+- Soft: “Always prefer `find` for Beer” vs “Never use `find` for Beer”
 - `deny_when: abv > 7` vs `require: abv >= 8` on the same entity
 - Two `optimal_paths` that match the same intent but prefer different entry verbs
 - Pipeline templates that would 400 on Zeus (`missing as`, `return[]` lists verbs, unknown verb)
 
-Before ZC-35 there was **no static diagnostic** for that inconsistency. Contract verify / hash drift only protect **locked** rules content; they do not score open-rule conflicts.
+Contract verify / hash drift only protect **locked** rules content; they do not score open-rule conflicts or open-vs-locked fights.
 
-ZC-35 adds a **read-only, heuristic** conflict linter that:
+The linter is **read-only** and:
 
-1. Inventories open rule atoms with JSON paths  
-2. Runs pairwise + structural checkers  
-3. Produces a `ConflictReport` with `conflict_score` (0–100), severity band, and detailed findings  
+1. Inventories open rule atoms with JSON paths + provenance  
+2. Runs hard structured + soft NL + open-vs-locked checkers  
+3. Produces a `ConflictReport` with hard/soft/open_vs_locked counts, optional score, findings  
 4. **Never rewrites** contract-locked content  
-5. Surfaces via **Python API**, **CLI**, and optional **agent trace** when `guidance.debug` is true  
+5. Surfaces via **Python API**, **CLI**, and optional **agent trace** (assemble/debug/ci)  
 
 ### Scope
 
 | In scope (MVP) | Out of scope |
 |----------------|--------------|
 | Offline lint of any `chat_request` dict / file | Auto-merge / auto-edit of rules |
-| Heuristic NL + structured checks | Full formal logic / theorem prover over free text |
-| Score + findings list | Replacing Zeus contract `/verify` |
-| CLI + library + debug trace attachment | LLM-assisted contradiction review (phase 2) |
-| Document locked vs open paths | Blocking session create on high score (phase 2) |
+| Hard structured effects + soft NL + open-vs-locked | Full formal logic / theorem prover over free text |
+| Assemble-time cache | Per-turn LLM conflict auditor |
+| CLI + library + agent attach | Replacing Zeus contract `/verify` |
+| CI `--fail-on hard` | Client rewrite of hashed content |
+| Document locked vs open paths | Workbench UI button (Phase D) |
 
 ### Entry points
 
 | Surface | Entry |
 |---------|--------|
-| Library | `from zeus_client import lint_chat_request` |
-| Report types | `ConflictReport`, `Finding`, `hash_policy_summary` |
+| Library | `from zeus_client import lint_chat_request, lint_catalog_assembled` |
+| Report types | `ConflictReport`, `Finding`, `CatalogLintConfig`, `hash_policy_summary` |
+| Schema | `structured_rule_schema()` / CLI `--schema` |
 | CLI | `python scripts/lint_chat_request.py <path>` |
 | Policy dump | `python scripts/lint_chat_request.py --policy` |
-| Agent (opt-in) | `guidance.debug: true` → `trace["catalog_lint"]` |
+| Agent (opt-in) | `guidance.debug` or `guidance.catalog_lint.mode` ∈ assemble/debug/ci |
 | Implementation | `src/zeus/lint.py` |
 | Policy constants | `src/contract_hash.py` (`HASH_EXCLUDED_ROOTS`, `LOCKED_POINTERS`) |
-
 ---
 
 ## 2. Problem context (why this exists)

@@ -18,17 +18,26 @@ from zeus_client.constants import (
     user_chat_requests_dir,
     user_config_dir,
 )
-from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash
+from zeus_client.contract_hash import (
+    compute_contract_hash,
+    extract_stamped_hash,
+    heal_trailing_ws_stamp_drift,
+)
 from zeus_client.http_client import client, close_http, init_http
 from zeus_client.logging_setup import logger
 from zeus_client.toon import to_toon
 from zeus_client.zeus.auth import invalidate_zeus_session, resolve_zeus_auth
 from zeus_client.zeus.catalog import list_chat_requests, load_chat_request
 from zeus_client.zeus.lint import (
+    CatalogLintConfig,
     ConflictReport,
     Finding,
+    clear_lint_cache,
     hash_policy_summary,
+    lint_catalog_assembled,
     lint_chat_request,
+    resolve_lint_config,
+    structured_rule_schema,
 )
 from zeus_client.zeus.sync import SyncResult, sync_chat_requests
 from zeus_client.zeus.contracts import resolve_contract_for_scope
@@ -79,16 +88,22 @@ __all__ = [
     "dispatch_zeus_tool",
     "dispatch_zeus_v2_verb",
     "extract_stamped_hash",
+    "heal_trailing_ws_stamp_drift",
     "init_http",
     "invalidate_zeus_session",
     "list_chat_requests",
     "load_chat_request",
     "load_config",
     "logger",
+    "CatalogLintConfig",
     "ConflictReport",
     "Finding",
+    "clear_lint_cache",
     "hash_policy_summary",
+    "lint_catalog_assembled",
     "lint_chat_request",
+    "resolve_lint_config",
+    "structured_rule_schema",
     "normalize_api_version",
     "post_session_trace",
     "rehydrate_session",

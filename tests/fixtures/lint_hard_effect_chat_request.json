@@ -1,0 +1,78 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_comment": "ZC-36 fixture: structured open-rule hard effect conflict",
+  "contract": {
+    "hash": "md5:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "lint_hard_effect_fixture"
+  },
+  "instructions": {
+    "system_prompt": "BASE RULES (locked — linter must not rewrite).",
+    "verb_order": ["find", "search", "return"]
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "BASE RULES (locked — linter must not rewrite).\n\n## SCOPE BRIEF\n\nscope: beer-sample/_default\n"
+    }
+  ],
+  "verbs": [
+    {
+      "function": {
+        "name": "find",
+        "description": "find nodes",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "search",
+        "description": "search",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "return",
+        "description": "return",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      "type": "function"
+    }
+  ],
+  "guidance": {
+    "catalog_lint": {
+      "mode": "ci",
+      "hard_conflicts": true,
+      "soft_nl": false,
+      "open_vs_locked": false,
+      "fail_on": "hard"
+    },
+    "injections": {
+      "business_logic": [
+        {
+          "id": "prefer-find-beer",
+          "effect": "prefer_tool",
+          "tool": "find",
+          "when": {"entity_type": "Beer"},
+          "priority": 10,
+          "source": "operator",
+          "kind": "routing",
+          "rule": "Prefer find for Beer lookups."
+        },
+        {
+          "id": "ban-find-beer",
+          "effect": "forbid_tool",
+          "tool": "find",
+          "when": {"entity_type": "Beer"},
+          "priority": 50,
+          "source": "plugin",
+          "kind": "routing",
+          "plugin": "demo-plugin",
+          "rule": "Do not use find for Beer."
+        }
+      ]
+    }
+  }
+}
