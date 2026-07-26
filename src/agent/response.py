@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from zeus_client.agent.layer_a import LayerABag, parse_layer_a
 from zeus_client.zeus.catalog import get_mini_schema
 
 _DATA_TOOLS = frozenset({"pipeline", "project", "find", "search", "get", "traverse"})
@@ -18,6 +19,8 @@ class StructuredAgentResponse:
     entity_type: Optional[str] = None
     source_tool: Optional[str] = None
     warnings: list[str] = field(default_factory=list)
+    # base-5 / base-5.2 Layer A (ZC-WISH-004…012) — G2 never chat UI
+    layer_a: Optional[LayerABag] = None
 
 
 def _parse_return_payload(trace: dict) -> dict:
@@ -324,10 +327,20 @@ def extract_structured_response(
     chat_req: dict,
     *,
     output_schema: Any = None,
+    dual_read_array_triggers: bool = True,
 ) -> StructuredAgentResponse:
     """Build a StructuredAgentResponse from a completed agent turn."""
     return_payload = _parse_return_payload(trace)
+    layer_a = parse_layer_a(
+        return_payload or None,
+        dual_read_array_triggers=dual_read_array_triggers,
+    )
     decomposition = _decomposition_from_payload(return_payload)
+    if decomposition is None and isinstance(layer_a.decomposition, dict):
+        decomposition = layer_a.decomposition
+    # Prefer query_decomposition intent path when older decomposition is thin
+    if decomposition is None and isinstance(layer_a.query_decomposition, dict):
+        decomposition = layer_a.query_decomposition
 
     raw_rows, source_tool, entity_type = _select_row_source(trace, return_payload)
     if not entity_type:
@@ -351,14 +364,21 @@ def extract_structured_response(
         zeus_data = []
         filter_warnings = []
 
-    warnings = schema_warnings + filter_warnings
+    # G1 answer: prefer model summary when caller left answer empty (ZC-WISH-012)
+    g1 = layer_a.g1_answer(answer or "")
+    warnings = schema_warnings + filter_warnings + list(layer_a.warnings) + list(layer_a.shape_errors)
+    if layer_a.missing_required:
+        warnings.append(
+            "layer_a: missing required " + ", ".join(layer_a.missing_required)
+        )
 
     return StructuredAgentResponse(
-        answer=answer or "",
+        answer=g1,
         zeus_data=zeus_data,
         decomposition=decomposition,
         return_payload=return_payload or None,
         entity_type=entity_type,
         source_tool=source_tool,
         warnings=warnings,
+        layer_a=layer_a,
     )
