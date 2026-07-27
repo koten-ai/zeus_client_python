@@ -103,17 +103,142 @@ def _dict_rows(value: Any) -> list[dict]:
     return []
 
 
+# Keys on pipeline `data` that are envelope metadata, not step bindings or row lists.
+_PIPELINE_DATA_META_KEYS = frozenset(
+    {
+        "job_fingerprint",
+        "meta",
+        "status",
+        "confidence",
+        "summary",
+        "turn_complete",
+        "query_decomposition",
+        "decomposition",
+        "provenance",
+        "entity_refs",
+        "node_refs",
+        "error",
+        "warnings",
+        "notes",
+        "usage",
+        "elapsed_ms",
+        "total_cost",
+        "steps_executed",
+        "step_costs",
+    }
+)
+_ROW_LIST_KEYS = ("rows", "items", "results")
+
+
+def _rows_from_step_output(step_out: Any) -> list[dict]:
+    """Extract entity dict rows from a single pipeline step binding value."""
+    if isinstance(step_out, list):
+        return _dict_rows(step_out)
+    if not isinstance(step_out, dict):
+        return []
+    for key in _ROW_LIST_KEYS:
+        rows = _dict_rows(step_out.get(key))
+        if rows:
+            return rows
+    # Nested data envelope under a binding (rare)
+    nested = step_out.get("data")
+    if nested is not None and nested is not step_out:
+        if isinstance(nested, list):
+            return _dict_rows(nested)
+        if isinstance(nested, dict):
+            for key in _ROW_LIST_KEYS:
+                rows = _dict_rows(nested.get(key))
+                if rows:
+                    return rows
+    # A single entity-shaped object (has name/id) — not meta-only
+    if any(k in step_out for k in ("id", "name", "doc_key", "node_id")):
+        return [step_out]
+    return []
+
+
+def _return_binding_names(args: dict, data: dict) -> list[str]:
+    """Ordered step `as` names to pull from pipeline data."""
+    names: list[str] = []
+    ret = args.get("return") if isinstance(args, dict) else None
+    if isinstance(ret, list):
+        for name in ret:
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+    elif isinstance(ret, str) and ret.strip():
+        names.append(ret.strip())
+
+    if names:
+        return names
+
+    # Infer from pipeline steps' `as` (last step first — usually the projection)
+    steps = args.get("steps") if isinstance(args, dict) else None
+    if isinstance(steps, list):
+        for step in reversed(steps):
+            if isinstance(step, dict):
+                as_name = step.get("as")
+                if isinstance(as_name, str) and as_name.strip():
+                    names.append(as_name.strip())
+        if names:
+            return names
+
+    # Fall back: non-meta keys on data that look like step bindings
+    for key, val in data.items():
+        if key in _PIPELINE_DATA_META_KEYS or key in _ROW_LIST_KEYS:
+            continue
+        if isinstance(val, (dict, list)) and _rows_from_step_output(val):
+            names.append(key)
+    return names
+
+
+def _rows_from_pipeline_data_dict(data: dict, args: dict) -> list[dict]:
+    """Unpack terminating-pipeline `data` envelopes into entity rows.
+
+    Real V2 shape::
+
+        {
+          \"job_fingerprint\": {...},
+          \"meta\": {...},
+          \"status\": \"ok\",
+          \"tampa_proj\": {\"rows\": [{\"name\": ...}, ...]}
+        }
+
+    Never treat the whole envelope dict as a single entity row.
+    """
+    # Flat list aliases on data itself
+    for key in _ROW_LIST_KEYS:
+        rows = _dict_rows(data.get(key))
+        if rows:
+            return rows
+
+    for name in _return_binding_names(args, data):
+        if name not in data:
+            continue
+        rows = _rows_from_step_output(data.get(name))
+        if rows:
+            return rows
+
+    # Last resort: first non-meta binding with rows (stable key order)
+    for key, val in data.items():
+        if key in _PIPELINE_DATA_META_KEYS or key in _ROW_LIST_KEYS:
+            continue
+        rows = _rows_from_step_output(val)
+        if rows:
+            return rows
+
+    return []
+
+
 def _rows_from_pipeline_result(result_json: dict, args: dict) -> list[dict]:
     data = result_json.get("data")
     if data is not None:
         if isinstance(data, list):
             return _dict_rows(data)
         if isinstance(data, dict):
-            for key in ("rows", "items", "results"):
-                rows = _dict_rows(data.get(key))
-                if rows:
-                    return rows
-            return _dict_rows(data)
+            rows = _rows_from_pipeline_data_dict(data, args if isinstance(args, dict) else {})
+            if rows:
+                return rows
+            # Do NOT fall back to _dict_rows(data) — that wraps the entire
+            # envelope as one fake entity and empties zeus_data after schema filter.
 
     return_names = args.get("return") if isinstance(args, dict) else None
     if isinstance(return_names, list):
@@ -122,23 +247,28 @@ def _rows_from_pipeline_result(result_json: dict, args: dict) -> list[dict]:
             for name in reversed(return_names):
                 if not isinstance(name, str):
                     continue
-                step_out = result_block.get(name)
-                if isinstance(step_out, dict):
-                    for key in ("rows", "items", "results"):
-                        rows = _dict_rows(step_out.get(key))
-                        if rows:
-                            return rows
-                    rows = _dict_rows(step_out)
-                    if rows:
-                        return rows
-                rows = _dict_rows(step_out)
+                rows = _rows_from_step_output(result_block.get(name))
                 if rows:
                     return rows
 
     result_block = result_json.get("result")
     if isinstance(result_block, dict):
-        for key in ("rows", "items", "results"):
+        # Named bindings under result (non-terminating / older shapes)
+        if isinstance(return_names, list):
+            for name in reversed(return_names):
+                if isinstance(name, str) and name in result_block:
+                    rows = _rows_from_step_output(result_block.get(name))
+                    if rows:
+                        return rows
+        for key in _ROW_LIST_KEYS:
             rows = _dict_rows(result_block.get(key))
+            if rows:
+                return rows
+        # Scan non-list keys for step bindings
+        for key, val in result_block.items():
+            if key in _ROW_LIST_KEYS or key in _PIPELINE_DATA_META_KEYS:
+                continue
+            rows = _rows_from_step_output(val)
             if rows:
                 return rows
     return []
