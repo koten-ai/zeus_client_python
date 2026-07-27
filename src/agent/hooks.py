@@ -1,6 +1,8 @@
 """Agent hook extension surface."""
 from dataclasses import dataclass
+import re
 from typing import List, Optional
+
 
 @dataclass
 class AgentDecision:
@@ -9,6 +11,19 @@ class AgentDecision:
     reason: Optional[str] = None
     force_return: Optional[str] = None          # if set, end the turn with this summary
     inject_messages: Optional[List[dict]] = None  # messages to splice into the conversation
+
+
+# Patterns that suggest prompt dump / secrets exfil (hooks baseline — ZC-WISH-013).
+_PROMPT_DUMP_RE = re.compile(
+    r"(system\s*prompt|show\s*(me\s*)?(your|the)\s*(rules|instructions|prompt)|"
+    r"ignore\s*(all\s*)?(previous|prior|system)|"
+    r"reveal\s*(hidden|internal)|dump\s*(the\s*)?(prompt|catalog))",
+    re.I,
+)
+_SECRETS_RE = re.compile(
+    r"(api[_-]?key|secret[_-]?key|bearer\s+[a-z0-9]|password\s*[:=])",
+    re.I,
+)
 
 
 class AgentHooks:
@@ -31,6 +46,7 @@ class AgentHooks:
           - "zeus_result"        {round, name, args, status, result_text, result_json, ctx}
           - "round_end"          {round, answer_ready, ctx}
           - "final_answer"       {answer, ctx}
+          - "policy_decision"    {policy, flags, hooks_jailbreak_score, ctx}
 
         For crawl: just log everything.
         For walk:  if event == "zeus_result" and "high_margin" in str(data): ...
@@ -71,6 +87,28 @@ class AgentHooks:
         cost, enforce a per-turn round budget, or bail out once a condition is
         met. Default returns True (no change to normal behavior)."""
         return True
+
+    def score_jailbreak(self, ctx: dict) -> float:
+        """Client-side jailbreak score 0.0–1.0 (ZC-WISH-014).
+
+        **Never** overwrite model ``jail_break_attempt`` — store separately as
+        ``hooks_jailbreak_score``.
+        """
+        user_msg = str((ctx or {}).get("user_msg") or "")
+        score = 0.0
+        if _PROMPT_DUMP_RE.search(user_msg):
+            score = max(score, 0.85)
+        if _SECRETS_RE.search(user_msg):
+            score = max(score, 0.7)
+        # Denied / sensitive tool names attempted this turn
+        denied = (ctx or {}).get("denied_verbs") or []
+        if denied:
+            score = max(score, 0.6)
+        return min(1.0, float(score))
+
+    def must_refuse(self, ctx: dict) -> bool:
+        """Hard refuse even if the model cooperates (prompt dump / secrets)."""
+        return self.score_jailbreak(ctx) >= 0.85
 
 
 # Back-compat module-level hooks (still work, for simple cases).

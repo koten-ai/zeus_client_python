@@ -1,8 +1,11 @@
 """Zeus Python client library."""
 
 from zeus_client.agent.hooks import AgentDecision, AgentHooks
+from zeus_client.agent.layer_a import LayerA, parse_layer_a, normalize_triggers
 from zeus_client.agent.loop import run_agent
+from zeus_client.agent.policy import PolicyDecision, decide_policy
 from zeus_client.agent.response import StructuredAgentResponse, extract_structured_response
+from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings
 from zeus_client.config import (
     load_config,
     resolve_llm_provider_config,
@@ -27,6 +30,7 @@ from zeus_client.http_client import client, close_http, init_http
 from zeus_client.logging_setup import logger
 from zeus_client.toon import to_toon
 from zeus_client.zeus.auth import invalidate_zeus_session, resolve_zeus_auth
+from zeus_client.zeus.base_catalog import list_base_catalogs, load_base_catalog
 from zeus_client.zeus.catalog import list_chat_requests, load_chat_request
 from zeus_client.zeus.lint import (
     CatalogLintConfig,
@@ -71,8 +75,19 @@ class ZeusClient:
 __all__ = [
     "AgentDecision",
     "AgentHooks",
+    "ClientSettings",
+    "LayerA",
+    "PolicyDecision",
     "StructuredAgentResponse",
+    "decide_policy",
     "extract_structured_response",
+    "freeze_session_rules",
+    "list_base_catalogs",
+    "load_base_catalog",
+    "merge_rules",
+    "normalize_triggers",
+    "parse_layer_a",
+    "prepare_settings",
     "BASE_DIR",
     "build_tool_order",
     "MAX_ROUNDS",

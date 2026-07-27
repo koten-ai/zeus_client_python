@@ -11,6 +11,8 @@ SYMBOLS = [
     "lint_chat_request", "lint_catalog_assembled", "ConflictReport", "Finding",
     "CatalogLintConfig", "hash_policy_summary", "resolve_lint_config",
     "structured_rule_schema", "clear_lint_cache",
+    "ClientSettings", "load_base_catalog", "list_base_catalogs", "parse_layer_a",
+    "decide_policy", "prepare_settings", "merge_rules", "LayerA", "PolicyDecision",
 ]
 
 

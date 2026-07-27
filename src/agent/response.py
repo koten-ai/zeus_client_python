@@ -18,6 +18,14 @@ class StructuredAgentResponse:
     entity_type: Optional[str] = None
     source_tool: Optional[str] = None
     warnings: list[str] = field(default_factory=list)
+    # base-5 control plane (optional; filled when settings/policy path runs)
+    layer_a: Optional[dict] = None
+    policy: Optional[str] = None
+    ui_text: Optional[str] = None
+    ui: Optional[dict] = None
+    flags: dict = field(default_factory=dict)
+    hooks_jailbreak_score: Optional[float] = None
+    artifacts: Optional[dict] = None
 
 
 def _parse_return_payload(trace: dict) -> dict:
@@ -454,8 +462,21 @@ def extract_structured_response(
     chat_req: dict,
     *,
     output_schema: Any = None,
+    settings: Any = None,
+    hooks_jailbreak_score: Optional[float] = None,
+    hooks_must_refuse: bool = False,
+    apply_policy: Optional[bool] = None,
 ) -> StructuredAgentResponse:
-    """Build a StructuredAgentResponse from a completed agent turn."""
+    """Build a StructuredAgentResponse from a completed agent turn.
+
+    Layer A parse + Client policy table run when ``apply_policy`` is True, or
+    when ``settings`` is provided (base-5 floor). Default off preserves
+    pre-0.2 structured extraction behavior.
+    """
+    from zeus_client.agent.layer_a import parse_layer_a
+    from zeus_client.agent.policy import decide_policy
+    from zeus_client.agent.settings import ClientSettings, prepare_settings
+
     return_payload = _parse_return_payload(trace)
     decomposition = _decomposition_from_payload(return_payload)
 
@@ -483,12 +504,80 @@ def extract_structured_response(
 
     warnings = schema_warnings + filter_warnings
 
+    layer_a_dict = None
+    policy = None
+    ui_text = None
+    ui = None
+    flags: dict = {}
+    artifacts = None
+    hscore = hooks_jailbreak_score
+    final_answer = answer or ""
+
+    run_policy = apply_policy if apply_policy is not None else (settings is not None)
+    if run_policy and return_payload:
+        try:
+            cs = prepare_settings(settings) if settings is not None else ClientSettings()
+        except Exception as exc:
+            warnings.append(f"settings_prepare_failed: {exc}")
+            cs = ClientSettings()
+        rule_ids = list((cs.rules or {}).keys()) if cs.rules else None
+        layer = parse_layer_a(
+            return_payload,
+            rule_ids=rule_ids,
+            allow_array_triggers=cs.allow_array_triggers,
+            output_request=cs.output_request,
+            app_output_on_error=cs.app_output_on_error,
+        )
+        warnings.extend(layer.warnings)
+        warnings.extend(layer.errors)
+        brand = bool(cs.company_context) or bool((cs.messages or {}).get("message_brand"))
+        decision = decide_policy(
+            layer,
+            settings=cs,
+            hooks_jailbreak_score=float(hscore or 0.0),
+            hooks_must_refuse=hooks_must_refuse,
+            brand_inject_present=brand,
+        )
+        layer_a_dict = {
+            "summary": layer.summary,
+            "query_decomposition": layer.query_decomposition,
+            "decomposition": layer.decomposition,
+            "confidence": layer.confidence,
+            "policy_action": layer.policy_action,
+            "business_rules_triggers": layer.business_rules_triggers,
+            "app_output": layer.app_output,
+            "jail_break_attempt": layer.jail_break_attempt,
+            "errors": layer.errors,
+            "warnings": layer.warnings,
+            "ok": layer.ok,
+        }
+        policy = decision.policy
+        ui_text = decision.ui_text
+        ui = decision.ui(layer)
+        flags = decision.flags
+        hscore = decision.hooks_jailbreak_score
+        artifacts = decision.artifacts(layer)
+        # Prefer policy chrome for user-facing answer when refuse/error forced
+        if decision.forced and decision.policy in ("refuse", "error"):
+            final_answer = decision.ui_text
+        elif not final_answer and decision.ui_text:
+            final_answer = decision.ui_text
+        if decision.soft_require_policy_action_missing:
+            warnings.append("soft_require: policy_action missing with brand inject present")
+
     return StructuredAgentResponse(
-        answer=answer or "",
+        answer=final_answer,
         zeus_data=zeus_data,
         decomposition=decomposition,
         return_payload=return_payload or None,
         entity_type=entity_type,
         source_tool=source_tool,
         warnings=warnings,
+        layer_a=layer_a_dict,
+        policy=policy,
+        ui_text=ui_text,
+        ui=ui,
+        flags=flags,
+        hooks_jailbreak_score=hscore,
+        artifacts=artifacts,
     )

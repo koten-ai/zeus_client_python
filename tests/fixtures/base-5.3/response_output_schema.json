@@ -1,0 +1,402 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/koten-ai/zeus_chat_request/v2/base/base-5/response_output_schema.json",
+  "title": "Zeus Layer A terminate (return tool args) — base-5",
+  "description": "JSON Schema for the model terminate payload on `return` / terminating pipeline. Flat on the wire. Audiences: G1 user, G2 admin (never chat UI), G3 client control-plane. base-5: business_rules_triggers is an object keyed by rule_id (sparse; missing=false); optional app_output when Client sent output_request.app.fields (type+description). Does NOT include Detective Layer B.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "summary",
+    "query_decomposition",
+    "decomposition",
+    "confidence"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "G1 USER-FACING. Human-readable facts for the end user. Must not include admin scores, wish_i_knew, jail_break_attempt, business_rules_triggers, or app_output."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "med",
+        "low"
+      ],
+      "description": "G1 (also analytics). Overall answer confidence as a string enum. Distinct from subject_confidence (float)."
+    },
+    "query_decomposition": {
+      "type": "object",
+      "description": "G1 / evidence-loop. Business intent facets. Must be an object (never a top-level string or array). Core: intent + entity.",
+      "additionalProperties": true,
+      "properties": {
+        "intent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "High-level goal/action (e.g. List, Best, Book, Count)."
+        },
+        "entity": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Primary entity type or subject (e.g. Beer, Hotel) from MINI-SCHEMA when possible."
+        },
+        "attribute": {
+          "type": [
+            "string",
+            "array",
+            "null"
+          ],
+          "description": "Optional attributes/fields requested."
+        },
+        "geo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional place/region when signaled."
+        },
+        "audience": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "theme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "occasion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "price": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Multi-part questions: array of mini-decomps.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "other": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true,
+          "description": "Catch-all structured signals (e.g. coupon_code_mentioned)."
+        },
+        "synthetic": {
+          "type": "boolean",
+          "description": "Server may set true when QD was synthesized due to incomplete model output. Models should not set this."
+        }
+      }
+    },
+    "decomposition": {
+      "type": "object",
+      "description": "G1 / evidence-loop. Data plan grounded in MINI-SCHEMA: targets, predicates, output shape.",
+      "additionalProperties": true,
+      "properties": {
+        "intent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional short data-plan intent."
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "entity_type": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "predicates": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Extracted constraints; keys should match schema paths when possible."
+        },
+        "output": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Desired shape: rows | count | ids | …"
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional extras (time window, needs[], comparison baseline)."
+        }
+      }
+    },
+    "node_refs": {
+      "type": "array",
+      "description": "G1 optional grounding: node ids supporting the answer.",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "entity_refs": {
+      "type": "array",
+      "description": "G1 optional grounding: entity references.",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "description": "G1 optional: tool-step / bag provenance.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "policy_action": {
+      "type": "string",
+      "enum": [
+        "answer",
+        "clarify",
+        "refuse",
+        "error"
+      ],
+      "description": "G3 CLIENT control-plane. Maps to zeus_client business_injection message_* boilerplate. Not shown as raw admin telemetry."
+    },
+    "subject_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "G2 ADMIN-ONLY. Subjective 0.0–1.0 confidence that the subject/entity was identified correctly. Never chat UI."
+    },
+    "jail_break_attempt": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "G2 ADMIN-ONLY. Subjective 0.0–1.0 signal that the user tried to jailbreak / bypass policy (continuous float, not boolean 0|1). Never chat UI."
+    },
+    "wish_i_knew": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "G2 ADMIN-ONLY. Gaps this turn (rules/message/schema/data/tool). Empty array if nothing material. Max 3. Never chat UI.",
+      "items": {
+        "$ref": "#/$defs/wish_i_knew_item"
+      }
+    },
+    "business_rules_triggers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "description": "G3 CLIENT control-plane. Map rule_id → whether rule applied this round. Keys match zeus_client business_injection.rules object ids. Missing key = false (sparse OK). base-5 object-only (not boolean[])."
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional echo of round index. Client session.zeus_round is authoritative."
+    },
+    "app_output": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "G3/app. Values only when Client sent output_request.app.fields (each field type + description rendered into the prompt). Client validates types. Never put admin scores here. Never a second summary essay."
+    },
+    "data_gaps": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "G2 ADMIN/Helios. Acquisition gaps (schema|data|index). Optional. Never chat UI. See docs/WISH_I_KNEW_DUAL.md",
+      "items": {
+        "$ref": "#/$defs/data_gap_item"
+      }
+    }
+  },
+  "$defs": {
+    "wish_i_knew_item": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "what",
+        "kind"
+      ],
+      "properties": {
+        "what": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short gap statement."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "rules",
+            "message",
+            "schema",
+            "data",
+            "tool",
+            "other"
+          ]
+        },
+        "why": {
+          "type": "string",
+          "description": "Optional: how knowing this would have changed the answer."
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "med",
+            "high"
+          ]
+        }
+      }
+    },
+    "data_gap_item": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "what",
+        "kind"
+      ],
+      "properties": {
+        "what": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short human label for the gap."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "schema",
+            "data",
+            "index"
+          ],
+          "description": "Acquisition kind only."
+        },
+        "entity_type": {
+          "type": "string",
+          "description": "Entity type when known (e.g. Beer)."
+        },
+        "field": {
+          "type": "string",
+          "description": "Field/facet name when known."
+        },
+        "path": {
+          "type": "string",
+          "description": "Optional JSON path."
+        },
+        "why": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "med",
+            "high"
+          ]
+        },
+        "blocked_answer": {
+          "type": "boolean",
+          "description": "True if this gap prevented a full answer."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "summary": "I can help you find rooms we actually list. Share city and dates to search. I noted coupon SAVE20 if it matches a valid offer.",
+      "confidence": "med",
+      "query_decomposition": {
+        "intent": "Book",
+        "entity": "Hotel",
+        "other": {
+          "coupon_code_mentioned": "SAVE20"
+        }
+      },
+      "decomposition": {
+        "targets": [
+          {
+            "entity_type": "Hotel",
+            "focus": [
+              "city",
+              "dates",
+              "price"
+            ]
+          }
+        ],
+        "predicates": {},
+        "output": "rows",
+        "context": {
+          "needs": [
+            "city",
+            "check_in",
+            "check_out"
+          ]
+        }
+      },
+      "policy_action": "clarify",
+      "subject_confidence": 0.72,
+      "jail_break_attempt": 0.55,
+      "wish_i_knew": [
+        {
+          "what": "city and stay dates",
+          "kind": "message",
+          "why": "cannot search inventory without a stay window",
+          "severity": "med"
+        }
+      ],
+      "business_rules_triggers": {
+        "coupon_presented": true,
+        "no_invent_promos": true
+      },
+      "node_refs": [],
+      "entity_refs": [],
+      "provenance": [],
+      "app_output": {
+        "booking_ready": false,
+        "coupon_code": "SAVE20"
+      }
+    }
+  ]
+}

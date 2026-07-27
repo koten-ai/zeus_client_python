@@ -2,20 +2,23 @@
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Mapping, Optional, Union
 
 from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash
 
 from zeus_client.agent.audit import run_runtime_contract_audit
 from zeus_client.agent.hooks import AgentHooks
+from zeus_client.agent.prompt_inject import apply_control_plane_inject
 from zeus_client.agent.response import extract_structured_response
 from zeus_client.agent.session_phase import commit_session_turn, setup_contract_and_session
+from zeus_client.agent.settings import ClientSettings, prepare_settings
 from zeus_client.agent.tool_round import execute_tool_calls, run_llm_round
 from zeus_client.constants import MAX_ROUNDS, normalize_api_version
 from zeus_client.llm.client import cache_hints
 from zeus_client.logging_setup import logger
 from zeus_client.toon import _toon_encode
 from zeus_client.zeus.auth import resolve_zeus_auth
+from zeus_client.zeus.base_catalog import load_base_catalog
 from zeus_client.zeus.catalog import (
     apply_injected_business_logic,
     load_chat_request,
@@ -47,11 +50,18 @@ class TurnContext:
     toon_on: bool = False
     cache_headers: dict = field(default_factory=dict)
     cache_body: dict = field(default_factory=dict)
+    settings: Optional[ClientSettings] = None
+    max_rounds: int = MAX_ROUNDS
 
 
 async def setup_turn_context(
     zeus_url, zcfg, api_version, mode, bucket, scope,
     user_msg, prior_turns, optimized, provider_id, base_url, conv_id,
+    *,
+    base_id: Optional[str] = None,
+    base_catalog_dirs: Optional[list] = None,
+    settings: Optional[Union[ClientSettings, Mapping[str, Any]]] = None,
+    chat_req_override: Optional[dict] = None,
 ) -> TurnContext:
     """Initialize trace, auth, catalog load, and contract prep."""
     api_version = normalize_api_version(api_version)
@@ -64,6 +74,30 @@ async def setup_turn_context(
     def at_ms():
         return int((time.time() - t_turn) * 1000)
 
+    prepared: Optional[ClientSettings] = None
+    if settings is not None:
+        prepared = prepare_settings(settings)
+        trace["notes"].append(
+            f"settings: ruleset_id={prepared.ruleset_id} "
+            f"rules={len(prepared.rules or {})}"
+        )
+        if prepared.deployment_id:
+            trace["notes"].append(f"deployment_id={prepared.deployment_id}")
+        if prepared.locale or prepared.channel or prepared.timezone:
+            trace["notes"].append(
+                "session_meta: "
+                + ",".join(
+                    f"{k}={v}"
+                    for k, v in (
+                        ("locale", prepared.locale),
+                        ("channel", prepared.channel),
+                        ("tz", prepared.timezone),
+                        ("lang", prepared.language),
+                    )
+                    if v
+                )
+            )
+
     t0 = time.time()
     zeus_headers, auth_note = await resolve_zeus_auth(zeus_url, zcfg, bucket, scope)
     trace["notes"].append(f"auth: {auth_note}")
@@ -73,14 +107,60 @@ async def setup_turn_context(
     })
 
     t0 = time.time()
-    chat_req, src_note = await load_chat_request(
-        zeus_url, api_version, mode, bucket, scope, zeus_headers)
+    if chat_req_override is not None:
+        chat_req = deepcopy(chat_req_override)
+        src_note = "override"
+    elif base_id:
+        dirs = list(base_catalog_dirs or [])
+        if not dirs:
+            from zeus_client.constants import chat_request_search_dirs, bundled_chat_requests_dir
+            dirs = list(chat_request_search_dirs(bucket, scope) or [])
+            dirs.append(bundled_chat_requests_dir())
+        chat_req = load_base_catalog(
+            base_id=base_id, mode=mode or "analytics", search_dirs=dirs,
+        )
+        src_note = f"base_id={base_id}"
+        # Optional live brief merge when Zeus reachable and no brief present
+        try:
+            from zeus_client.zeus.catalog import extract_scope_brief, load_live_chat_request, merge_scope_brief
+            if not extract_scope_brief(chat_req):
+                live = await load_live_chat_request(
+                    zeus_url, mode, bucket, scope, zeus_headers,
+                )
+                brief = extract_scope_brief(live) if live else ""
+                if brief:
+                    chat_req = merge_scope_brief(chat_req, brief)
+                    src_note += " + live scope brief"
+        except Exception as exc:
+            src_note += f"; live brief skipped: {exc}"
+    else:
+        chat_req, src_note = await load_chat_request(
+            zeus_url, api_version, mode, bucket, scope, zeus_headers)
     trace["notes"].append(f"chat_request: {src_note}")
+    if base_id:
+        lineage = (chat_req.get("_lineage") or {}) if isinstance(chat_req, dict) else {}
+        trace["catalog_base_id"] = lineage.get("base_id") or base_id
     trace["spans"].append({
         "name": "chat_request.load", "cls": "other",
         "at": int((t0 - t_turn) * 1000),
         "ms": int((time.time() - t0) * 1000),
     })
+
+    # base-5 control-plane inject (hash-excluded zones after SCOPE BRIEF)
+    if prepared is not None:
+        chat_req = apply_control_plane_inject(chat_req, prepared)
+        trace["notes"].append("control_plane: rules/company/output_request inject applied")
+        trace["ruleset_id"] = prepared.ruleset_id
+        trace["control_plane"] = {
+            "ruleset_id": prepared.ruleset_id,
+            "rule_ids": sorted((prepared.rules or {}).keys()),
+            "has_company_context": bool(prepared.company_context),
+            "has_output_request": bool(prepared.output_request),
+            "locale": prepared.locale,
+            "channel": prepared.channel,
+            "timezone": prepared.timezone,
+            "deployment_id": prepared.deployment_id,
+        }
 
     # Render any operator-injected business rules (guidance.injections.
     # business_logic) into the system prompt so they reach the LLM. Spliced
@@ -140,10 +220,17 @@ async def setup_turn_context(
         else "optimized: off (tool results sent as JSON)"
     )
 
+    max_rounds = MAX_ROUNDS
+    if prepared and prepared.max_rounds:
+        max_rounds = max(1, int(prepared.max_rounds))
+
     ctx = {
         "user_msg": user_msg, "bucket": bucket, "scope": scope,
         "collection": None, "mode": mode, "api_version": api_version,
         "_t_turn": t_turn, "_at_ms": at_ms,
+        "base_id": base_id,
+        "ruleset_id": prepared.ruleset_id if prepared else None,
+        "settings": prepared,
     }
     cache_headers, cache_body = cache_hints(provider_id, base_url, conv_id)
     if cache_headers or cache_body:
@@ -167,6 +254,8 @@ async def setup_turn_context(
         toon_on=toon_on,
         cache_headers=cache_headers,
         cache_body=cache_body,
+        settings=prepared,
+        max_rounds=max_rounds,
     )
 
 
@@ -178,22 +267,35 @@ async def run_agent(
     hooks: Optional[AgentHooks] = None,
     structured: bool = False,
     output_schema=None,
+    base_id: Optional[str] = None,
+    base_catalog_dirs: Optional[list] = None,
+    settings: Optional[Union[ClientSettings, Mapping[str, Any]]] = None,
+    chat_req_override: Optional[dict] = None,
 ):
     """Run one user-question turn (LLM + Zeus dispatches).
 
     When ``structured=True``, returns a 5-tuple with a
     :class:`~zeus_client.agent.response.StructuredAgentResponse` as the last
     element (schema-filtered ``zeus_data`` rows plus decomposition metadata).
+
+    base-5 control plane:
+      - ``base_id``: load ``chat_request_<mode>_<base_id>.json`` (ZC-WISH-001)
+      - ``settings``: rules merge/freeze, company_context, output_request, locale…
+      - post-terminate policy table when structured or settings present
     """
     api_version = normalize_api_version(api_version)
     logger.debug(
         f"run_agent: START conv_id={conv_id} mode={mode} api={api_version} "
-        f"sample_scope={bucket}/{scope}"
+        f"sample_scope={bucket}/{scope} base_id={base_id or '-'}"
     )
 
     tc = await setup_turn_context(
         zeus_url, zcfg, api_version, mode, bucket, scope,
         user_msg, prior_turns, optimized, provider_id, base_url, conv_id,
+        base_id=base_id,
+        base_catalog_dirs=base_catalog_dirs,
+        settings=settings,
+        chat_req_override=chat_req_override,
     )
     tc.ctx["collection"] = collection
 
@@ -222,9 +324,28 @@ async def run_agent(
 
     at_ms = tc.ctx["_at_ms"]
     answer = None
+    max_rounds = tc.max_rounds
 
-    for rnd in range(1, MAX_ROUNDS + 1):
+    for rnd in range(1, max_rounds + 1):
         tc.trace["rounds"] = rnd
+
+        # ZC-WISH-021: force final return when budget nearly exhausted
+        force_left = None
+        if tc.settings and tc.settings.force_return_rounds_left is not None:
+            force_left = int(tc.settings.force_return_rounds_left)
+        remaining = max_rounds - rnd
+        if force_left is not None and remaining <= force_left and rnd > 1:
+            tc.trace["notes"].append(
+                f"force_return: rounds remaining={remaining} <= {force_left}"
+            )
+            # Nudge model via inject message once
+            tc.messages.append({
+                "role": "user",
+                "content": (
+                    "SYSTEM: Round budget nearly exhausted. "
+                    "Terminate now with the return tool (required four fields)."
+                ),
+            })
 
         answer, should_break, msg = await run_llm_round(
             rnd, model, tc.messages, tc.tools, tc.cache_body, tc.cache_headers,
@@ -253,6 +374,18 @@ async def run_agent(
     else:
         answer = "⚠️ Ran out of tool rounds before the model produced a final answer."
 
+    # Dual jailbreak score (hooks) — never overwrite model field
+    hooks_score = 0.0
+    hooks_refuse = False
+    try:
+        hooks_score = float(hooks.score_jailbreak(tc.ctx) or 0.0)
+        hooks_refuse = bool(hooks.must_refuse(tc.ctx))
+    except Exception as exc:
+        tc.trace["notes"].append(f"hooks_score_failed: {exc}")
+    tc.trace["hooks_jailbreak_score"] = hooks_score
+    if hooks_refuse:
+        tc.trace["notes"].append("hooks: must_refuse=true")
+
     await hooks.observe("final_answer", {"answer": answer, "ctx": tc.ctx})
 
     produced_delta = (
@@ -263,6 +396,18 @@ async def run_agent(
         tc.contract_id, tc.contract_hash, tc.chat_req, produced_delta,
         prior_turns, tc.this_turn_reqs, tc.trace, tc.zeus_headers,
     )
+    # Helios cheap spine on session_meta / trace
+    if tc.settings:
+        session_meta = dict(session_meta or {})
+        session_meta.setdefault("ruleset_id", tc.settings.ruleset_id)
+        if tc.settings.deployment_id:
+            session_meta.setdefault("deployment_id", tc.settings.deployment_id)
+        if tc.settings.locale:
+            session_meta.setdefault("locale", tc.settings.locale)
+        if tc.settings.channel:
+            session_meta.setdefault("channel", tc.settings.channel)
+        if tc.settings.timezone:
+            session_meta.setdefault("timezone", tc.settings.timezone)
 
     t_turn = tc.ctx["_t_turn"]
     tc.trace["total_ms"] = int((time.time() - t_turn) * 1000)
@@ -276,9 +421,15 @@ async def run_agent(
         tc.bound_contract_hash, tc.contract_id,
     )
 
-    if structured:
+    # Always run policy path when settings present or structured requested
+    want_policy = structured or (tc.settings is not None)
+    if want_policy:
         structured_response = extract_structured_response(
             answer, tc.trace, tc.chat_req, output_schema=output_schema,
+            settings=tc.settings,
+            hooks_jailbreak_score=hooks_score,
+            hooks_must_refuse=hooks_refuse,
+            apply_policy=True,
         )
         for w in structured_response.warnings:
             tc.trace["notes"].append(f"[WARN] {w}")
@@ -286,7 +437,23 @@ async def run_agent(
             "zeus_data_count": len(structured_response.zeus_data),
             "entity_type": structured_response.entity_type,
             "source_tool": structured_response.source_tool,
+            "policy": structured_response.policy,
+            "flags": structured_response.flags,
+            "hooks_jailbreak_score": structured_response.hooks_jailbreak_score,
         }
-        return answer, tc.trace, tc.messages[1:], session_meta, structured_response
+        if structured_response.policy:
+            tc.trace["policy"] = structured_response.policy
+            tc.trace["control_flags"] = structured_response.flags
+            await hooks.observe("policy_decision", {
+                "policy": structured_response.policy,
+                "flags": structured_response.flags,
+                "hooks_jailbreak_score": structured_response.hooks_jailbreak_score,
+                "ctx": tc.ctx,
+            })
+        # Prefer policy UI text for refuse/error
+        if structured_response.ui_text and structured_response.policy in ("refuse", "error"):
+            answer = structured_response.ui_text
+        if structured:
+            return answer, tc.trace, tc.messages[1:], session_meta, structured_response
 
     return answer, tc.trace, tc.messages[1:], session_meta
