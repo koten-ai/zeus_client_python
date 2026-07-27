@@ -1,9 +1,12 @@
 """Chat request catalog discovery and loading."""
+from __future__ import annotations
+
 import asyncio
 import json
 import re
 from copy import deepcopy
 from pathlib import Path
+from typing import Optional
 
 import httpx
 
@@ -21,16 +24,40 @@ from zeus_client.logging_setup import logger
 _MANIFEST_NAME = "manifest.json"
 
 
+_BASE_SUFFIX_RE = re.compile(
+    r"^(?P<mode>.+?)(?:_v2_min|_v2|_base-(?P<base>[\d.]+)|_min)?$"
+)
+
+
 def _mode_from_filename(name: str) -> str:
+    """Extract mode from catalog filenames.
+
+    Supports legacy ``chat_request_<mode>_v2.json`` / ``*_v2_min.json`` and
+    base-N packs ``chat_request_<mode>_base-5.3.json`` (ZC-WISH-001).
+    """
     stem = Path(name).stem
-    if stem in ("chat_request", "chat_request_v2"):
+    if stem in ("chat_request", "chat_request_v2", "chat_request_v2_min"):
         return "default"
     if stem.startswith("chat_request_"):
-        mode = stem[len("chat_request_"):]
-        if mode.endswith("_v2"):
-            mode = mode[:-3]
-        return mode
+        rest = stem[len("chat_request_") :]
+        m = _BASE_SUFFIX_RE.match(rest)
+        if m:
+            return m.group("mode") or rest
+        if rest.endswith("_v2"):
+            return rest[:-3]
+        return rest
     return stem
+
+
+def _base_id_from_filename(name: str) -> Optional[str]:
+    """Return ``base-N`` from ``chat_request_*_base-N.json`` or None."""
+    stem = Path(name).stem
+    m = re.search(r"_base-([\d.]+)$", stem)
+    if m:
+        return f"base-{m.group(1)}"
+    if stem.endswith("_v2_min") or stem.endswith("_v2") or stem == "chat_request":
+        return None
+    return None
 
 
 def _subdir_source_name(root: Path, sub: Path) -> str:
@@ -90,25 +117,71 @@ def list_chat_requests():
     return out
 
 
-def chat_request_path(api_version, mode, bucket=None, scope=None):
-    """Resolve chat_request path (api_version kept for callers)."""
+def chat_request_path(
+    api_version,
+    mode,
+    bucket=None,
+    scope=None,
+    *,
+    base_id: str | None = None,
+):
+    """Resolve chat_request path (api_version kept for callers).
+
+    Prefer ``base_id`` packs (``chat_request_<mode>_base-5.3.json``) when set
+    (ZC-WISH-001); fall back to legacy ``*_v2.json`` / ``*_v2_min.json``.
+    """
     del api_version
     dirs = chat_request_search_dirs(bucket, scope)
     if not dirs:
         dirs = [bundled_chat_requests_dir()]
 
+    base = (base_id or "").strip() or None
+    if base and not base.startswith("base-"):
+        base = f"base-{base}"
+
     if mode in (None, "", "default"):
         for d in dirs:
+            if base:
+                for name in (
+                    f"chat_request_default_{base}.json",
+                    f"chat_request_auto_{base}.json",
+                ):
+                    p = d / name
+                    if p.exists():
+                        return p
             p = d / "chat_request_v2.json"
             if p.exists():
                 return p
 
+    # Prefer exact base-N stem when requested
+    if base and mode:
+        want = f"chat_request_{mode}_{base}.json"
+        for d in dirs:
+            for p in d.rglob("*.json"):
+                if p.name == _MANIFEST_NAME:
+                    continue
+                if p.name == want:
+                    return p
+
     candidate = f"chat_request_{mode}_v2.json"
+    candidate_min = f"chat_request_{mode}_v2_min.json"
     for d in dirs:
         for p in d.rglob("*.json"):
             if p.name == _MANIFEST_NAME:
                 continue
-            if p.name == candidate or (mode == "default" and p.name == "chat_request_v2.json"):
+            if p.name in (candidate, candidate_min):
+                return p
+            if mode == "default" and p.name in (
+                "chat_request_v2.json",
+                "chat_request_v2_min.json",
+            ):
+                return p
+            # base-N without explicit base_id: any matching mode pack
+            if (
+                not base
+                and p.name.startswith(f"chat_request_{mode}_base-")
+                and p.name.endswith(".json")
+            ):
                 return p
 
     for d in dirs:
@@ -116,6 +189,26 @@ def chat_request_path(api_version, mode, bucket=None, scope=None):
         if p.exists():
             return p
     return None
+
+
+def load_chat_request_file(path: Path | str, *, expect_base_id: str | None = None) -> dict:
+    """Load a catalog JSON and optionally enforce ``_lineage.base_id`` (ZC-WISH-001)."""
+    p = Path(path)
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(doc, dict):
+        raise ValueError(f"chat_request must be object: {p}")
+    if expect_base_id:
+        want = expect_base_id if expect_base_id.startswith("base-") else f"base-{expect_base_id}"
+        lin = doc.get("_lineage") if isinstance(doc.get("_lineage"), dict) else {}
+        got = lin.get("base_id") or _base_id_from_filename(p.name)
+        if got and got != want:
+            raise ValueError(
+                f"chat_request base_id mismatch: file={got!r} expected={want!r} path={p}"
+            )
+        if not got:
+            raise ValueError(f"chat_request missing base_id lineage for expected {want!r}: {p}")
+    # Never invent contract_hash — leave stamped hash as-is or absent
+    return doc
 
 
 # ── chat_request loading ──────────────────────────────────────────

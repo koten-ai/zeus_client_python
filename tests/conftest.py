@@ -58,10 +58,32 @@ def patch_paths(monkeypatch, tmp_path, sample_config):
     bundled_chat_req_dir = tmp_path / "bundled_chat_requests"
     user_chat_req_dir = tmp_path / "chat_requests"
     src_chat = PACKAGE_DATA / "chat_requests"
-    if src_chat.is_dir():
+    if src_chat.is_dir() and any(src_chat.glob("*.json")):
         shutil.copytree(src_chat, bundled_chat_req_dir)
     else:
-        bundled_chat_req_dir.mkdir(parents=True)
+        # Minimal stubs so path/load tests work without vendored packs in package data.
+        bundled_chat_req_dir.mkdir(parents=True, exist_ok=True)
+        from zeus_client.contract_hash import compute_contract_hash
+
+        analytics = {
+            "_format": "zeus.chat_request.v2",
+            "_lineage": {"base_id": "base-1", "mode": "analytics"},
+            "messages": [{"role": "system", "content": "analytics catalog"}],
+            "verbs": [{"name": "find"}, {"name": "return"}],
+        }
+        analytics["contract"] = {"hash": compute_contract_hash(analytics)}
+        stubs = {
+            "chat_request_v2.json": {
+                "_lineage": {"base_id": "base-1", "mode": "default"},
+                "messages": [{"role": "system", "content": "default catalog"}],
+                "verbs": [{"name": "return"}],
+            },
+            "chat_request_analytics_v2.json": analytics,
+        }
+        for name, body in stubs.items():
+            (bundled_chat_req_dir / name).write_text(
+                json.dumps(body), encoding="utf-8"
+            )
     user_chat_req_dir.mkdir(parents=True, exist_ok=True)
     chat_log = tmp_path / "chats.jsonl"
     example_config = tmp_path / "config.example.json"

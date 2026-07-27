@@ -1,7 +1,8 @@
 """Extract schema-aligned zeus_data rows from an agent turn trace."""
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Mapping, MutableMapping, Optional
 
+from zeus_client.agent.control_plane import PolicyResult, apply_policy_table
 from zeus_client.agent.layer_a import LayerABag, parse_layer_a
 from zeus_client.zeus.catalog import get_mini_schema
 
@@ -21,6 +22,8 @@ class StructuredAgentResponse:
     warnings: list[str] = field(default_factory=list)
     # base-5 / base-5.2 Layer A (ZC-WISH-004…012) — G2 never chat UI
     layer_a: Optional[LayerABag] = None
+    # base-5 post-terminate policy table (ZC-WISH-010) — optional
+    policy: Optional[PolicyResult] = None
 
 
 def _parse_return_payload(trace: dict) -> dict:
@@ -328,8 +331,18 @@ def extract_structured_response(
     *,
     output_schema: Any = None,
     dual_read_array_triggers: bool = True,
+    apply_policy: bool = False,
+    hooks_jailbreak_score: float = 0.0,
+    hooks_must_refuse: bool = False,
+    message_map: Optional[Mapping[str, str]] = None,
+    output_request: Any = None,
+    sticky_flags: Optional[MutableMapping[str, bool]] = None,
 ) -> StructuredAgentResponse:
-    """Build a StructuredAgentResponse from a completed agent turn."""
+    """Build a StructuredAgentResponse from a completed agent turn.
+
+    When ``apply_policy`` is True, runs the Client policy table (ZC-WISH-010)
+    and prefers G1 ``policy.ui_text`` for :attr:`StructuredAgentResponse.answer`.
+    """
     return_payload = _parse_return_payload(trace)
     layer_a = parse_layer_a(
         return_payload or None,
@@ -372,6 +385,27 @@ def extract_structured_response(
             "layer_a: missing required " + ", ".join(layer_a.missing_required)
         )
 
+    policy: Optional[PolicyResult] = None
+    if apply_policy:
+        # Prefer explicit output_request; else guidance / settings on catalog
+        oreq = output_request
+        if oreq is None and isinstance(chat_req, dict):
+            oreq = (chat_req.get("guidance") or {}).get("output_request")
+            if oreq is None:
+                oreq = chat_req.get("output_request")
+        policy = apply_policy_table(
+            layer_a,
+            hooks_jailbreak_score=hooks_jailbreak_score,
+            hooks_must_refuse=hooks_must_refuse,
+            message_map=message_map,
+            output_request=oreq,
+            sticky_flags=sticky_flags,
+        )
+        g1 = policy.ui_text or g1
+        warnings.extend(policy.app_output_errors)
+        if policy.reasons:
+            warnings.append("policy: " + ", ".join(policy.reasons))
+
     return StructuredAgentResponse(
         answer=g1,
         zeus_data=zeus_data,
@@ -381,4 +415,5 @@ def extract_structured_response(
         source_tool=source_tool,
         warnings=warnings,
         layer_a=layer_a,
+        policy=policy,
     )

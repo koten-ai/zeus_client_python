@@ -4,7 +4,7 @@ from functools import lru_cache
 from importlib import resources
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 MAX_ROUNDS = 12
 MAX_TOOLCALLS_PER_ROUND = 32
