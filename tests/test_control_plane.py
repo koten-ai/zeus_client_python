@@ -3,6 +3,7 @@ import pytest
 
 from zeus_client.agent.control_plane import (
     DEFAULT_JAILBREAK_RULES,
+    HintsError,
     OutputRequestError,
     RuleMergeError,
     apply_policy_table,
@@ -11,6 +12,7 @@ from zeus_client.agent.control_plane import (
     inject_control_plane_blocks,
     merge_rules,
     normalize_output_request_app_fields,
+    render_hints_block,
     render_output_request_block,
     ruleset_id,
     settings_from_mapping,
@@ -260,3 +262,80 @@ def test_settings_from_mapping():
     assert s.max_rounds == 4
     assert s.locale == "en-US"
     assert s.denied_verbs == ["analyze"]
+
+
+def test_render_hints_p0_path_fields_multipart():
+    block = render_hints_block(
+        {
+            "path": {
+                "default_recipe": "TEXT",
+                "prefer": ["search→project"],
+                "avoid": ["describe first"],
+            },
+            "fields": ["Beer.description is text_fts → search"],
+            "multipart": {
+                "force_parts": True,
+                "max_parts": 4,
+                "join_default": "set_intersect",
+                "if_underspecified": "clarify",
+            },
+        }
+    )
+    assert "## Soft path hints" in block
+    assert "default_recipe: TEXT" in block
+    assert "text_fts" in block
+    assert "force_parts" in block
+    assert "mode=open" in block  # negative law in preamble
+
+
+def test_render_hints_hot_path_and_ab():
+    block = render_hints_block(
+        {
+            "hot_path": [
+                {
+                    "name": "fruit_beers",
+                    "when": "fruit|flavor",
+                    "steps": ["search fts", "project"],
+                }
+            ],
+            "avoid_patterns": ["do not use direction on order"],
+            "ab_arm": "B",
+            "ab_paste": "Prefer hybrid over pure fts.",
+        }
+    )
+    assert "fruit_beers" in block
+    assert "direction on order" in block
+    assert "ab_arm: B" in block
+
+
+def test_hints_hard_cap_rejected():
+    huge = {"fields": ["x" * 5000]}
+    with pytest.raises(HintsError, match="hard cap"):
+        render_hints_block(huge)
+
+
+def test_inject_hints_after_rules():
+    chat = {
+        "messages": [
+            {
+                "role": "system",
+                "content": "Base.\n\n## SCOPE BRIEF\n\nscope: beer/_default\n",
+            }
+        ]
+    }
+    rules = merge_rules({"coupon_presented": "Note coupons."})
+    out = inject_control_plane_blocks(
+        chat,
+        rules=rules,
+        company_context="Beer and Brewery entities.",
+        hints={
+            "path": {"default_recipe": "LOOKUP", "prefer": ["find→get"]},
+            "fields": ["abv is gsi → find"],
+        },
+    )
+    content = out["messages"][0]["content"]
+    assert content.index("## Company context") < content.index("## Business rules")
+    assert content.index("## Business rules") < content.index("## Soft path hints")
+    assert "LOOKUP" in content
+    # structured bag for middle-man
+    assert out["guidance"]["injections"]["hints"]["path"]["default_recipe"] == "LOOKUP"

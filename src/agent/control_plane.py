@@ -612,6 +612,205 @@ def apply_policy_table_from_payload(
 
 
 # ---------------------------------------------------------------------------
+# Soft hints.* (ZC-WISH-040 / base-6 — hash-excluded after rules{})
+# ---------------------------------------------------------------------------
+
+# Soft ~1–2 KB; hard reject above this (HINTS.md / PROMPT_SETTINGS spirit)
+HINTS_SOFT_BYTES = 2048
+HINTS_HARD_BYTES = 4096
+
+_RECIPE_OK = frozenset({"TEXT", "LOOKUP", "TOP_N", "HOP", "COMPOSE"})
+
+
+class HintsError(ValueError):
+    """Invalid or oversized hints inject."""
+
+
+def normalize_hints(raw: Any) -> dict[str, Any]:
+    """Return a clean hints dict (accepts bare map or ``{"hints": {...}}``)."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise HintsError("hints must be an object")
+    h = raw.get("hints") if isinstance(raw.get("hints"), dict) else raw
+    if not isinstance(h, dict):
+        raise HintsError("hints must be an object")
+    # Shallow copy only known top-level keys we render (pass-through rest as-is)
+    return dict(h)
+
+
+def estimate_hints_bytes(hints: Mapping[str, Any]) -> int:
+    """UTF-8 size of rendered block (approximate inject tax)."""
+    try:
+        return len(render_hints_block(hints).encode("utf-8"))
+    except HintsError:
+        return 0
+
+
+def _fmt_list(items: Any) -> list[str]:
+    if not isinstance(items, list):
+        return []
+    out: list[str] = []
+    for x in items:
+        if isinstance(x, str) and x.strip():
+            out.append(x.strip())
+        elif isinstance(x, dict):
+            # hot_path entry
+            name = x.get("name") or x.get("id") or "path"
+            when = x.get("when") or ""
+            steps = x.get("steps")
+            if isinstance(steps, list):
+                step_s = " → ".join(str(s) for s in steps)
+            else:
+                step_s = str(steps or "")
+            line = f"{name}"
+            if when:
+                line += f" when={when!r}"
+            if step_s:
+                line += f": {step_s}"
+            out.append(line)
+    return out
+
+
+def render_hints_block(
+    hints: Any,
+    *,
+    soft_bytes: int = HINTS_SOFT_BYTES,
+    hard_bytes: int = HINTS_HARD_BYTES,
+) -> str:
+    """Render soft steer section for the system prompt (after rules{}).
+
+    Raises :class:`HintsError` if the rendered block exceeds ``hard_bytes``.
+    """
+    h = normalize_hints(hints)
+    if not h:
+        return ""
+
+    lines: list[str] = [
+        "## Soft path hints (this turn only)",
+        "",
+        "Prefer these biases for first moves. They never replace hard `rules{}`, "
+        "company_context, MINI-SCHEMA, or required Layer A. Multi-paragraph multi-ask "
+        "is planning — not mode=open.",
+        "",
+    ]
+
+    path = h.get("path") if isinstance(h.get("path"), dict) else {}
+    if path:
+        lines.append("### Path / recipe")
+        recipe = path.get("default_recipe")
+        if isinstance(recipe, str) and recipe.strip():
+            r = recipe.strip().upper()
+            if r in _RECIPE_OK:
+                lines.append(f"- default_recipe: {r}")
+            else:
+                lines.append(f"- default_recipe: {recipe.strip()}")
+        prefer = _fmt_list(path.get("prefer"))
+        avoid = _fmt_list(path.get("avoid"))
+        if prefer:
+            lines.append("- prefer: " + "; ".join(prefer))
+        if avoid:
+            lines.append("- avoid: " + "; ".join(avoid))
+        lines.append("")
+
+    fields = _fmt_list(h.get("fields"))
+    if fields:
+        lines.append("### Field gotchas")
+        for f in fields[:8]:
+            lines.append(f"- {f}")
+        lines.append("")
+
+    multipart = h.get("multipart") if isinstance(h.get("multipart"), dict) else {}
+    if multipart:
+        lines.append("### Multi-intent")
+        if multipart.get("force_parts") is True:
+            lines.append("- force_parts: true (decompose paragraph goals)")
+        if multipart.get("max_parts") is not None:
+            lines.append(f"- max_parts: {multipart.get('max_parts')}")
+        if multipart.get("join_default"):
+            lines.append(f"- join_default: {multipart.get('join_default')}")
+        if multipart.get("if_underspecified"):
+            lines.append(f"- if_underspecified: {multipart.get('if_underspecified')}")
+        lines.append("")
+
+    hot = _fmt_list(h.get("hot_path"))
+    if hot:
+        lines.append("### Hot paths (empiric)")
+        for line in hot[:10]:
+            lines.append(f"- {line}")
+        lines.append("")
+
+    avoid_pat = _fmt_list(h.get("avoid_patterns"))
+    if avoid_pat:
+        lines.append("### Avoid patterns")
+        for line in avoid_pat[:8]:
+            lines.append(f"- {line}")
+        lines.append("")
+
+    join = h.get("join") if isinstance(h.get("join"), dict) else {}
+    if join:
+        lines.append("### Join bias (soft)")
+        if join.get("prefer_edges"):
+            edges = _fmt_list(join.get("prefer_edges"))
+            if edges:
+                lines.append("- prefer_edges: " + ", ".join(edges))
+        if join.get("noise_floor") is not None:
+            lines.append(f"- noise_floor: {join.get('noise_floor')}")
+        if join.get("super_node_cap") is not None:
+            lines.append(f"- super_node_cap: {join.get('super_node_cap')}")
+        lines.append("")
+
+    if h.get("ab_arm") or h.get("ab_paste"):
+        lines.append("### A/B")
+        if h.get("ab_arm"):
+            lines.append(f"- ab_arm: {h.get('ab_arm')}")
+        if isinstance(h.get("ab_paste"), str) and h["ab_paste"].strip():
+            lines.append(f"- ab_paste: {h['ab_paste'].strip()}")
+        lines.append("")
+
+    term = h.get("terminate") if isinstance(h.get("terminate"), dict) else {}
+    if term:
+        lines.append("### Terminate soft")
+        if term.get("soft_require"):
+            req = term["soft_require"]
+            if isinstance(req, list):
+                lines.append("- soft_require: " + ", ".join(str(x) for x in req))
+            else:
+                lines.append(f"- soft_require: {req}")
+        if term.get("summary_style"):
+            lines.append(f"- summary_style: {term.get('summary_style')}")
+        lines.append("")
+
+    budget = h.get("budget") if isinstance(h.get("budget"), dict) else {}
+    if budget:
+        lines.append("### Budget / channel")
+        for k in ("prefer_one_pipeline", "max_steps", "search_timeout_ms", "channel"):
+            if k in budget and budget[k] is not None:
+                lines.append(f"- {k}: {budget[k]}")
+        lines.append("")
+
+    product = h.get("product") if isinstance(h.get("product"), dict) else {}
+    if product:
+        lines.append("### Product")
+        for k in ("motion", "channel", "default_limit"):
+            if product.get(k) is not None:
+                lines.append(f"- {k}: {product.get(k)}")
+        lines.append("")
+
+    if h.get("playbook_id"):
+        lines.append(f"### Playbook chip\n- playbook_id: {h.get('playbook_id')}\n")
+
+    text = "\n".join(lines).rstrip() + "\n"
+    n = len(text.encode("utf-8"))
+    if n > hard_bytes:
+        raise HintsError(
+            f"hints inject {n} bytes exceeds hard cap {hard_bytes} "
+            f"(soft target {soft_bytes})"
+        )
+    return text
+
+
+# ---------------------------------------------------------------------------
 # Inject helpers (hash-excluded prompt zones)
 # ---------------------------------------------------------------------------
 
@@ -622,9 +821,15 @@ def inject_control_plane_blocks(
     rules: Optional[Mapping[str, str]] = None,
     company_context: str = "",
     output_request: Any = None,
+    hints: Any = None,
     after_brief: bool = True,
+    store_hints: bool = True,
 ) -> dict:
     """Append control-plane inject blocks to system prompt (deepcopy).
+
+    Wire order (hash-excluded when after brief marker)::
+
+        company_context → rules{} → output_request → hints.*
 
     When ``after_brief`` is True and a SCOPE BRIEF / MINI-SCHEMA marker is
     present, blocks are appended after the marker so strip-for-hash still works
@@ -642,21 +847,42 @@ def inject_control_plane_blocks(
                 parts.append(block)
         except OutputRequestError:
             raise
+    if hints is not None:
+        hblock = render_hints_block(hints)
+        if hblock:
+            parts.append(hblock)
 
     section = "\n\n".join(p for p in parts if p)
-    if not section:
+    if not section and not (store_hints and hints):
         return chat_req
 
     out = deepcopy(chat_req)
+
+    # Mirror business_logic: keep structured bag under guidance.injections
+    if store_hints and hints is not None:
+        try:
+            hnorm = normalize_hints(hints)
+        except HintsError:
+            hnorm = {}
+        if hnorm:
+            (
+                out.setdefault("guidance", {})
+                .setdefault("injections", {})
+            )["hints"] = hnorm
+
+    if not section:
+        return out
+
     block = "\n\n" + section
 
     def _splice(text: str) -> str:
         if not text:
             return section
-        if "Company context" in text and "## Business rules" in text:
-            # already injected — avoid duplicate
-            if company_context and "## Company context" in text:
-                return text
+        # Avoid double-inject of full control-plane suite
+        if company_context and "## Company context" in text and "## Soft path hints" in text:
+            return text
+        if hints is not None and "## Soft path hints" in text and not company_context and not rules:
+            return text
         if after_brief and (
             "## SCOPE BRIEF" in text or "## MINI-SCHEMA" in text
         ):
