@@ -294,20 +294,139 @@ async def test_rehydrate_existing_session_success(http_client, monkeypatch):
     assert result["sid"] == sid
     assert result["this_user_round"] == 3
     assert trace["session_rehydrate"]["server_round"] == 2
+    assert trace["session"]["rehydrated"] is True
+    assert trace["session"]["created"] is False
+    assert trace["session"]["contract_status"] == "none"
+    assert any("contract_status=none" in n for n in trace["notes"])
 
 
 @pytest.mark.asyncio
-async def test_rehydrate_failure_continues(http_client):
+async def test_rehydrate_existing_session_with_contract_match(http_client, monkeypatch):
+    zcfg = {"enable_durable_sessions": True}
+    sid = "sess-rehydrate-match"
+    trace = _trace()
+    respx.get(f"{ZEUS_URL}/v2/session/{sid}?rounds=6").mock(return_value=httpx.Response(
+        200,
+        json={
+            "session_id": sid,
+            "round": 5,
+            "hash": "md5:abc123",
+            "contract_id": "analytics_v4",
+            "conversation": [{"role": "user"}] * 10,
+            "rounds_loaded": 5,
+        },
+    ))
+    monkeypatch.setattr(
+        "zeus_client.agent.session_phase.resolve_contract_for_scope",
+        lambda *a, **k: ("analytics_v4", "md5:abc123"),
+    )
+    monkeypatch.setattr(
+        "zeus_client.agent.session_phase.extract_stamped_hash",
+        lambda _r: "md5:abc123",
+    )
+    monkeypatch.setattr(
+        "zeus_client.agent.session_phase.compute_contract_hash",
+        lambda _r: "md5:abc123",
+    )
+    result = await setup_contract_and_session(
+        ZEUS_URL, zcfg, BUCKET, SCOPE, "analytics", _chat_req("md5:abc123"), "next",
+        sid, 5, trace, "md5:abc123", "md5:abc123", HEADERS,
+    )
+    assert result["sid"] == sid
+    assert result["this_user_round"] == 6
+    assert result["contract_id"] == "analytics_v4"
+    assert result["contract_hash"] == "md5:abc123"
+    assert trace["session"]["contract_status"] == "match"
+    assert trace["session"]["rehydrated"] is True
+    assert trace["session_rehydrate"]["contract_status"] == "match"
+    assert any("contract_status=match" in n for n in trace["notes"])
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_existing_session_with_contract_drift(http_client, monkeypatch):
+    zcfg = {"enable_durable_sessions": True}
+    sid = "sess-rehydrate-drift"
+    trace = _trace()
+    respx.get(f"{ZEUS_URL}/v2/session/{sid}?rounds=6").mock(return_value=httpx.Response(
+        200,
+        json={
+            "session_id": sid,
+            "round": 2,
+            "hash": "md5:old-hash",
+            "contract_id": "analytics_v4",
+            "conversation": [{"role": "user"}, {"role": "assistant"}],
+        },
+    ))
+    monkeypatch.setattr(
+        "zeus_client.agent.session_phase.resolve_contract_for_scope",
+        lambda *a, **k: ("analytics_v4", "md5:new-hash"),
+    )
+    monkeypatch.setattr(
+        "zeus_client.agent.session_phase.extract_stamped_hash",
+        lambda _r: "md5:new-hash",
+    )
+    monkeypatch.setattr(
+        "zeus_client.agent.session_phase.compute_contract_hash",
+        lambda _r: "md5:new-hash",
+    )
+    result = await setup_contract_and_session(
+        ZEUS_URL, zcfg, BUCKET, SCOPE, "analytics", _chat_req("md5:new-hash"), "next",
+        sid, 2, trace, "md5:new-hash", "md5:new-hash", HEADERS,
+    )
+    assert result["sid"] == sid
+    assert trace["session"]["contract_status"] == "drift"
+    assert any("contract_status=drift" in n for n in trace["notes"])
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_failure_creates_fresh_session(http_client):
+    zcfg = {
+        "enable_durable_sessions": True,
+        "scope_contracts": {f"{BUCKET}/{SCOPE}": {"contract_id": "cid", "contract_hash": "md5:h"}},
+    }
+    trace = _trace()
+    dead = "stale-sid"
+    respx.get(f"{ZEUS_URL}/v2/session/{dead}?rounds=6").mock(return_value=httpx.Response(404))
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
+        201,
+        json={"session_id": "sess-recovered", "round": 1, "contract_status": "match"},
+        headers={"X-Zeus-Req-Id": "creq-recover"},
+    ))
+    result = await setup_contract_and_session(
+        ZEUS_URL, zcfg, BUCKET, SCOPE, "analytics", _chat_req(), "hi",
+        dead, 6, trace, "md5:h", "md5:h", HEADERS,
+    )
+    assert result["sid"] == "sess-recovered"
+    assert result["this_user_round"] == 1
+    assert trace["session"]["created"] is True
+    assert trace["session"]["contract_status"] == "match"
+    assert trace["session"]["recovered_from"] == dead
+    assert trace["session_rehydrate"]["failed"] is True
+    assert trace["session_rehydrate"]["recreated"] is True
+    assert any("rehydrate" in n and "failed" in n for n in trace["notes"])
+    assert any("creating fresh session" in n for n in trace["notes"])
+    assert any("session create sess-recover" in n for n in trace["notes"])
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_failure_and_create_failure_clears_sid(http_client):
     zcfg = {"enable_durable_sessions": True}
     trace = _trace()
-    sid = "stale-sid"
-    respx.get(f"{ZEUS_URL}/v2/session/{sid}?rounds=6").mock(return_value=httpx.Response(404))
+    dead = "stale-sid-2"
+    respx.get(f"{ZEUS_URL}/v2/session/{dead}?rounds=6").mock(return_value=httpx.Response(404))
+    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
+        409, text='{"error":"contract_required"}',
+    ))
     result = await setup_contract_and_session(
         ZEUS_URL, zcfg, BUCKET, SCOPE, "auto", _chat_req(), "hi",
-        sid, 1, trace, "", "", HEADERS,
+        dead, 1, trace, "", "", HEADERS,
     )
-    assert result["this_user_round"] == 2
+    assert result["sid"] == ""
+    assert result["this_user_round"] == 1
+    assert trace["session"]["created"] is False
+    assert trace["session"]["recovered_from"] == dead
     assert any("rehydrate" in n and "failed" in n for n in trace["notes"])
+    assert any("session create failed" in n for n in trace["notes"])
 
 
 @pytest.mark.asyncio

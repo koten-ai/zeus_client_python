@@ -16,6 +16,10 @@ cd zeus_client_python
 pip install -e ".[dev]"
 ```
 
+## Version 0.2.0 — base-5 control plane
+
+Optional **base-5** Client floor (object rules, Layer A policy table, `base_id` catalog load). See [docs/BASE5_CLIENT.md](docs/BASE5_CLIENT.md). Legacy `*_v2.json` paths remain the default when `base_id` is omitted. Never invent production `contract_hash` values — Hub stamp only.
+
 ## Agent flow
 
 One `run_agent` call executes a single user turn through these phases:

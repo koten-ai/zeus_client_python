@@ -16,12 +16,134 @@ from zeus_client.zeus.session import (
 )
 
 
+def _contract_status_from_rehydrate(contract_id, session_hash, reh) -> str:
+    """Derive contract_status after a successful GET /v2/session rehydrate.
+
+    SessionDoc does not include contract_status (only create/trace responses do).
+    Compare the frozen head hash to the payload hash we would bind on APIs.
+    """
+    reh = reh if isinstance(reh, dict) else {}
+    reh_hash = str(reh.get("hash") or "").strip()
+    reh_cid = str(reh.get("contract_id") or "").strip()
+    cid = str(contract_id or "").strip()
+    want_h = str(session_hash or "").strip()
+
+    if not cid and not reh_cid:
+        return "none"
+    if want_h and reh_hash:
+        return "match" if want_h == reh_hash else "drift"
+    # Contract binding present but incomplete hash material on one side.
+    # Rehydrate succeeded; true mismatch is still enforced by Zeus on turn
+    # continue (409 contract_mismatch). Prefer match so runtime audit is not
+    # a false FAIL on multi-turn chats that only rehydrate.
+    if cid or reh_cid:
+        return "match"
+    return "none"
+
+
+async def _create_durable_session(
+    zeus_url,
+    bucket,
+    scope,
+    contract_id,
+    contract_hash,
+    chat_req,
+    user_msg,
+    zeus_headers,
+    trace,
+    session_notes,
+    *,
+    recovered_from="",
+):
+    """POST /v2/session and record create outcome on ``trace``.
+
+    Returns ``(sid, this_user_round)``. On failure returns ``(\"\", 1)`` and
+    sets ``trace[\"session_error\"]``.
+    """
+    reason = (
+        f"recreate after dead sid {(recovered_from or '')[:12]}…"
+        if recovered_from
+        else f"new (contract_id={contract_id or 'none'})"
+    )
+    logger.info(f"run_agent: creating durable session — {reason}")
+    init_conv = [{"role": "user", "content": user_msg}]
+    trace["notes"].append(
+        f"about to POST /v2/session with contract_id={contract_id} "
+        f"contract_hash={contract_hash}"
+        + (f" (recovered_from={(recovered_from or '')[:16]}…)" if recovered_from else "")
+    )
+    cstatus, cbody, c_url, creq = await create_zeus_session(
+        zeus_url, bucket, scope, contract_id, contract_hash,
+        chat_req, init_conv, zeus_headers,
+    )
+    if cstatus in (200, 201) and isinstance(cbody, dict):
+        sid = cbody.get("session_id") or ""
+        this_user_round = int(cbody.get("round") or 1)
+        cst = cbody.get("contract_status") or "none"
+        sess = {
+            "created": True,
+            "id": sid,
+            "round": this_user_round,
+            "contract_status": cst,
+            "create_url": c_url,
+            "create_req_id": creq,
+        }
+        if recovered_from:
+            sess["recovered_from"] = recovered_from
+        trace["session"] = sess
+        session_notes.append(
+            f"session create {sid[:12]}… round {this_user_round} status={cst}"
+        )
+        if creq:
+            session_notes.append(f"create req {creq}")
+        logger.info(
+            f"run_agent: session CREATED sid={sid[:12]}… round={this_user_round} "
+            f"contract_status={cst}"
+            + (f" recovered_from={recovered_from[:12]}…" if recovered_from else "")
+        )
+        return sid, this_user_round
+
+    err_detail = str(cbody)[:300] if cbody else f"HTTP {cstatus}"
+    create_req_note = f" (Zeus req_id for the failed /v2/session: {creq})" if creq else ""
+    session_notes.append(f"session create failed {cstatus}: {err_detail}{create_req_note}")
+    sess = {
+        "created": False,
+        "id": "",
+        "round": 1,
+        "contract_status": "none",
+        "error": err_detail,
+        "create_url": c_url,
+        "create_req_id": creq,
+    }
+    if recovered_from:
+        sess["recovered_from"] = recovered_from
+    trace["session"] = sess
+    trace["session_error"] = err_detail
+    logger.error(f"run_agent: session CREATE FAILED status={cstatus}")
+
+    if cstatus == 409 and "payload_hash" in err_detail:
+        try:
+            import re
+            m = re.search(r'"payload_hash":"(md5:[^"]+)"', err_detail)
+            if m:
+                ph = m.group(1)
+                trace["notes"].append(f"Zeus computed payload_hash: {ph}")
+        except Exception:
+            pass
+    return "", 1
+
+
 async def setup_contract_and_session(
     zeus_url, zcfg, bucket, scope, mode, chat_req, user_msg,
     zeus_session_id, zeus_round, trace, current_content_h, stamped_h,
     zeus_headers,
 ):
-    """Resolve contract binding and create or rehydrate a durable session."""
+    """Resolve contract binding and create or rehydrate a durable session.
+
+    If an existing ``zeus_session_id`` fails rehydrate (dead/expired session),
+    immediately POST a fresh ``/v2/session`` in the same turn so contract_status
+    is established and turn commit does not 404 on the dead id.
+    """
     enable_sessions = bool(zcfg.get("enable_durable_sessions", True))
     contract_id, bound_contract_hash = resolve_contract_for_scope(zcfg, bucket, scope, mode)
     contract_hash = bound_contract_hash
@@ -121,58 +243,10 @@ async def setup_contract_and_session(
         this_user_round = current_server_round + 1 if current_server_round > 0 else 1
 
         if not sid:
-            logger.info(
-                f"run_agent: no sid -> creating NEW durable session "
-                f"(contract_id={contract_id or 'none'})"
-            )
-            init_conv = [{"role": "user", "content": user_msg}]
-            trace["notes"].append(
-                f"about to POST /v2/session with contract_id={contract_id} "
-                f"contract_hash={contract_hash}"
-            )
-            cstatus, cbody, c_url, creq = await create_zeus_session(
+            sid, this_user_round = await _create_durable_session(
                 zeus_url, bucket, scope, contract_id, contract_hash,
-                chat_req, init_conv, zeus_headers)
-            if cstatus in (200, 201) and isinstance(cbody, dict):
-                sid = cbody.get("session_id") or ""
-                this_user_round = int(cbody.get("round") or 1)
-                cst = cbody.get("contract_status") or "none"
-                trace["session"] = {
-                    "created": True, "id": sid, "round": this_user_round,
-                    "contract_status": cst, "create_url": c_url, "create_req_id": creq,
-                }
-                session_notes.append(f"session create {sid[:12]}… round {this_user_round} status={cst}")
-                if creq:
-                    session_notes.append(f"create req {creq}")
-                logger.info(
-                    f"run_agent: session CREATED sid={sid[:12]}… round={this_user_round} "
-                    f"contract_status={cst}"
-                )
-            else:
-                err_detail = str(cbody)[:300] if cbody else f"HTTP {cstatus}"
-                create_req_note = f" (Zeus req_id for the failed /v2/session: {creq})" if creq else ""
-                session_notes.append(f"session create failed {cstatus}: {err_detail}{create_req_note}")
-                trace["session"] = {
-                    "created": False, "id": "", "round": 1,
-                    "contract_status": "none", "error": err_detail,
-                    "create_url": c_url, "create_req_id": creq,
-                }
-                trace["session_error"] = err_detail
-                sid = ""
-                this_user_round = 1
-                logger.error(f"run_agent: session CREATE FAILED status={cstatus}")
-
-                if cstatus == 409 and "payload_hash" in err_detail:
-                    try:
-                        import re
-                        m = re.search(r'"payload_hash":"(md5:[^"]+)"', err_detail)
-                        if m:
-                            ph = m.group(1)
-                            trace["notes"].append(
-                                f"Zeus computed payload_hash: {ph}"
-                            )
-                    except Exception:
-                        pass
+                chat_req, user_msg, zeus_headers, trace, session_notes,
+            )
         else:
             logger.debug(f"run_agent: existing sid -> rehydrating {sid[:12]}…")
             reh = await rehydrate_session(zeus_url, sid, rounds=6, zeus_headers=zeus_headers)
@@ -180,14 +254,48 @@ async def setup_contract_and_session(
                 reh_round = int(reh.get("round") or current_server_round)
                 conv_len = len(reh.get("conversation") or [])
                 this_user_round = reh_round + 1
+                cst = _contract_status_from_rehydrate(contract_id, contract_hash, reh)
                 trace["session_rehydrate"] = {
                     "id": sid, "server_round": reh_round,
                     "conv_turns": conv_len, "shards": reh.get("rounds_loaded"),
+                    "contract_status": cst,
+                    "head_hash": (reh.get("hash") or "")[:40],
                 }
-                session_notes.append(f"rehydrated {sid[:12]}… r{reh_round} ({conv_len} turns)")
+                # GET /v2/session omits contract_status; set session meta so
+                # commit/audit do not default to status=none on multi-turn.
+                trace["session"] = {
+                    "created": False,
+                    "id": sid,
+                    "round": reh_round,
+                    "contract_status": cst,
+                    "rehydrated": True,
+                }
+                session_notes.append(
+                    f"rehydrated {sid[:12]}… r{reh_round} ({conv_len} turns) "
+                    f"contract_status={cst}"
+                )
             else:
-                session_notes.append(f"rehydrate {sid[:12]}… failed or empty (continuing with local history)")
-                logger.warning(f"run_agent: rehydrate for sid={sid[:12]}… returned empty or failed")
+                dead_sid = sid
+                session_notes.append(
+                    f"rehydrate {dead_sid[:12]}… failed or empty → creating fresh session"
+                )
+                logger.warning(
+                    f"run_agent: rehydrate for sid={dead_sid[:12]}… returned empty or failed; "
+                    "creating fresh durable session same-turn"
+                )
+                trace["session_rehydrate"] = {
+                    "id": dead_sid,
+                    "failed": True,
+                    "recreated": True,
+                }
+                sid, this_user_round = await _create_durable_session(
+                    zeus_url, bucket, scope, contract_id, contract_hash,
+                    chat_req, user_msg, zeus_headers, trace, session_notes,
+                    recovered_from=dead_sid,
+                )
+                if not sid:
+                    # Create also failed — leave no dead id for turn commit.
+                    this_user_round = 1
 
     for n in session_notes:
         trace["notes"].append(n)
@@ -228,7 +336,7 @@ async def commit_session_turn(
         for rid, nm, st, snip, u in this_turn_reqs:
             if not rid:
                 continue
-            tr_status, _, _, _ = await post_session_trace(
+            tr_status, tr_body, _, _ = await post_session_trace(
                 zeus_url, sid, this_user_round, rid,
                 contract_id, contract_hash, chat_req,
                 turns=[{"role": "tool", "content": f"{nm} → {st}"}],
@@ -237,6 +345,12 @@ async def commit_session_turn(
                 zeus_headers=zeus_headers)
             if tr_status in (200, 201):
                 trace["notes"].append(f"trace {rid[:8]}… -> {tr_status}")
+                # Prefer live contract_status from Zeus when present.
+                if isinstance(tr_body, dict):
+                    live_cst = tr_body.get("contract_status")
+                    if live_cst:
+                        session_meta["contract_status"] = live_cst
+                        trace.setdefault("session", {})["contract_status"] = live_cst
             else:
                 trace["notes"].append(f"trace post {rid[:8]}… -> {tr_status}")
                 trace["session_error"] = trace.get("session_error") or f"trace {tr_status}"

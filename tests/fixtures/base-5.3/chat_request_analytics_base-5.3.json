@@ -1,0 +1,911 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_hash": "md5:5aacbf1d7a4d9d5de9436cdffbce050f",
+  "_hash_policy": {
+    "excluded": [
+      "guidance",
+      "contract",
+      "metadata",
+      "_.*"
+    ],
+    "pointers": [
+      "/instructions/system_prompt",
+      "/instructions/verb_usage_guide",
+      "/instructions/verb_order",
+      "/instructions/response_expectations",
+      "/masq",
+      "/verbs",
+      "/messages/*/content"
+    ],
+    "version": 1
+  },
+  "_note": "base-5.3 chat_request (breaking freeze: object rules/triggers, app_output, control-plane injects). Required: summary, query_decomposition, decomposition, confidence. Recommended: policy_action (soft-require), subject_confidence, jail_break_attempt, wish_i_knew, business_rules_triggers{}, app_output. See docs/ROADMAP.md · docs/RULES_OBJECT_AND_OUTPUT_REQUEST.md · docs/PROMPT_SETTINGS.md. Production pin may still be base-1 until CURRENT.json is updated.",
+  "_version": 2,
+  "contract": {
+    "builder": "base-4",
+    "hash": "md5:5aacbf1d7a4d9d5de9436cdffbce050f",
+    "id": "analytics_base5_2",
+    "name": "V2 analytics · base-5.2",
+    "scope": "prototype/_unbound",
+    "built_at": "2026-07-26T04:47:57Z",
+    "built_by": "zeus_chat_request base-4",
+    "prototype": true,
+    "parent_base_id": "base-5.1",
+    "text_pack_base_id": "base-5.3"
+  },
+  "messages": [
+    {
+      "content": "You have access to verbs for retrieving and transforming data. Current mode: `analytics`. Prefer V2 verbs over V1 tool names.\n\n## How Zeus data works (read this once)\n\nZeus is an **AI-Ready overlay** over operator-owned documents: it projects entities, attributes, and relations you can navigate — it does not replace the system of record, and you must **not invent** facts into empty fields.\n\n1) **World map** (already in this message when present)\n   - SCOPE BRIEF = scale + vocabulary for this scope/mode\n   - MINI-SCHEMA = shape: legal `where` keys, index kind (`gsi`|`fts`|`display`), `entity_fk` / `inverse_fks`, samples (`ex:`). Absence ≠ invent.\n   - WALK_PATHS (if present) = pre-validated FK chains\n\n2) **Access path → verb** (prefer cheapest that answers)\n   - id / exact key      → `get`\n   - equality / [gsi]    → `find` (`where` equality only on MINI-SCHEMA paths)\n   - language / text_fts → `search` (`strategy:fts` or `hybrid`)\n   - multi-hop / graph   → `traverse` (respect mode hop caps; real links > noise)\n   - multi-step          → `pipeline`; terminate with `return` (or terminating pipeline)\n   - fresher inventory   → `describe` **only if** BRIEF/MINI-SCHEMA missing or user asks for live inventory/indexes (never a substitute for inject)\n\n3) **Answer from evidence only**\n   - Layer A fields are an **emit contract**: fill from tool results / brief — not a form for inventing data.\n   - Missing data → clarify, empty rows, or `wish_i_knew` / `data_gaps` — do not invent.\n\n## Execution style (latency matters)\n\n- Act, don't narrate. Emit tool call or ONE pipeline directly.\n- One decisive call (or parallel) per round. Correct `@as.ids` / `@step.ids` on first try. Do not repeat the exact same pipeline or search in later rounds. For terminating pipeline you pre-write summary + query_decomposition before seeing data.\n- Always end with `return` (structured) or put terminating fields on pipeline. Never plain text.\n- Prefer pipeline for multi-step/recall+shape. Use prior step results (`@step.ids` — not bare `@step`). If you called pipeline and got data, stop — do not retry same pipeline.\n\n## CRITICAL EFFICIENCY & CORRECTNESS RULES\n\n1. **NEVER rediscover stats or entity lists.**\n   The SCOPE BRIEF (in this message) + MINI-SCHEMA already contain:\n   - nodes_total, entities_total, edges_total\n   - nodes_by_type / entities_by_type (with counts)\n   - per-entity numeric facets (min/max for abv, price, etc.)\n   - top categories / attributes\n   Use these values directly for counts, ranges, \"how many\", or entity type lists.\n   **Do not** call get_stats, count_nodes, list_entity_types, or emit raw `COUNT(*) ... zeus_nodes ... entity_type` (or similar system/indexstats counts).\n   These cause 10-20+ repeated expensive queries per turn. If the brief seems stale, use a single cheap `find` with `limit:1` or `describe` instead.\n\n2. **Vague \"answer\" or bare \"List\" intents cause massive waste.**\n   - Always decompose first (use query_decomposition).\n   - Use the brief + MINI-SCHEMA for overview/stats.\n   - Prefer targeted `find` with `where` (from schema) or `search` with `query_text`.\n   - Never trigger full discovery fanouts for vague requests.\n\n3. **\"Top N\", \"highest\", \"lowest\", \"most\", \"ranked by\", \"sorted desc\" queries:**\n   - Do **not** guess ranges in `where` for ranking.\n   - Retrieve a broad candidate set with `find`/`search` (large `limit` or broad filter).\n   - Then `order` with `by: \"field:<name>\"` and **`asc: false`** for highest/desc (default `asc` is true = ascending), then `project`/`get` with `limit: N`.\n   - Prefer one `pipeline` for ranking multi-steps.\n   - Use `order` for post-filter ranking; `find` where is for exact filters only. **Never use `direction` on order** — the API uses **`asc`** (boolean).\n\nTerminating pipeline: put final fields at top level. Must include summary + decomposition + query_decomposition.\n\nScope is a hard boundary (see mode overlay for tenancy posture).\n\nHard cap: **8 steps** unless the mode overlay raises traversal hop expectations (still respect engine caps).\n\nconfidence (STRING only: high | med | low — never object).\n\n## Verb Priority & Cost Model\n\nChoose cheapest path that still answers under this mode's evidence rules (see **Mode: analytics** below).\n\n## Terminate (Layer A) — copy this shape\n\nOn every terminating `return` / terminating pipeline, emit structured fields (never plain text only).\n**Fill Layer A from evidence only** — never invent summary facts, counts, or field values that tools did not return.\n\nfield                    | req | audience | type / notes\nsummary                  | yes | user     | string — facts for the user only\nquery_decomposition      | yes | analytics| object — intent+entity core; optional facets when signaled\ndecomposition            | yes | analytics| object — targets/predicates/output grounded in MINI-SCHEMA\nconfidence               | yes | soft UI  | string enum high|med|low — NOT a number\npolicy_action            | no  | client   | answer|clarify|refuse|error\nsubject_confidence       | no  | admin    | number 0.0–1.0 — “right entity/subject?” (≠ confidence)\njail_break_attempt       | no  | admin    | number 0.0–1.0 — subjective policy-bypass signal (not 0|1 boolean)\nwish_i_knew              | no  | admin    | array max 3 of {what, kind, why?, severity?} — gaps *I* lacked; [] if none\nbusiness_rules_triggers  | no* | client   | object { rule_id: bool } sparse (missing=false); keys match inject rules\nnode_refs / entity_refs / provenance | no | user/ui | optional grounding\n\nOne-line distinctions:\n- query_decomposition = what the USER wanted\n- wish_i_knew = what *I* was missing (rules|message|schema|data|tool)\n- confidence = overall answer quality; subject_confidence = entity/subject surety\n- Never put admin/client fields (scores, wish_i_knew, triggers) into summary\n- Do NOT emit Detective/store fields (attribution, decision, diagnosis, spans, inject_inspect)\n\nExample return (valid skeleton — fill from this turn):\n```\nsummary: \"…\"\nconfidence: med\nquery_decomposition: { intent: \"List\", entity: \"Beer\" }\ndecomposition: { targets: [{ entity_type: \"Beer\", focus: [\"name\"] }], predicates: {}, output: \"rows\" }\npolicy_action: answer\nsubject_confidence: 0.8\njail_break_attempt: 0.0\nwish_i_knew: []\nbusiness_rules_triggers: {}\nnode_refs: []\nentity_refs: []\n```\n\nquery_decomposition optional facets only when signaled: audience, geo, theme, occasion, price, parts[], other.\nMulti-part turns: shared fields top-level; distinct sub-goals in parts[].\nOmitting required fields on terminate is a contract miss.\nUse @step.ids. Lead multi-step with pipeline. Lite schema injected at runtime.\n\n### base-5 Client inject (not hashed; middle-man)\n- company_context: short product identity (soft ≤150 / hard ≤250 words) — tenant people/places/things + key links\n- business_injection.rules: object { rule_id: \"one sentence\" } — not a string array\n- output_request.app.fields: each { type, description }; model fills app_output values only\n- policy_action: soft-required (answer|clarify|refuse|error) for Client message_* mapping\n- business_rules_triggers: object map, not boolean[]\n\n### Dual gaps (G2 admin / Helios — optional)\n- wish_i_knew[]: classic ops feedback (rules|message|schema|data|tool|other)\n- data_gaps[]: acquisition only (schema|data|index) with entity_type/field when known — never chat UI\n- See docs/WISH_I_KNEW_DUAL.md\n\n## Mode: analytics\n\n**Mission:** Safe default for internal BI and knowledge-graph help. Prefer **real links, not noise**. Cross-corpus exploration with degree-aware traversal and evidence before claims.\n\n**Entities:** Use registered defaults from MINI-SCHEMA / ontology (typical: Email, Account, Person, Organization, product entities in scope). Do not invent entity types not in the brief.\n\n**Join / noise posture:**\n- Confidence floor ~**0.50** mindset: do not chase weak co-occurrence as fact.\n- Prefer structural + semantic edges over pure topological coincidence.\n- Super-nodes: cap fan-out; use filters before deep traverse.\n\n**Edges / relations:** Core graph relations only unless brief shows more. Prefer high-selectivity joins.\n\n**Traversal:** Default max hops modest (engine default ~3). Do not explode walks for vague asks.\n\n**Terminate flavor:** Clear user summary; solid `query_decomposition` + `decomposition` grounded in schema; `confidence` honest when data is thin.\n\n**Don't:**\n- Treat every shared attribute as a hard identity link.\n- Fan out discovery tools when SCOPE BRIEF already answers counts.\n- Put admin scores in `summary`.\n\n**Example pipeline (ranked list):**\n```\nsteps: [\n  {\"as\": \"cands\", \"verb\": \"find\", \"entity_type\": \"<Type>\", \"limit\": 100},\n  {\"as\": \"ord\", \"verb\": \"order\", \"ids\": \"@cands.ids\", \"by\": \"field:<field>\", \"asc\": false},\n  {\"as\": \"top\", \"verb\": \"project\", \"ids\": \"@ord.ids\", \"fields\": [\"name\", \"<field>\"], \"limit\": 5}\n]\n```\n",
+      "role": "system"
+    }
+  ],
+  "verbs": [
+    {
+      "type": "function",
+      "function": {
+        "name": "describe",
+        "description": "[cheap] Scope orientation (stats/entity_types/edge_types). WHEN: BRIEF/MINI-SCHEMA missing or user asks for fresh inventory/indexes. WHEN NOT: inject already present — do not rediscover. KEY: never returns node rows (use find/search); optional include defaults to stats+entity_types+edge_types.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "stats",
+                  "entity_types",
+                  "edge_types",
+                  "modes",
+                  "tools",
+                  "indexes"
+                ]
+              },
+              "description": "Slices to return. Omit for default [stats, entity_types, edge_types]."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get",
+        "description": "[cheap] KV hydrate by public node id (1..50). WHEN: after find/search produced ids. WHEN NOT: as a query — no where/entity_type. KEY: bodies opt-in via include:[body]; default is summary only.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "description": "Public node ids to fetch (1..50)."
+            },
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "body",
+                  "edges",
+                  "edges_in",
+                  "edges_out"
+                ]
+              },
+              "description": "body=full node; edges*=edge bags. Omit body for summary only."
+            }
+          },
+          "required": [
+            "ids"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "find",
+        "description": "[cheap] GSI/predicate anchor. WHEN: equality filters or counts on MINI-SCHEMA [gsi]/scalar fields. WHEN NOT: free-text (use search). KEY: where is EQUALITY-ONLY on MINI-SCHEMA paths — never text_fts; return routes rows|ids|count|selectivity; entity_type must be exact MINI-SCHEMA name.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "entity_type": {
+              "type": "string",
+              "description": "Exact MINI-SCHEMA entity type (e.g. Beer), not a human label."
+            },
+            "where": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Equality filters only on [gsi]/scalar MINI-SCHEMA paths. No $gt/$lt; no text_fts fields."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows/ids to return."
+            },
+            "return": {
+              "type": "string",
+              "enum": [
+                "rows",
+                "ids",
+                "count",
+                "selectivity"
+              ],
+              "description": "Router: rows|ids → find_nodes; count → count; selectivity → entity_selectivity. Prefer ids then project/get."
+            }
+          },
+          "required": [
+            "entity_type"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "traverse",
+        "description": "[mod] Graph expansion from ids. WHEN: multi-hop / connected questions after seeds exist. WHEN NOT: first-step orientation or FTS. KEY: shape REQUIRED (hop|bfs|path|subgraph|walk_path); walk_path uses nested walk_path object from ## WALK_PATHS / FK map — entity_fk is often GSI not zeus_edges.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "shape": {
+              "type": "string",
+              "enum": [
+                "hop",
+                "bfs",
+                "path",
+                "subgraph",
+                "walk_path"
+              ],
+              "description": "Walker router: hop|bfs|path|subgraph|walk_path."
+            },
+            "from": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Seed public node ids (from find/search)."
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Target ids for shape:path."
+            },
+            "depth": {
+              "type": "integer",
+              "description": "Hop depth for hop/bfs/subgraph (respect mode hop caps)."
+            },
+            "via": {
+              "type": "string",
+              "description": "Optional edge type / namespace filter when applicable."
+            },
+            "direction": {
+              "type": "string",
+              "description": "Graph walk direction when applicable (e.g. in|out|both) — not the order.asc sort flag."
+            },
+            "max_nodes": {
+              "type": "integer",
+              "description": "Cap expansion size."
+            },
+            "return": {
+              "type": "string",
+              "description": "Optional return projection token for some shapes."
+            },
+            "walk_path": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Required for shape:walk_path — nested {from, path, return} per V2/WALK_PATHS."
+            }
+          },
+          "required": [
+            "shape"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "search",
+        "description": "[exp] FTS/hybrid/vector recall. WHEN: text_fts / language / similarity. WHEN NOT: pure GSI equality (use find first). KEY: strategy required; entity_type exact MINI-SCHEMA name; never put text_fts paths in find where; short query_text; timeout_ms 5000+ on large scopes (default often too short).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "entity_type": {
+              "type": "string",
+              "description": "Exact MINI-SCHEMA entity type (not a human label)."
+            },
+            "strategy": {
+              "type": "string",
+              "enum": [
+                "vector",
+                "semantic",
+                "fts",
+                "hybrid",
+                "spatial"
+              ],
+              "description": "Engine router. fts/hybrid need query_text; spatial needs seed_node_id."
+            },
+            "query_text": {
+              "type": "string",
+              "description": "Search text (prefer short; 1–few tokens for fts)."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max hits."
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "description": "Search timeout ms. Prefer 5000+ on large scopes."
+            },
+            "where": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Optional GSI equality filters on hybrid (not text_fts paths)."
+            },
+            "seed_node_id": {
+              "type": "string",
+              "description": "Seed for spatial / similarity-by-example strategies."
+            }
+          },
+          "required": [
+            "entity_type",
+            "strategy"
+          ],
+          "examples": [
+            {
+              "entity_type": "Beer",
+              "strategy": "fts",
+              "query_text": "lager",
+              "limit": 20,
+              "timeout_ms": 5000
+            },
+            {
+              "entity_type": "Beer",
+              "strategy": "hybrid",
+              "query_text": "lager",
+              "limit": 20,
+              "timeout_ms": 5000,
+              "where": {
+                "style": "American-Style Lager"
+              }
+            },
+            {
+              "strategy": "spatial",
+              "seed_node_id": "n_abc123",
+              "limit": 10,
+              "entity_type": "Beer"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "analyze",
+        "description": "[exp] Offline analytics job over the scope. WHEN: corpus-shape questions (communities, duplicates, …). WHEN NOT: ordinary list/search Q&A — prefer find/search. KEY: job required; may return status:pending until first compute; some jobs mode-gated.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "job": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "duplicates",
+                "super_nodes",
+                "bridges",
+                "outliers",
+                "node_importance",
+                "spatial_disagreements",
+                "topics"
+              ],
+              "description": "Named offline-backed analytics job."
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Optional job-specific args forwarded to the v1 tool."
+            }
+          },
+          "required": [
+            "job"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "explain",
+        "description": "[cheap] Planner / cost pass-through. WHEN: debug which plan/shape is cheaper before a heavy call. WHEN NOT: end-user answers or data retrieval.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set",
+        "description": "[cheap] Boolean compose of id lists (union|intersect|difference|xor). WHEN: combine prior step id bags inside a pipeline. KEY: inputs is 2..8 arrays of ids.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "union",
+                "intersect",
+                "difference",
+                "xor"
+              ],
+              "description": "Set operation."
+            },
+            "inputs": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 8,
+              "items": {
+                "type": "array"
+              },
+              "description": "2..8 id lists (often @step.ids bindings resolved by pipeline)."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Optional output size cap."
+            }
+          },
+          "required": [
+            "op",
+            "inputs"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "order",
+        "description": "[cheap] Re-rank an id list. WHEN: top-N / highest / lowest after find/search. KEY: by is id|created_at|field:<name> (prefix field: for document fields); sort with asc boolean (default true=ascending; use asc:false for desc). Never use direction.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {},
+              "description": "Id list or scored ids from prior step (@step.ids)."
+            },
+            "by": {
+              "type": "string",
+              "description": "Ranker: id | created_at | field:<name> (e.g. field:abv)."
+            },
+            "asc": {
+              "type": "boolean",
+              "description": "true=ascending (default), false=descending for highest/top-N."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Optional output size cap."
+            }
+          },
+          "required": [
+            "ids",
+            "by"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "enrich",
+        "description": "[cheap] Attach named fields to ids without changing cardinality/rank. WHEN: decorate for later steps. WHEN NOT: final flat rows (use project).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {},
+              "description": "Id list from prior step."
+            },
+            "with": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Field/attachment names to attach."
+            }
+          },
+          "required": [
+            "ids",
+            "with"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "project",
+        "description": "[cheap] Shape flat output rows with a field allow-list. WHEN: final user-facing columns from MINI-SCHEMA. WHEN NOT: id-only bag transforms (use set/order/enrich).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {},
+              "description": "Id list from prior step."
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fields to include in each row (MINI-SCHEMA paths)."
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "row",
+                "card",
+                "citation"
+              ],
+              "description": "Presentation format (default row)."
+            }
+          },
+          "required": [
+            "ids",
+            "fields"
+          ]
+        }
+      }
+    },
+    {
+      "function": {
+        "description": "[mod] Preferred multi-step DAG (max 8). WHEN: multi-verb plans. KEY: bind prior ids as @step.ids (not bare @step); put terminating Layer A fields top-level (same required four as return) to end the turn in one round. Typical: find|search → order → project. One scope only.",
+        "name": "pipeline",
+        "parameters": {
+          "properties": {
+            "confidence": {
+              "enum": [
+                "high",
+                "med",
+                "low"
+              ],
+              "type": "string",
+              "description": "When terminating: overall confidence high|med|low"
+            },
+            "decomposition": {
+              "type": "object",
+              "description": "When terminating: data plan object"
+            },
+            "entity_refs": {
+              "items": {},
+              "type": "array",
+              "description": "Optional grounding entity refs."
+            },
+            "node_refs": {
+              "items": {},
+              "type": "array",
+              "description": "Optional grounding node ids supporting the answer."
+            },
+            "provenance": {
+              "items": {},
+              "type": "array",
+              "description": "Optional tool-step / bag provenance."
+            },
+            "query_decomposition": {
+              "type": "object",
+              "description": "When terminating: business intent facets object"
+            },
+            "return": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "steps": {
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "as": {
+                    "description": "Unique step name; reference results as @as.ids (not bare @as).",
+                    "type": "string"
+                  },
+                  "verb": {
+                    "description": "Step verb name (find, search, order, project, …).",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "verb",
+                  "as"
+                ],
+                "type": "object"
+              },
+              "maxItems": 8,
+              "type": "array",
+              "description": "Ordered steps (max 8). Prefer @step.ids bindings between steps."
+            },
+            "summary": {
+              "type": "string",
+              "description": "When terminating: G1 USER-FACING summary (same as return.summary)."
+            },
+            "policy_action": {
+              "type": "string",
+              "enum": [
+                "answer",
+                "clarify",
+                "refuse",
+                "error"
+              ],
+              "description": "Client control-plane: maps to business_injection message_* boilerplate. Not user-admin telemetry."
+            },
+            "subject_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "ADMIN-ONLY subjective 0.0–1.0: confidence in subject/entity identification. Never show in chat UI."
+            },
+            "jail_break_attempt": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "ADMIN-ONLY subjective 0.0–1.0: how strongly this turn looks like a policy/jailbreak attempt (not boolean). Never show in chat UI."
+            },
+            "wish_i_knew": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "what": {
+                    "type": "string",
+                    "description": "What was missing (rules/message/schema/data/tool)"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "rules",
+                      "message",
+                      "schema",
+                      "data",
+                      "tool",
+                      "other"
+                    ]
+                  },
+                  "why": {
+                    "type": "string",
+                    "description": "Optional: how it would have helped"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "med",
+                      "high"
+                    ]
+                  }
+                },
+                "required": [
+                  "what",
+                  "kind"
+                ],
+                "additionalProperties": true
+              },
+              "description": "ADMIN-ONLY gap report (max 3). What was missing in rules/message/schema/data this turn. Empty [] if nothing material. Never user chat UI."
+            },
+            "business_rules_triggers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "description": "CLIENT control-plane: object keyed by business_injection.rules ids (true = rule applies this round). Missing key = false. base-5 object-only."
+            },
+            "app_output": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Optional app bag when Client sent output_request.app.fields (type+description). Values only; Client validates. Never admin scores."
+            },
+            "data_gaps": {
+              "type": "array",
+              "maxItems": 3,
+              "description": "G2: acquisition gaps schema|data|index (Helios). Optional. Never UI.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "what": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "schema",
+                      "data",
+                      "index"
+                    ]
+                  },
+                  "entity_type": {
+                    "type": "string"
+                  },
+                  "field": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "why": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string"
+                  },
+                  "blocked_answer": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] Terminal answer — Layer A emit contract (see system ## Terminate). REQUIRED: summary, query_decomposition, decomposition, confidence. RECOMMENDED: policy_action, subject_confidence, jail_break_attempt, wish_i_knew, business_rules_triggers{}. Fill from evidence only; never put admin/client fields in summary. Prefer terminating pipeline when multi-step data is already planned.",
+        "name": "return",
+        "parameters": {
+          "properties": {
+            "confidence": {
+              "type": "string",
+              "enum": [
+                "high",
+                "med",
+                "low"
+              ],
+              "description": "Overall answer confidence (string enum). Distinct from subject_confidence float."
+            },
+            "decomposition": {
+              "type": "object",
+              "description": "Data plan grounded in MINI-SCHEMA: targets, predicates, output type.",
+              "additionalProperties": true
+            },
+            "query_decomposition": {
+              "type": "object",
+              "description": "Business intent facets object (intent+entity core). Never a top-level string/array. Used for evidence-loop / Helios.",
+              "additionalProperties": true
+            },
+            "summary": {
+              "type": "string",
+              "description": "G1 USER-FACING: human-readable facts for the user. No admin scores, no triggers, no Detective fields."
+            },
+            "policy_action": {
+              "type": "string",
+              "enum": [
+                "answer",
+                "clarify",
+                "refuse",
+                "error"
+              ],
+              "description": "Client control-plane: maps to business_injection message_* boilerplate. Not user-admin telemetry."
+            },
+            "subject_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "ADMIN-ONLY subjective 0.0–1.0: confidence in subject/entity identification. Never show in chat UI."
+            },
+            "jail_break_attempt": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "ADMIN-ONLY subjective 0.0–1.0: how strongly this turn looks like a policy/jailbreak attempt (not boolean). Never show in chat UI."
+            },
+            "wish_i_knew": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "what": {
+                    "type": "string",
+                    "description": "What was missing (rules/message/schema/data/tool)"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "rules",
+                      "message",
+                      "schema",
+                      "data",
+                      "tool",
+                      "other"
+                    ]
+                  },
+                  "why": {
+                    "type": "string",
+                    "description": "Optional: how it would have helped"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "med",
+                      "high"
+                    ]
+                  }
+                },
+                "required": [
+                  "what",
+                  "kind"
+                ],
+                "additionalProperties": true
+              },
+              "description": "ADMIN-ONLY gap report (max 3). What was missing in rules/message/schema/data this turn. Empty [] if nothing material. Never user chat UI."
+            },
+            "business_rules_triggers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "description": "CLIENT control-plane: object keyed by business_injection.rules ids (true = rule applies this round). Missing key = false. base-5 object-only."
+            },
+            "node_refs": {
+              "type": "array",
+              "items": {},
+              "description": "Optional grounding node ids supporting the answer."
+            },
+            "entity_refs": {
+              "type": "array",
+              "items": {},
+              "description": "Optional grounding entity refs."
+            },
+            "provenance": {
+              "type": "array",
+              "items": {},
+              "description": "Optional tool-step / bag provenance."
+            },
+            "app_output": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Optional app bag when Client sent output_request.app.fields (type+description). Values only; Client validates. Never admin scores."
+            },
+            "data_gaps": {
+              "type": "array",
+              "maxItems": 3,
+              "description": "G2: acquisition gaps schema|data|index (Helios). Optional. Never UI.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "what": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "schema",
+                      "data",
+                      "index"
+                    ]
+                  },
+                  "entity_type": {
+                    "type": "string"
+                  },
+                  "field": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "why": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string"
+                  },
+                  "blocked_answer": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "summary",
+            "query_decomposition",
+            "decomposition",
+            "confidence"
+          ],
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "type": "function"
+    }
+  ],
+  "_lineage": {
+    "base_id": "base-5.3",
+    "custom_id": null,
+    "mode": "analytics",
+    "profile": "v2_min",
+    "kind": "base",
+    "parent_base_id": "base-5.2",
+    "prototype": false,
+    "file_stem": "chat_request_analytics_base-5.3.json",
+    "status": "current_candidate"
+  },
+  "_base_meta": {
+    "base_id": "base-5.3",
+    "status": "current_candidate",
+    "breaks_compat": true,
+    "audience": "zeus_client + Hub feedback",
+    "docs": [
+      "docs/BIBLE.md",
+      "docs/ROADMAP.md",
+      "docs/RULES_OBJECT_AND_OUTPUT_REQUEST.md",
+      "docs/PROMPT_SETTINGS.md",
+      "docs/migration/base-4_to_base-5/",
+      "docs/BASE_AGENT_PLAYBOOK.md"
+    ],
+    "layer_a": {
+      "required": [
+        "summary",
+        "query_decomposition",
+        "decomposition",
+        "confidence"
+      ],
+      "recommended": [
+        "policy_action",
+        "subject_confidence",
+        "jail_break_attempt",
+        "wish_i_knew",
+        "business_rules_triggers",
+        "node_refs",
+        "entity_refs"
+      ],
+      "forbidden_for_model": [
+        "attribution",
+        "decision",
+        "diagnosis",
+        "inject_inspect",
+        "prompt_checklist",
+        "spans",
+        "support_pack"
+      ],
+      "note": "Layer A = return tool args. Layer B = Detective/store (server-built)."
+    },
+    "client_pass_in": {
+      "business_injection.rules": "stable index list; model returns business_rules_triggers[] parallel",
+      "business_injection.message_failure": "branded user-facing fail copy",
+      "session.zeus_round": "Client-authoritative round clock"
+    },
+    "token_budget": "Keep rules[] short; do not stuff Base prose (10KB→60KB trap).",
+    "mode": "analytics",
+    "created_at": "2026-07-26T04:01:10Z",
+    "source": "v2/base/base-1/min/chat_request_analytics_v2_min.json",
+    "file_naming": "chat_request_<mode>_base-<id>.json (not *_v2_min.json)",
+    "diet": "merged_terminate_into_one_table_and_example",
+    "parent_text_pack": "base-3",
+    "parent_json_pack": "base-2-prototype",
+    "prototype": false,
+    "packaging": "base-4",
+    "updated_at": "2026-07-26T18:23:02Z",
+    "breaking": "object rules/triggers; app_output; control-plane inject contracts",
+    "mode_overlay": true,
+    "snapshot": true,
+    "theme": "Skinny + world-model CORE + verb clarity (content on base-5 wire)",
+    "parent_base_id": "base-5.2"
+  }
+}

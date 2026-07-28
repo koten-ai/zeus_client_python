@@ -111,6 +111,154 @@ def test_terminating_pipeline_data_envelope():
     assert resp.source_tool == "pipeline"
 
 
+def test_terminating_pipeline_named_step_binding_under_data():
+    """V2 terminating pipeline returns data.<as>.rows plus meta keys — not a flat list.
+
+    Regression: treating the whole data dict as one Business/Beer row dropped
+    step bindings (tampa_proj/vaProj) as unknown fields → empty zeus_data.
+    """
+    trace = {
+        "steps": [],
+        "tool_calls": [
+            {
+                "name": "pipeline",
+                "status": 200,
+                "args": {
+                    "steps": [
+                        {
+                            "as": "cands",
+                            "verb": "find",
+                            "entity_type": "Beer",
+                            "where": {"city": "Arena"},
+                            "return": "ids",
+                        },
+                        {
+                            "as": "vaProj",
+                            "verb": "project",
+                            "ids": "@cands.ids",
+                            "fields": ["name", "abv"],
+                            "format": "row",
+                        },
+                    ],
+                    "return": ["vaProj"],
+                    "summary": "Beers in Arena",
+                    "confidence": "high",
+                    "decomposition": {"targets": ["Beer"], "predicates": {"city": "Arena"}},
+                },
+                "result_json": {
+                    "confidence": "high",
+                    "data": {
+                        "job_fingerprint": {
+                            "algorithm": "md5",
+                            "canonical_bytes": 590,
+                            "server_md5": "md5:deadbeef",
+                            "verified": False,
+                        },
+                        "meta": {"elapsed_ms": 18, "steps_executed": 2, "total_cost": 3.05},
+                        "status": "ok",
+                        "vaProj": {
+                            "rows": [
+                                {
+                                    "id": "file::abc",
+                                    "doc_key": "beer:1",
+                                    "name": "Coopers Sparkling Ale",
+                                    "abv": 5.8,
+                                    "node_id": "file::abc",
+                                },
+                                {
+                                    "id": "file::def",
+                                    "doc_key": "beer:2",
+                                    "name": "Pale Lager",
+                                    "abv": 4.2,
+                                    "node_id": "file::def",
+                                },
+                            ]
+                        },
+                    },
+                    "decomposition": {"targets": ["Beer"], "predicates": {"city": "Arena"}},
+                    "summary": "Beers in Arena",
+                    "turn_complete": True,
+                },
+            },
+        ],
+    }
+    resp = extract_structured_response("Beers in Arena", trace, base_chat_req())
+    assert resp.source_tool == "pipeline"
+    assert resp.entity_type == "Beer"
+    assert len(resp.zeus_data) == 2
+    assert resp.zeus_data[0]["name"] == "Coopers Sparkling Ale"
+    assert resp.zeus_data[0]["abv"] == 5.8
+    assert resp.zeus_data[0]["id"] == "file::abc"
+    assert resp.zeus_data[1]["name"] == "Pale Lager"
+    # Envelope keys must not surface as dropped "fields on entity Beer"
+    assert not any("job_fingerprint" in w for w in resp.warnings)
+    assert not any("tampa_proj" in w or "vaProj" in w for w in resp.warnings)
+    assert not any("dropped unknown field 'meta'" in w for w in resp.warnings)
+    assert not any("dropped unknown field 'status'" in w for w in resp.warnings)
+
+
+def test_terminating_pipeline_prefers_return_binding_order():
+    """When multiple step bindings have rows, use pipeline return[] order."""
+    trace = {
+        "steps": [],
+        "tool_calls": [
+            {
+                "name": "pipeline",
+                "status": 200,
+                "args": {
+                    "steps": [
+                        {"as": "first", "verb": "find", "entity_type": "Beer"},
+                        {"as": "second", "verb": "project", "entity_type": "Beer"},
+                    ],
+                    "return": ["second"],
+                },
+                "result_json": {
+                    "data": {
+                        "status": "ok",
+                        "first": {
+                            "rows": [{"id": "n_old", "name": "Skip Me", "abv": 1.0}],
+                        },
+                        "second": {
+                            "rows": [{"id": "n_keep", "name": "Keep Me", "abv": 6.0}],
+                        },
+                    },
+                },
+            },
+        ],
+    }
+    resp = extract_structured_response("ok", trace, base_chat_req())
+    assert len(resp.zeus_data) == 1
+    assert resp.zeus_data[0]["name"] == "Keep Me"
+    assert resp.zeus_data[0]["id"] == "n_keep"
+
+
+def test_terminating_pipeline_items_under_named_binding():
+    """Some verbs emit items instead of rows under the step binding."""
+    trace = {
+        "steps": [],
+        "tool_calls": [
+            {
+                "name": "pipeline",
+                "status": 200,
+                "args": {
+                    "steps": [{"as": "hits", "verb": "find", "entity_type": "Beer"}],
+                    "return": ["hits"],
+                },
+                "result_json": {
+                    "data": {
+                        "status": "ok",
+                        "hits": {
+                            "items": [{"id": "n_1", "name": "IPA", "abv": 6.5}],
+                        },
+                    },
+                },
+            },
+        ],
+    }
+    resp = extract_structured_response("ok", trace, base_chat_req())
+    assert resp.zeus_data == [{"id": "n_1", "name": "IPA", "abv": 6.5}]
+
+
 def test_legacy_rows_shape():
     trace = {
         "steps": [],
