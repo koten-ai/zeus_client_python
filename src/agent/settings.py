@@ -53,6 +53,10 @@ class ClientSettings:
     redaction: Optional[dict] = None
     # soft-require policy_action when brand/company inject present
     soft_require_policy_action: bool = True
+    # After Zeus tool data: True = insight AI turn (Hub Debug default);
+    # False = cheap path (UI/tables + thin Layer A, no extra open re-plan).
+    # ZC-WISH-044 · package default True to mirror Zeus Hub.
+    ai_process_result: bool = True
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any] | None) -> "ClientSettings":
@@ -223,4 +227,22 @@ def prepare_settings(settings: ClientSettings | Mapping | None) -> ClientSetting
     s.ruleset_id = rid
     if s.company_context:
         s.company_context, _ = truncate_company_context(s.company_context)
+    s.ai_process_result = bool(s.ai_process_result)
     return s
+
+
+# Package / Hub Debug default when no ClientSettings is supplied.
+DEFAULT_AI_PROCESS_RESULT = True
+
+
+def effective_ai_process_result(
+    settings: ClientSettings | Mapping | None,
+) -> bool:
+    """Resolve ai_process_result: settings bag → package default (True)."""
+    if settings is None:
+        return DEFAULT_AI_PROCESS_RESULT
+    if isinstance(settings, ClientSettings):
+        return bool(settings.ai_process_result)
+    if isinstance(settings, Mapping) and "ai_process_result" in settings:
+        return bool(settings["ai_process_result"])
+    return DEFAULT_AI_PROCESS_RESULT

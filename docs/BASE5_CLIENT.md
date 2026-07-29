@@ -1,6 +1,6 @@
-# base-5 Client control plane (0.2.0)
+# base-5 Client control plane (0.2.x)
 
-**Status:** shipped in package **0.2.0** on the `feat/base-5-client-floor` line.  
+**Status:** base-5 floor in **0.2.0**; **`ai_process_result`** (ZC-WISH-044) in **0.2.1**.  
 **SoT packs:** [zeus_chat_request](https://github.com/koten-ai/zeus_chat_request) `v2/base/base-5.3/` (wire = base-5).  
 **Pin:** production `CURRENT.json` remains **base-1** — do not invent stamps; Hub stamp only.
 
@@ -17,6 +17,7 @@
 | Policy table | every structured/settings turn → `policy`, `ui_text`, `flags` |
 | Dual jailbreak scores | model `jail_break_attempt` **and** `hooks_jailbreak_score` (never same field) |
 | G1 UI vs artifacts | `ui` / `ui_text` vs `artifacts` (G2 never chat UI) |
+| AI on Zeus result | `ClientSettings.ai_process_result` (default **`true`**, Hub Debug parity) |
 
 ## Minimal example
 
@@ -45,6 +46,8 @@ settings = ClientSettings(
     },
     locale="en-US",
     channel="web",
+    # Hub default on; set False for cheap path (AI → Zeus → UI, no insight hop)
+    ai_process_result=True,
 )
 
 answer, trace, history, session, structured = await run_agent(
@@ -58,6 +61,21 @@ print(structured.policy, structured.ui_text, structured.flags)
 print(structured.artifacts)  # admin / metrics — not end-user chrome
 ```
 
+## `ai_process_result` (ZC-WISH-044)
+
+| Value | Loop after Zeus tool data |
+| --- | --- |
+| **`true` (package default)** | Insight path — after terminating `return` / pipeline `turn_complete`, one **no-tools** synthesis turn narrates tool JSON (mirrors Zeus Hub Debug “AI on Zeus result”). Non-terminating tools continue the open multi-round loop. |
+| **`false`** | Cheap path — after tools with data, force a short final answer (no open re-plan); after terminate, return the terminal summary immediately without an insight hop. |
+
+```python
+# Product / lab cheap path (show tables, skip second billable essay)
+settings = ClientSettings(ai_process_result=False)
+await run_agent(..., settings=settings)
+```
+
+Still honors `max_rounds`. When insight is on and `max_rounds < 2`, Client raises the floor to 2.
+
 ## Hash safety
 
 Injects splice **after** `## SCOPE BRIEF` / `## MINI-SCHEMA` only.  
@@ -69,12 +87,13 @@ Injects splice **after** `## SCOPE BRIEF` / `## MINI-SCHEMA` only.
 - `guidance.injections.business_logic` list inject still works (ZC-36 lint path).
 - Prefer named `settings.rules` for new base-5 work.
 - base-6 soft `hints.*` inject is **not** in 0.2.0 (ZC-WISH-040 later).
+- Wishlist/ROADMAP product default for `ai_process_result` is often **false**; this package defaults **true** to match Hub Debug. Set `false` explicitly for product cheap cost.
 
 ## Tests
 
 ```bash
 pytest tests/test_base_catalog_load.py tests/test_layer_a.py \
   tests/test_settings_rules_merge.py tests/test_prompt_inject_hash_stable.py \
-  tests/test_policy_table.py -q
+  tests/test_policy_table.py tests/test_agent_loop.py tests/test_agent_tool_round.py -q
 pytest -q
 ```
