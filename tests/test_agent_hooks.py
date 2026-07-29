@@ -89,11 +89,12 @@ async def test_hooks_fire_through_tool_round(patched_tool_round):
     assert any("loyalty_tier=Gold" in (m.get("content") or "") for m in messages)
     messages.append(msg)
 
-    answer, should_break, _ = await tr.execute_tool_calls(
+    answer, should_break, _, outcome = await tr.execute_tool_calls(
         1, msg.get("tool_calls") or [], messages,
         "v2", "http://zeus", "beer-sample", "_default", None,
         {}, {}, hooks, ctx, trace, lambda: 0, "turn-1", "conv-1", False, [],
     )
+    assert outcome.tools_executed == 1
 
     rec = trace["tool_calls"][0]
     assert rec["args"].get("_injected_filter") is True

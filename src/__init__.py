@@ -5,7 +5,7 @@ from zeus_client.agent.layer_a import LayerA, parse_layer_a, normalize_triggers
 from zeus_client.agent.loop import run_agent
 from zeus_client.agent.policy import PolicyDecision, decide_policy
 from zeus_client.agent.response import StructuredAgentResponse, extract_structured_response
-from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings
+from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings, effective_ai_process_result
 from zeus_client.config import (
     load_config,
     resolve_llm_provider_config,
@@ -80,6 +80,7 @@ __all__ = [
     "PolicyDecision",
     "StructuredAgentResponse",
     "decide_policy",
+    "effective_ai_process_result",
     "extract_structured_response",
     "freeze_session_rules",
     "list_base_catalogs",

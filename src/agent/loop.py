@@ -11,8 +11,18 @@ from zeus_client.agent.hooks import AgentHooks
 from zeus_client.agent.prompt_inject import apply_control_plane_inject
 from zeus_client.agent.response import extract_structured_response
 from zeus_client.agent.session_phase import commit_session_turn, setup_contract_and_session
-from zeus_client.agent.settings import ClientSettings, prepare_settings
-from zeus_client.agent.tool_round import execute_tool_calls, run_llm_round
+from zeus_client.agent.settings import (
+    ClientSettings,
+    effective_ai_process_result,
+    prepare_settings,
+)
+from zeus_client.agent.tool_round import (
+    CHEAP_FINAL_AFTER_ZEUS_INSTRUCTION,
+    INSIGHT_AFTER_ZEUS_INSTRUCTION,
+    execute_tool_calls,
+    force_final_llm_answer,
+    run_llm_round,
+)
 from zeus_client.constants import MAX_ROUNDS, normalize_api_version
 from zeus_client.llm.client import cache_hints
 from zeus_client.logging_setup import logger
@@ -223,6 +233,15 @@ async def setup_turn_context(
     max_rounds = MAX_ROUNDS
     if prepared and prepared.max_rounds:
         max_rounds = max(1, int(prepared.max_rounds))
+    ai_process = effective_ai_process_result(prepared)
+    # Insight after Zeus tools needs at least 2 AI hops when the first hop
+    # only plans tools (Hub / ROADMAP open question: floor max_rounds).
+    if ai_process and max_rounds < 2:
+        max_rounds = 2
+        trace["notes"].append(
+            "ai_process_result=true: max_rounds raised to 2 for insight turn"
+        )
+    trace["notes"].append(f"ai_process_result={str(ai_process).lower()}")
 
     ctx = {
         "user_msg": user_msg, "bucket": bucket, "scope": scope,
@@ -231,6 +250,7 @@ async def setup_turn_context(
         "base_id": base_id,
         "ruleset_id": prepared.ruleset_id if prepared else None,
         "settings": prepared,
+        "ai_process_result": ai_process,
     }
     cache_headers, cache_body = cache_hints(provider_id, base_url, conv_id)
     if cache_headers or cache_body:
@@ -259,6 +279,12 @@ async def setup_turn_context(
     )
 
 
+def _ai_process_from_tc(tc: TurnContext) -> bool:
+    if tc.ctx and "ai_process_result" in tc.ctx:
+        return bool(tc.ctx["ai_process_result"])
+    return effective_ai_process_result(tc.settings)
+
+
 async def run_agent(
     zeus_url, zcfg, base_url, api_key, model, api_version, mode,
     bucket, scope, collection, user_msg, prior_turns,
@@ -282,6 +308,8 @@ async def run_agent(
       - ``base_id``: load ``chat_request_<mode>_<base_id>.json`` (ZC-WISH-001)
       - ``settings``: rules merge/freeze, company_context, output_request, locale…
       - post-terminate policy table when structured or settings present
+      - ``settings.ai_process_result`` (default True): after Zeus tool data,
+        True = insight synthesis turn; False = cheap terminal / thin final
     """
     api_version = normalize_api_version(api_version)
     logger.debug(
@@ -325,6 +353,7 @@ async def run_agent(
     at_ms = tc.ctx["_at_ms"]
     answer = None
     max_rounds = tc.max_rounds
+    ai_process = _ai_process_from_tc(tc)
 
     for rnd in range(1, max_rounds + 1):
         tc.trace["rounds"] = rnd
@@ -356,12 +385,73 @@ async def run_agent(
 
         tc.messages.append(msg)
 
-        answer, should_break, tc.zeus_headers = await execute_tool_calls(
+        answer, should_break, tc.zeus_headers, outcome = await execute_tool_calls(
             rnd, msg.get("tool_calls") or [], tc.messages,
             api_version, zeus_url, bucket, scope, collection,
             zcfg, tc.zeus_headers, hooks, tc.ctx, tc.trace, at_ms,
             tc.turn_id, conv_id, tc.toon_on, tc.this_turn_reqs,
         )
+
+        # ZC-WISH-044 / Hub: after Zeus tools, cheap vs insight branch
+        if outcome.return_seen:
+            terminal = (outcome.terminal_summary or answer or "").strip()
+            if ai_process:
+                # One more no-tools hop to narrate tool JSON (Hub default on).
+                synth = await force_final_llm_answer(
+                    rnd, model, tc.messages, tc.cache_body, tc.cache_headers,
+                    base_url, api_key, hooks, tc.ctx, tc.trace, at_ms,
+                    instruction=INSIGHT_AFTER_ZEUS_INSTRUCTION,
+                    cause="ai_process_result_insight",
+                )
+                answer = synth or terminal or answer
+                tc.trace["notes"].append(
+                    "ai_process_result=true after terminating Zeus tool; insight synthesis"
+                )
+                tc.trace["ai_process_result_exit"] = "insight"
+            else:
+                answer = terminal or answer or ""
+                if answer and not any(
+                    m.get("role") == "assistant" and m.get("content") == answer
+                    for m in tc.messages[-3:]
+                ):
+                    tc.messages.append({"role": "assistant", "content": answer})
+                tc.trace["notes"].append(
+                    "ai_process_result=false after terminate; cheap terminal envelope"
+                )
+                tc.trace["ai_process_result_exit"] = "cheap_terminal"
+            await hooks.observe("round_end", {
+                "round": rnd, "answer_ready": True, "ctx": tc.ctx,
+                "ai_process_result": ai_process,
+            })
+            break
+
+        if (
+            not ai_process
+            and outcome.tools_executed > 0
+            and outcome.tools_with_data > 0
+        ):
+            # Cheap path: tools returned data, no open re-plan insight loop.
+            synth = await force_final_llm_answer(
+                rnd, model, tc.messages, tc.cache_body, tc.cache_headers,
+                base_url, api_key, hooks, tc.ctx, tc.trace, at_ms,
+                instruction=CHEAP_FINAL_AFTER_ZEUS_INSTRUCTION,
+                cause="ai_process_result_false",
+            )
+            answer = synth or (
+                "Zeus returned data. See structured results in the UI."
+            )
+            if not synth:
+                tc.messages.append({"role": "assistant", "content": answer})
+            tc.trace["notes"].append(
+                "ai_process_result=false after Zeus data; forced final answer"
+            )
+            tc.trace["ai_process_result_exit"] = "cheap_final"
+            await hooks.observe("round_end", {
+                "round": rnd, "answer_ready": True, "ctx": tc.ctx,
+                "ai_process_result": False,
+            })
+            break
+
         await hooks.observe("round_end", {
             "round": rnd, "answer_ready": should_break, "ctx": tc.ctx,
         })

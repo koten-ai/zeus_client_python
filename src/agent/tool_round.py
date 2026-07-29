@@ -1,7 +1,11 @@
 """Single-round LLM call and tool dispatch."""
+from __future__ import annotations
+
 import json
 import time
 from copy import deepcopy
+from dataclasses import dataclass
+from typing import Any, Optional
 
 import httpx
 
@@ -14,6 +18,103 @@ from zeus_client.toon import to_toon
 from zeus_client.trace.pipeline import pipeline_step_spans
 from zeus_client.zeus.auth import resolve_zeus_auth
 from zeus_client.zeus.dispatch import dispatch_zeus_call, zeus_correlation_headers
+
+# Hub-aligned synthesis instructions (internal/admin/chat.go).
+FORCED_FINAL_ANSWER_INSTRUCTION = (
+    "The tool round budget is exhausted. Use only the tool results already "
+    "present in this conversation to answer the user's latest question now. "
+    "Do not call any tools. If the evidence is incomplete, say what is missing "
+    "and give the best supported answer."
+)
+
+INSIGHT_AFTER_ZEUS_INSTRUCTION = (
+    "Zeus tool results (including row/data payloads) are already in this "
+    "conversation. Analyze that evidence and write a clear, useful answer for "
+    "the operator: what was found, notable names/counts/patterns, and any "
+    "caveats. Do not call tools. Do not re-run the same successful pipeline or "
+    "invent rows/fields not present in the tool results. Prefer concrete "
+    "details from the data over a one-line abstract summary."
+)
+
+CHEAP_FINAL_AFTER_ZEUS_INSTRUCTION = (
+    "Zeus tool results are already in this conversation. Give a short final "
+    "answer based only on that evidence. Do not call any tools. Prefer a brief "
+    "summary over a long essay — the product UI will show the Zeus rows."
+)
+
+
+@dataclass
+class ToolRoundOutcome:
+    """What happened during one tool-dispatch round (for ai_process_result)."""
+
+    return_seen: bool = False
+    terminal_summary: Optional[str] = None
+    tools_executed: int = 0
+    tools_with_data: int = 0
+    tools_empty: int = 0
+
+
+def _is_empty_json_value(v: Any) -> bool:
+    """Best-effort empty detection for Zeus tool payloads (Hub isEmptyJSONValue)."""
+    if v is None:
+        return True
+    if isinstance(v, str):
+        return not v.strip()
+    if isinstance(v, (list, tuple, set)):
+        return len(v) == 0
+    if isinstance(v, dict):
+        if not v:
+            return True
+        # Common Zeus envelopes
+        for key in ("rows", "items", "results", "entities"):
+            if key in v:
+                return _is_empty_json_value(v.get(key))
+        data = v.get("data")
+        if data is not None:
+            return _is_empty_json_value(data)
+        result = v.get("result")
+        if result is not None and result is not v:
+            return _is_empty_json_value(result)
+        # Non-empty dict without row lists — treat as data present
+        return False
+    return False
+
+
+def _tool_result_empty(status: int, text: str, parsed: Any) -> bool:
+    if status and status >= 400:
+        return True
+    if not (text or "").strip():
+        return True
+    if parsed is None:
+        # Non-JSON body with content is non-empty
+        return False
+    return _is_empty_json_value(parsed)
+
+
+def _has_turn_complete(parsed: Any, text: str) -> bool:
+    """True when tool result body carries turn_complete:true (pipeline terminator)."""
+    if isinstance(parsed, dict) and parsed.get("turn_complete") is True:
+        return True
+    if not text:
+        return False
+    try:
+        m = json.loads(text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    return isinstance(m, dict) and m.get("turn_complete") is True
+
+
+def _summary_from_terminal(parsed: Any, tc_args: dict) -> str:
+    if isinstance(parsed, dict):
+        for key in ("summary", "answer", "message"):
+            val = parsed.get(key)
+            if isinstance(val, str) and val.strip():
+                return val
+    if isinstance(tc_args, dict):
+        val = tc_args.get("summary")
+        if isinstance(val, str) and val.strip():
+            return val
+    return ""
 
 
 async def run_llm_round(
@@ -83,14 +184,92 @@ async def run_llm_round(
     return None, False, msg
 
 
+async def force_final_llm_answer(
+    rnd,
+    model,
+    messages,
+    cache_body,
+    cache_headers,
+    base_url,
+    api_key,
+    hooks,
+    ctx,
+    trace,
+    at_ms,
+    *,
+    instruction: str = "",
+    cause: str = "force_final",
+):
+    """One no-tools synthesis pass after Zeus tool results are already spliced.
+
+    Mirrors Hub forceFinalChatAnswer. Empty ``instruction`` uses the round-budget
+    forced-final text. Returns the assistant content string (may be empty).
+    """
+    text = (instruction or "").strip() or FORCED_FINAL_ANSWER_INSTRUCTION
+    messages.append({"role": "user", "content": text})
+    trace["notes"].append(f"force_final: {cause}")
+
+    t_llm = time.time()
+    llm_at = at_ms()
+    # No tools — OpenAI-compatible providers reject tool_choice without tools.
+    payload = llm_payload(model, messages, tools=None, body_extra=cache_body)
+    trace["ai_requests"].append({
+        "round": rnd, "payload": deepcopy(payload), "force_final": cause,
+    })
+    status, resp = await llm_chat_payload(
+        base_url, api_key, payload, extra_headers=cache_headers,
+    )
+    llm_ms = int((time.time() - t_llm) * 1000)
+    cached_tok = cached_tokens_of(resp)
+    trace["spans"].append({
+        "name": f"ai.chat.force_final.{rnd}", "cls": "ai", "at": llm_at, "ms": llm_ms,
+        "cause": cause,
+    })
+    trace["ai_responses"].append({
+        "round": rnd, "status": status, "ms": llm_ms,
+        "cached_tokens": cached_tok, "body": deepcopy(resp),
+        "force_final": cause,
+    })
+
+    await hooks.observe("ai_response", {
+        "round": rnd, "response": resp, "ctx": ctx, "force_final": cause,
+    })
+
+    if status != 200 or not isinstance(resp, dict):
+        snippet = resp if isinstance(resp, str) else json.dumps(resp)
+        trace["notes"].append(f"force_final_failed: HTTP {status} {snippet[:200]}")
+        return ""
+
+    choice = (resp.get("choices") or [{}])[0]
+    msg = choice.get("message", {}) or {}
+    # Ignore tool_calls on forced final — we asked for prose only.
+    content = (msg.get("content") or "").strip()
+    if content:
+        messages.append({"role": "assistant", "content": content})
+        trace["steps"].append({
+            "round": rnd, "type": "force_final", "ms": llm_ms,
+            "cause": cause, "content_len": len(content),
+        })
+        return content
+    trace["notes"].append(f"force_final_empty: {cause}")
+    return ""
+
+
 async def execute_tool_calls(
     rnd, tool_calls, messages, api_version, zeus_url, bucket, scope, collection,
     zcfg, zeus_headers, hooks, ctx, trace, at_ms, turn_id, conv_id,
     toon_on, this_turn_reqs,
 ):
-    """Dispatch tool calls for one round. Returns (answer, should_break)."""
+    """Dispatch tool calls for one round.
+
+    Returns ``(answer, should_break, zeus_headers, outcome)``.
+    ``should_break`` is True when a terminating ``return`` / pipeline was seen
+    (loop still decides cheap vs insight via ``ai_process_result``).
+    """
     answer = None
     final_summary = None
+    return_seen = False
+    outcome = ToolRoundOutcome()
 
     for tc in tool_calls[:MAX_TOOLCALLS_PER_ROUND]:
         fn = tc.get("function", {})
@@ -101,7 +280,8 @@ async def execute_tool_calls(
             tc_args = {}
 
         if name in ("return_result", "return"):
-            final_summary = tc_args.get("summary", "")
+            final_summary = tc_args.get("summary", "") or ""
+            return_seen = True
             messages.append({
                 "role": "tool", "tool_call_id": tc.get("id"),
                 "name": name, "content": json.dumps(tc_args),
@@ -188,9 +368,26 @@ async def execute_tool_calls(
         if req_id:
             this_turn_reqs.append((req_id, name, tstatus, (ttext or "")[:300], dispatch_url))
 
-    if final_summary is not None:
-        answer = final_summary
-        messages.append({"role": "assistant", "content": answer})
-        return answer, True, zeus_headers
+        outcome.tools_executed += 1
+        empty = _tool_result_empty(tstatus, ttext or "", parsed_result)
+        if empty:
+            outcome.tools_empty += 1
+        else:
+            outcome.tools_with_data += 1
 
-    return None, False, zeus_headers
+        # Terminating pipeline (turn_complete) — Hub returnResultSeen path
+        if name == "pipeline" and _has_turn_complete(parsed_result, ttext or ""):
+            return_seen = True
+            if not final_summary:
+                final_summary = _summary_from_terminal(parsed_result, tc_args)
+
+    outcome.return_seen = return_seen
+    outcome.terminal_summary = final_summary if return_seen else None
+
+    if return_seen:
+        # Do not append assistant yet — loop may run an insight synthesis turn
+        # (ai_process_result=true) or take the cheap terminal summary (false).
+        answer = final_summary if final_summary is not None else ""
+        return answer, True, zeus_headers, outcome
+
+    return None, False, zeus_headers, outcome
