@@ -135,6 +135,8 @@ async def test_no_content_fallback(monkeypatch):
 
 
 @pytest.mark.asyncio
+
+@pytest.mark.asyncio
 async def test_return_result_tool_ends_turn(monkeypatch):
     async def fake_dispatch(*_a, **_k):
         pytest.fail("dispatch should not run for return_result")
@@ -146,12 +148,70 @@ async def test_return_result_tool_ends_turn(monkeypatch):
     }]
     messages = []
     trace = _trace()
-    answer, should_break, _ = await tr.execute_tool_calls(
+    answer, should_break, _, outcome = await tr.execute_tool_calls(
         1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
         {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv", False, [],
     )
     assert answer == "The answer"
     assert should_break is True
+    assert outcome.return_seen is True
+    assert outcome.terminal_summary == "The answer"
+    # Assistant is deferred to the loop (cheap vs insight)
+    assert not any(m.get("role") == "assistant" for m in messages)
+    assert messages[-1]["role"] == "tool"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_turn_complete_is_return_seen(monkeypatch):
+    body = json.dumps({
+        "turn_complete": True,
+        "summary": "pipeline done",
+        "data": {"rows": [{"name": "A"}]},
+    })
+
+    async def fake_dispatch(*_a, **_k):
+        return 200, body, "http://z/pipeline", "req-p"
+
+    monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
+    tool_calls = [{
+        "id": "c1",
+        "function": {
+            "name": "pipeline",
+            "arguments": json.dumps({"steps": [{"as": "x", "verb": "find"}]}),
+        },
+    }]
+    messages = []
+    answer, should_break, _, outcome = await tr.execute_tool_calls(
+        1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
+        {}, {}, AgentHooks(), {}, _trace(), lambda: 0, "t1", "conv", False, [],
+    )
+    assert should_break is True
+    assert outcome.return_seen is True
+    assert outcome.terminal_summary == "pipeline done"
+    assert outcome.tools_with_data == 1
+    assert answer == "pipeline done"
+
+
+@pytest.mark.asyncio
+async def test_force_final_llm_answer_no_tools(monkeypatch):
+    captured = {}
+
+    async def fake_llm(_url, _key, payload, extra_headers=None):
+        captured["payload"] = payload
+        return 200, {
+            "choices": [{"message": {"role": "assistant", "content": "narrated"}}],
+        }
+
+    monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
+    messages = [{"role": "user", "content": "q"}]
+    out = await tr.force_final_llm_answer(
+        1, "m", messages, None, None, "http://llm", "k",
+        AgentHooks(), {}, _trace(), lambda: 0,
+        instruction=tr.INSIGHT_AFTER_ZEUS_INSTRUCTION,
+        cause="test",
+    )
+    assert out == "narrated"
+    assert "tools" not in captured["payload"]
     assert messages[-1]["role"] == "assistant"
 
 
@@ -164,12 +224,13 @@ async def test_invalid_tool_args_json(monkeypatch):
     tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "not-json"}}]
     messages = []
     trace = _trace()
-    _, should_break, _ = await tr.execute_tool_calls(
+    _, should_break, _, outcome = await tr.execute_tool_calls(
         1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
         {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv", False, [],
     )
     assert should_break is False
     assert trace["tool_calls"][0]["args"] == {}
+    assert outcome.tools_executed == 1
 
 
 @pytest.mark.asyncio
@@ -192,7 +253,7 @@ async def test_basic_auth_401_retry_success(monkeypatch, reset_auth_cache, http_
     tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "{}"}}]
     trace = _trace()
     zcfg = {"auth_mode": "basic"}
-    _, should_break, headers = await tr.execute_tool_calls(
+    _, should_break, headers, _ = await tr.execute_tool_calls(
         1, tool_calls, [], "v2", "http://z", "b", "s", "c",
         zcfg, {"X-Zeus-Session": "sid-old"}, AgentHooks(), {}, trace, lambda: 0,
         "t1", "conv", False, [],
@@ -216,7 +277,7 @@ async def test_basic_auth_401_remint_failure(monkeypatch):
 
     tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "{}"}}]
     trace = _trace()
-    _, _, _ = await tr.execute_tool_calls(
+    _, _, _, _ = await tr.execute_tool_calls(
         1, tool_calls, [], "v2", "http://z", "b", "s", "c",
         {"auth_mode": "basic"}, {}, AgentHooks(), {}, trace, lambda: 0,
         "t1", "conv", False, [],

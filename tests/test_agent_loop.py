@@ -3,7 +3,12 @@ import pytest
 
 import zeus_client.agent.loop as loop_mod
 from zeus_client.agent.hooks import AgentDecision, AgentHooks
+from zeus_client.agent.tool_round import ToolRoundOutcome
 from zeus_client.constants import MAX_ROUNDS
+
+
+def _empty_outcome(**kwargs):
+    return ToolRoundOutcome(**kwargs)
 
 
 def _minimal_chat_req():
@@ -157,7 +162,10 @@ async def test_run_agent_direct_answer(patched_loop, monkeypatch):
         return "done", True, None
 
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_answer)
-    monkeypatch.setattr(loop_mod, "execute_tool_calls", lambda *_a: (None, False, {}))
+    monkeypatch.setattr(
+        loop_mod, "execute_tool_calls",
+        lambda *_a, **_k: (None, False, {}, _empty_outcome()),
+    )
 
     class ObserveHooks(AgentHooks):
         def __init__(self):
@@ -185,10 +193,15 @@ async def test_run_agent_tool_round_breaks_early(patched_loop, monkeypatch):
         return None, False, {"role": "assistant", "tool_calls": [{"id": "c1"}]}
 
     async def tools_done(*_a, **_k):
-        return "early answer", True, {}
+        return "early answer", True, {}, _empty_outcome(return_seen=True, terminal_summary="early answer")
 
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_tools)
     monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_done)
+
+    async def no_insight(*_a, **_k):
+        return ""
+
+    monkeypatch.setattr(loop_mod, "force_final_llm_answer", no_insight)
 
     answer, trace, _, _ = await loop_mod.run_agent(
         "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
@@ -196,6 +209,7 @@ async def test_run_agent_tool_round_breaks_early(patched_loop, monkeypatch):
     )
     assert answer == "early answer"
     assert trace["rounds"] == 1
+    assert trace.get("ai_process_result_exit") == "insight"
 
 
 @pytest.mark.asyncio
@@ -209,7 +223,7 @@ async def test_run_agent_tool_round_then_answer(patched_loop, monkeypatch):
         return "final", True, None
 
     async def tools_once(*_a, **_k):
-        return None, False, {"X-Zeus-Session": "sid"}
+        return None, False, {"X-Zeus-Session": "sid"}, _empty_outcome()
 
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_twice)
     monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_once)
@@ -228,7 +242,7 @@ async def test_run_agent_should_continue_stops(patched_loop, monkeypatch):
         return None, False, {"role": "assistant", "tool_calls": []}
 
     async def tools_continue(*_a, **_k):
-        return None, False, {}
+        return None, False, {}, _empty_outcome()
 
     class StopHooks(AgentHooks):
         async def should_continue(self, round_num, messages, ctx):
@@ -251,7 +265,7 @@ async def test_run_agent_max_rounds_exhausted(patched_loop, monkeypatch):
         return None, False, {"role": "assistant", "tool_calls": [{"id": "x"}]}
 
     async def tools_never_done(*_a, **_k):
-        return None, False, {}
+        return None, False, {}, _empty_outcome()
 
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_always_tools)
     monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_never_done)
@@ -305,7 +319,10 @@ async def test_run_agent_structured_returns_five_tuple(patched_loop, monkeypatch
 
     monkeypatch.setattr(loop_mod, "load_chat_request", fake_catalog)
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_answer)
-    monkeypatch.setattr(loop_mod, "execute_tool_calls", lambda *_a: (None, False, {}))
+    monkeypatch.setattr(
+        loop_mod, "execute_tool_calls",
+        lambda *_a, **_k: (None, False, {}, _empty_outcome()),
+    )
 
     result = await loop_mod.run_agent(
         "http://zeus", {"auth_mode": "none"}, "http://llm", "key", "model", "v2",
@@ -326,10 +343,121 @@ async def test_run_agent_structured_false_returns_four_tuple(patched_loop, monke
         return "plain", True, None
 
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_answer)
-    monkeypatch.setattr(loop_mod, "execute_tool_calls", lambda *_a: (None, False, {}))
+    monkeypatch.setattr(
+        loop_mod, "execute_tool_calls",
+        lambda *_a, **_k: (None, False, {}, _empty_outcome()),
+    )
 
     result = await loop_mod.run_agent(
         "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
         "b", "s", "c", "q", [], structured=False,
     )
     assert len(result) == 4
+
+
+@pytest.mark.asyncio
+async def test_ai_process_result_false_cheap_after_tools(patched_loop, monkeypatch):
+    """ai_process_result=false: after Zeus data, force final — no open re-plan."""
+    from zeus_client.agent.settings import ClientSettings
+
+    llm_calls = {"n": 0}
+
+    async def llm_tools_once(*_a, **_k):
+        llm_calls["n"] += 1
+        return None, False, {"role": "assistant", "tool_calls": [{"id": "c1"}]}
+
+    async def tools_with_data(*_a, **_k):
+        return None, False, {}, _empty_outcome(tools_executed=1, tools_with_data=1)
+
+    async def cheap_synth(*_a, **_k):
+        return "short final from data"
+
+    monkeypatch.setattr(loop_mod, "run_llm_round", llm_tools_once)
+    monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_with_data)
+    monkeypatch.setattr(loop_mod, "force_final_llm_answer", cheap_synth)
+
+    answer, trace, _, _ = await loop_mod.run_agent(
+        "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
+        "b", "s", "c", "q", [],
+        settings=ClientSettings(ai_process_result=False, company_context="Beer Co"),
+    )
+    assert answer == "short final from data"
+    assert trace.get("ai_process_result_exit") == "cheap_final"
+    assert any("ai_process_result=false" in n for n in trace["notes"])
+    assert llm_calls["n"] == 1  # no second open-plan llm_round
+
+
+@pytest.mark.asyncio
+async def test_ai_process_result_false_cheap_terminal_on_return(patched_loop, monkeypatch):
+    async def llm_tools(*_a, **_k):
+        return None, False, {"role": "assistant", "tool_calls": [{"id": "c1"}]}
+
+    async def tools_return(*_a, **_k):
+        return "thin summary", True, {}, _empty_outcome(
+            return_seen=True, terminal_summary="thin summary",
+        )
+
+    insight_calls = {"n": 0}
+
+    async def should_not_insight(*_a, **_k):
+        insight_calls["n"] += 1
+        return "should not run"
+
+    monkeypatch.setattr(loop_mod, "run_llm_round", llm_tools)
+    monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_return)
+    monkeypatch.setattr(loop_mod, "force_final_llm_answer", should_not_insight)
+
+    from zeus_client.agent.settings import ClientSettings
+    answer, trace, _, _ = await loop_mod.run_agent(
+        "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
+        "b", "s", "c", "q", [],
+        settings=ClientSettings(ai_process_result=False),
+    )
+    assert answer == "thin summary"
+    assert insight_calls["n"] == 0
+    assert trace.get("ai_process_result_exit") == "cheap_terminal"
+
+
+@pytest.mark.asyncio
+async def test_ai_process_result_true_insight_after_return(patched_loop, monkeypatch):
+    async def llm_tools(*_a, **_k):
+        return None, False, {"role": "assistant", "tool_calls": [{"id": "c1"}]}
+
+    async def tools_return(*_a, **_k):
+        return "thin", True, {}, _empty_outcome(return_seen=True, terminal_summary="thin")
+
+    async def insight(*_a, **_k):
+        return "rich narration of Zeus rows"
+
+    monkeypatch.setattr(loop_mod, "run_llm_round", llm_tools)
+    monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_return)
+    monkeypatch.setattr(loop_mod, "force_final_llm_answer", insight)
+
+    from zeus_client.agent.settings import ClientSettings
+    answer, trace, _, _ = await loop_mod.run_agent(
+        "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
+        "b", "s", "c", "q", [],
+        settings=ClientSettings(ai_process_result=True),
+    )
+    assert answer == "rich narration of Zeus rows"
+    assert trace.get("ai_process_result_exit") == "insight"
+
+
+@pytest.mark.asyncio
+async def test_setup_turn_context_notes_ai_process_default(patched_loop):
+    tc = await loop_mod.setup_turn_context(
+        "http://zeus", {}, "v2", "auto", "b", "s", "q", [], False, "grok", "http://llm", None,
+    )
+    assert any("ai_process_result=true" in n for n in tc.trace["notes"])
+    assert tc.ctx["ai_process_result"] is True
+
+
+@pytest.mark.asyncio
+async def test_setup_turn_context_ai_process_false(patched_loop):
+    from zeus_client.agent.settings import ClientSettings
+    tc = await loop_mod.setup_turn_context(
+        "http://zeus", {}, "v2", "auto", "b", "s", "q", [], False, "grok", "http://llm", None,
+        settings=ClientSettings(ai_process_result=False),
+    )
+    assert any("ai_process_result=false" in n for n in tc.trace["notes"])
+    assert tc.ctx["ai_process_result"] is False

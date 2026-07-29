@@ -79,3 +79,21 @@ def test_prepare_settings_merges():
     assert "loyalty" in (s.rules or {})
     assert "no_prompt_dump" in (s.rules or {})
     assert s.locale == "en-US"
+    assert s.ai_process_result is True  # package / Hub default
+
+
+def test_ai_process_result_configurable():
+    from zeus_client.agent.settings import (
+        DEFAULT_AI_PROCESS_RESULT,
+        effective_ai_process_result,
+    )
+
+    assert DEFAULT_AI_PROCESS_RESULT is True
+    assert effective_ai_process_result(None) is True
+    assert ClientSettings().ai_process_result is True
+    s = prepare_settings({"ai_process_result": False})
+    assert s.ai_process_result is False
+    assert effective_ai_process_result(s) is False
+    assert effective_ai_process_result({"ai_process_result": False}) is False
+    assert effective_ai_process_result({"locale": "en"}) is True
+
