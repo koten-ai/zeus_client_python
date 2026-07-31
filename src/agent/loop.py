@@ -17,7 +17,7 @@ from zeus_client.agent.settings import (
     prepare_settings,
 )
 from zeus_client.agent.tool_round import (
-    CHEAP_FINAL_AFTER_ZEUS_INSTRUCTION,
+    CHEAP_FINAL_STATIC_ANSWER,
     INSIGHT_AFTER_ZEUS_INSTRUCTION,
     execute_tool_calls,
     force_final_llm_answer,
@@ -430,20 +430,22 @@ async def run_agent(
             and outcome.tools_executed > 0
             and outcome.tools_with_data > 0
         ):
-            # Cheap path: tools returned data, no open re-plan insight loop.
-            synth = await force_final_llm_answer(
-                rnd, model, tc.messages, tc.cache_body, tc.cache_headers,
-                base_url, api_key, hooks, tc.ctx, tc.trace, at_ms,
-                instruction=CHEAP_FINAL_AFTER_ZEUS_INSTRUCTION,
-                cause="ai_process_result_false",
+            # Cheap path (product / MULTI_ROUND wishlist): tools already returned
+            # data — do **not** bill a second LLM hop. Hub Debug still force-
+            # finals here for operator chat; Client prefers tool-arg summary
+            # (pipeline often carries one) or a static thin line so UIs can
+            # show Zeus rows without an insight-style essay.
+            answer = (
+                (outcome.tool_arg_summary or "").strip()
+                or CHEAP_FINAL_STATIC_ANSWER
             )
-            answer = synth or (
-                "Zeus returned data. See structured results in the UI."
-            )
-            if not synth:
+            if not any(
+                m.get("role") == "assistant" and m.get("content") == answer
+                for m in tc.messages[-3:]
+            ):
                 tc.messages.append({"role": "assistant", "content": answer})
             tc.trace["notes"].append(
-                "ai_process_result=false after Zeus data; forced final answer"
+                "ai_process_result=false after Zeus data; thin final without second LLM hop"
             )
             tc.trace["ai_process_result_exit"] = "cheap_final"
             await hooks.observe("round_end", {

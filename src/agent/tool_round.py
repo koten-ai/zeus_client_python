@@ -36,10 +36,17 @@ INSIGHT_AFTER_ZEUS_INSTRUCTION = (
     "details from the data over a one-line abstract summary."
 )
 
+# Kept for callers/tests that still want an explicit short synthesis prompt.
+# Cheap ``ai_process_result=false`` no longer bills a second LLM hop by default
+# (uses tool-arg summary or a static thin line instead).
 CHEAP_FINAL_AFTER_ZEUS_INSTRUCTION = (
     "Zeus tool results are already in this conversation. Give a short final "
     "answer based only on that evidence. Do not call any tools. Prefer a brief "
     "summary over a long essay — the product UI will show the Zeus rows."
+)
+
+CHEAP_FINAL_STATIC_ANSWER = (
+    "Zeus returned data. See structured results in the UI."
 )
 
 
@@ -49,6 +56,9 @@ class ToolRoundOutcome:
 
     return_seen: bool = False
     terminal_summary: Optional[str] = None
+    # Last non-empty ``summary`` from tool-call args (pipeline often carries one).
+    # Used by cheap ``ai_process_result=false`` so we can skip a second LLM hop.
+    tool_arg_summary: Optional[str] = None
     tools_executed: int = 0
     tools_with_data: int = 0
     tools_empty: int = 0
@@ -279,6 +289,11 @@ async def execute_tool_calls(
         except json.JSONDecodeError:
             tc_args = {}
 
+        if isinstance(tc_args, dict):
+            arg_sum = tc_args.get("summary")
+            if isinstance(arg_sum, str) and arg_sum.strip():
+                outcome.tool_arg_summary = arg_sum.strip()
+
         if name in ("return_result", "return"):
             final_summary = tc_args.get("summary", "") or ""
             return_seen = True
@@ -293,6 +308,10 @@ async def execute_tool_calls(
             "round": rnd, "name": name, "args": tc_args, "ctx": ctx,
         })
         tc_args = await hooks.before_zeus_dispatch(name, tc_args, ctx)
+        if isinstance(tc_args, dict):
+            arg_sum = tc_args.get("summary")
+            if isinstance(arg_sum, str) and arg_sum.strip():
+                outcome.tool_arg_summary = arg_sum.strip()
 
         t0 = time.time()
         tool_at = at_ms()

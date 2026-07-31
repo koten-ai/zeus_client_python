@@ -193,6 +193,40 @@ async def test_pipeline_turn_complete_is_return_seen(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_pipeline_args_summary_captured_without_turn_complete(monkeypatch):
+    body = json.dumps({
+        "status": "failed",
+        "error": "project failed",
+        "results_so_far": {"reno_biz": {"rows": [{"name": "A"}]}},
+    })
+
+    async def fake_dispatch(*_a, **_k):
+        return 200, body, "http://z/pipeline", "req-p"
+
+    monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
+    tool_calls = [{
+        "id": "c1",
+        "function": {
+            "name": "pipeline",
+            "arguments": json.dumps({
+                "summary": "Businesses in Reno ranked by review count",
+                "steps": [{"as": "x", "verb": "find"}],
+            }),
+        },
+    }]
+    messages = []
+    answer, should_break, _, outcome = await tr.execute_tool_calls(
+        1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
+        {}, {}, AgentHooks(), {}, _trace(), lambda: 0, "t1", "conv", False, [],
+    )
+    assert should_break is False
+    assert outcome.return_seen is False
+    assert outcome.tools_with_data == 1
+    assert outcome.tool_arg_summary == "Businesses in Reno ranked by review count"
+    assert answer is None
+
+
+@pytest.mark.asyncio
 async def test_force_final_llm_answer_no_tools(monkeypatch):
     captured = {}
 

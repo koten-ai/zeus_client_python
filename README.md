@@ -16,6 +16,11 @@ cd zeus_client_python
 pip install -e ".[dev]"
 ```
 
+## Version 0.2.2 — fast suggest + thinner cheap path
+
+- **`run_fast_suggest` / `run_fast_suggest_from_config`** — no-LLM typeahead over V2 FTS + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)).
+- **`ai_process_result=false`** after Zeus tool data: **no second LLM hop** — prefer tool-arg `summary`, else a static thin line (UI shows Zeus rows).
+
 ## Version 0.2.1 — `ai_process_result` (Hub parity)
 
 Client setting **`ai_process_result`** (default **`true`**) mirrors Zeus Hub Debug “AI on Zeus result”: after terminating Zeus tools, run a no-tools insight turn; set **`false`** for the cheap path (tables/UI without a second billable hop). See [docs/BASE5_CLIENT.md](docs/BASE5_CLIENT.md).
@@ -45,6 +50,47 @@ flowchart LR
 6. **Audit** — runtime contract checks appended to `trace["notes"]`.
 
 Pass `zeus_session_id` and `zeus_round` from the prior turn's `session_meta` to continue a durable session across questions.
+
+## Fast suggest (typeahead, no LLM)
+
+Google-like dropdowns should **not** call `run_agent`. Use the V2 data plane:
+
+```python
+from zeus_client import ZeusClient, run_fast_suggest, SuggestOptions
+
+async with ZeusClient():
+    result = await run_fast_suggest(
+        "sushi",
+        zeus_url="http://127.0.0.1:8080",
+        bucket="yelp-data",
+        scope="_default",
+        collection="_default",
+        zcfg={"auth_mode": "basic", "username": "…", "password": "…"},
+        # Optional: hydrate FTS src_keys via Couchbase Query (USE KEYS)
+        couchbase={
+            "query_url": "http://127.0.0.1:8093",
+            "username": "Administrator",
+            "password": "password",
+        },
+        options=SuggestOptions(entity_type="Business", limit=8, fts_timeout_ms=2000),
+    )
+    for hit in result.hits:
+        print(hit.name, hit.subtitle, hit.id)
+```
+
+What it calls:
+
+| Step | Endpoint / path |
+|------|------------------|
+| FTS | `POST /v2/{bucket}/{scope}/{collection}/search` · `strategy=fts` |
+| Hydrate (optional) | Couchbase `POST {query_url}/query/service` · `USE KEYS […]` |
+| Exact name / city | `POST …/pipeline` · `find` → `project` |
+
+Do **not** `project` / `get` FTS `biz:…` keys as graph node ids — they come back `missing`. Prefer N1QL hydrate or `find`→`project`.
+
+Config helper: `run_fast_suggest_from_config(q, cfg)` reads `samples` + `zeus` + optional `couchbase`. CLI sketch: [`examples/fast_suggest.py`](examples/fast_suggest.py). Module: `zeus_client.zeus.suggest`.
+
+UI: debounce ~280ms, min query length 2; on **Enter** without a highlight, call `run_agent` for full NL search.
 
 ## Quick start
 
