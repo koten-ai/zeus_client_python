@@ -1,7 +1,22 @@
-# Fast suggest (typeahead)
+# Fast-tier search (typeahead)
 
-**Status:** shipped in **0.2.2** (`zeus_client.zeus.suggest`). Tag **`0.2.2-alpha`**
-for demo pin / trial before a full 0.2.2 cut.
+**Status:** shipped in **0.3.0** (`zeus_client.zeus.suggest`). Tag **`0.3.0-alpha`**
+for demo pin / trial (`run_search` naming + direct verbs).
+
+## Naming
+
+Public helpers follow **`run_<primary_zeus_verb>`**. This path's primary wire
+verb is **`search`** (FTS), so:
+
+| Preferred | Role |
+|-----------|------|
+| `run_search(...)` | Main entry — headers or `zcfg` auth |
+| `run_search_from_config(q, cfg)` | Uses `samples` / `zeus` / `couchbase` |
+
+Deprecated aliases (≤1 Client release): `run_fast_suggest`, `run_fast_suggest_from_config`.
+
+Supporting types stay product-shaped: `SuggestOptions`, `SuggestHit`, `SuggestResult`
+(typeahead cards), plus `CouchbaseQueryConfig`.
 
 ## Goal
 
@@ -12,8 +27,8 @@ Google-like suggestions while the user types, against a Zeus scope
 
 | Symbol | Role |
 |--------|------|
-| `run_fast_suggest(...)` | Main entry — headers or `zcfg` auth |
-| `run_fast_suggest_from_config(q, cfg)` | Uses `samples` / `zeus` / `couchbase` |
+| `run_search(...)` | Main entry — headers or `zcfg` auth |
+| `run_search_from_config(q, cfg)` | Uses `samples` / `zeus` / `couchbase` |
 | `SuggestOptions` | limit, entity_type, FTS timeout, feature flags |
 | `SuggestResult` / `SuggestHit` | Structured hits + `to_dict()` for JSON APIs |
 | `CouchbaseQueryConfig` | Optional Query-service hydrate |
@@ -84,4 +99,4 @@ pytest tests/test_zeus_suggest.py tests/test_smoke_imports.py -q
 
 - Optional short client-side HTTP timeout override on dispatch (today FTS is capped by Zeus `timeout_ms`)
 - Fold `get_by_keys` into V2 when Zeus exposes it, drop N1QL dependency
-- Wire demo_yelp `fast_search` to call this module (delete remaining duplicate logic)
+- Remove deprecated `run_fast_suggest*` aliases after one Client release

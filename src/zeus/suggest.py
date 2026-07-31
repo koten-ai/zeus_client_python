@@ -1,4 +1,8 @@
-"""Fast-tier typeahead suggest (no LLM).
+"""Fast-tier typeahead via Zeus verbs (no LLM).
+
+Naming: public helpers are ``run_<primary_verb>``. This path's primary
+wire verb is ``search`` (FTS), so the entrypoints are ``run_search`` /
+``run_search_from_config`` — not product nicknames like ``fast_suggest``.
 
 Google-like dropdown path for apps that sit on Zeus V2:
 
@@ -9,7 +13,7 @@ Google-like dropdown path for apps that sit on Zeus V2:
 This is **not** the agent loop. Callers debounce in the UI and use
 ``run_agent`` only for full natural-language submit.
 
-See demo_yelp ``local_guide.fast_search`` for the productized BFF twin.
+See demo_yelp ``local_guide.suggest`` for the productized BFF twin.
 """
 from __future__ import annotations
 
@@ -149,7 +153,7 @@ class CouchbaseQueryConfig:
 
 @dataclass(frozen=True)
 class SuggestOptions:
-    """Knobs for :func:`run_fast_suggest`."""
+    """Knobs for :func:`run_search` (fast-tier typeahead)."""
 
     entity_type: str = DEFAULT_ENTITY_TYPE
     limit: int = DEFAULT_LIMIT
@@ -606,7 +610,7 @@ def _with_mode_header(headers: Mapping[str, str], mode: str) -> dict[str, str]:
     return h
 
 
-async def run_fast_suggest(
+async def run_search(
     query: str,
     *,
     zeus_url: str,
@@ -618,7 +622,10 @@ async def run_fast_suggest(
     couchbase: Mapping[str, Any] | CouchbaseQueryConfig | None = None,
     options: SuggestOptions | None = None,
 ) -> SuggestResult:
-    """No-LLM typeahead for ``bucket/scope/collection``.
+    """No-LLM typeahead for ``bucket/scope/collection`` via V2 ``search`` (+ helpers).
+
+    Named ``run_search`` after the primary Zeus verb (``search`` / FTS). This is
+    **not** ``run_agent`` — no LLM loop.
 
     Auth: pass ``zeus_headers`` **or** ``zcfg`` (resolved via
     :func:`resolve_zeus_auth`). Prefer headers when the BFF already minted
@@ -844,7 +851,7 @@ async def run_fast_suggest(
     )
 
 
-async def run_fast_suggest_from_config(
+async def run_search_from_config(
     query: str,
     cfg: Mapping[str, Any],
     *,
@@ -865,7 +872,7 @@ async def run_fast_suggest_from_config(
     scope = str(triple.get("scope") or "_default")
     collection = str(triple.get("collection") or "_default")
     cb = cfg.get("couchbase") if isinstance(cfg.get("couchbase"), dict) else None
-    return await run_fast_suggest(
+    return await run_search(
         query,
         zeus_url=zeus_url,
         bucket=bucket,
@@ -875,6 +882,11 @@ async def run_fast_suggest_from_config(
         couchbase=cb,
         options=options,
     )
+
+
+# Deprecated aliases (≤1 Client release). Prefer run_search / run_search_from_config.
+run_fast_suggest = run_search
+run_fast_suggest_from_config = run_search_from_config
 
 
 def apply_suggest_config_defaults(cfg: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
