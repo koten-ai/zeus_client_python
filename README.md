@@ -16,10 +16,15 @@ cd zeus_client_python
 pip install -e ".[dev]"
 ```
 
+## Version 0.3.0 — direct V2 verbs + `run_<verb>` naming
+
+- **`run_verb` / `run_<verb>`** — direct V2 verb POSTs (no LLM) for every Zeus verb **except `pipeline`** (see [docs/VERBS.md](docs/VERBS.md)). Helpers: `run_find`, `run_get`, `run_project`, …; raw search body via `run_search_verb` / `run_verb("search", …)`.
+- **`run_search` / `run_search_from_config`** — no-LLM typeahead over V2 `search` (FTS) + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)). Named after the primary Zeus verb (`run_<verb>`); deprecated aliases: `run_fast_suggest` / `run_fast_suggest_from_config`.
+- **`ai_process_result=false`** after Zeus tool data: **no second LLM hop** — prefer tool-arg `summary`, else a static thin line (UI shows Zeus rows).
+
 ## Version 0.2.2 — fast suggest + thinner cheap path
 
-- **`run_fast_suggest` / `run_fast_suggest_from_config`** — no-LLM typeahead over V2 FTS + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)).
-- **`ai_process_result=false`** after Zeus tool data: **no second LLM hop** — prefer tool-arg `summary`, else a static thin line (UI shows Zeus rows).
+- Typeahead + cheap path first land (API names later normalized in 0.3.0).
 
 ## Version 0.2.1 — `ai_process_result` (Hub parity)
 
@@ -51,15 +56,16 @@ flowchart LR
 
 Pass `zeus_session_id` and `zeus_round` from the prior turn's `session_meta` to continue a durable session across questions.
 
-## Fast suggest (typeahead, no LLM)
+## Fast-tier search (typeahead, no LLM)
 
-Google-like dropdowns should **not** call `run_agent`. Use the V2 data plane:
+Google-like dropdowns should **not** call `run_agent`. Use the V2 data plane via
+`run_search` (named after the Zeus `search` verb):
 
 ```python
-from zeus_client import ZeusClient, run_fast_suggest, SuggestOptions
+from zeus_client import ZeusClient, run_search, SuggestOptions
 
 async with ZeusClient():
-    result = await run_fast_suggest(
+    result = await run_search(
         "sushi",
         zeus_url="http://127.0.0.1:8080",
         bucket="yelp-data",
@@ -88,9 +94,45 @@ What it calls:
 
 Do **not** `project` / `get` FTS `biz:…` keys as graph node ids — they come back `missing`. Prefer N1QL hydrate or `find`→`project`.
 
-Config helper: `run_fast_suggest_from_config(q, cfg)` reads `samples` + `zeus` + optional `couchbase`. CLI sketch: [`examples/fast_suggest.py`](examples/fast_suggest.py). Module: `zeus_client.zeus.suggest`.
+Config helper: `run_search_from_config(q, cfg)` reads `samples` + `zeus` + optional `couchbase`. CLI sketch: [`examples/run_search.py`](examples/run_search.py). Module: `zeus_client.zeus.suggest`.
 
 UI: debounce ~280ms, min query length 2; on **Enter** without a highlight, call `run_agent` for full NL search.
+
+## Direct V2 verbs (no LLM, no pipeline)
+
+For BFF paths that need a single Zeus verb without the agent loop:
+
+```python
+from zeus_client import ZeusClient, run_find, run_get, run_verb
+
+async with ZeusClient():
+    found = await run_find(
+        {"entity_type": "Business", "where": {"name": "Pathmark"}, "limit": 5},
+        zeus_url="http://127.0.0.1:8080",
+        bucket="yelp-data",
+        scope="_default",
+        zcfg={"auth_mode": "basic", "username": "…", "password": "…"},
+    )
+    ids = [i.get("id") for i in (found.body or {}).get("items") or [] if isinstance(i, dict)]
+    if ids:
+        got = await run_get(
+            {"ids": ids[:10], "include": ["body"]},
+            zeus_url="http://127.0.0.1:8080",
+            bucket="yelp-data",
+            scope="_default",
+            zeus_headers=…,  # or zcfg=
+        )
+```
+
+| Helper | Notes |
+|--------|--------|
+| `run_verb(name, args, …)` | Generic entry; rejects `pipeline` |
+| `run_find` / `run_get` / `run_project` / … | One helper per exposed verb |
+| `run_search_verb` | Raw `POST …/search` body (not typeahead) |
+| `run_search` | Typeahead product path (see above) |
+| `pipeline` | **Not exposed** — use `run_agent` or `dispatch_zeus_v2_verb` |
+
+Full list + auth: [docs/VERBS.md](docs/VERBS.md). Module: `zeus_client.zeus.verbs`.
 
 ## Quick start
 

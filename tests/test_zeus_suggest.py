@@ -110,8 +110,8 @@ def test_suggest_result_to_dict():
 
 
 @pytest.mark.asyncio
-async def test_run_fast_suggest_short_query():
-    r = await sug.run_fast_suggest(
+async def test_run_search_short_query():
+    r = await sug.run_search(
         "a",
         zeus_url="http://zeus.test:8080",
         bucket="yelp-data",
@@ -123,8 +123,8 @@ async def test_run_fast_suggest_short_query():
 
 
 @pytest.mark.asyncio
-async def test_run_fast_suggest_requires_auth():
-    r = await sug.run_fast_suggest(
+async def test_run_search_requires_auth():
+    r = await sug.run_search(
         "sushi",
         zeus_url="http://zeus.test:8080",
         bucket="yelp-data",
@@ -135,7 +135,7 @@ async def test_run_fast_suggest_requires_auth():
 
 
 @pytest.mark.asyncio
-async def test_run_fast_suggest_fts_and_n1ql(http_client, monkeypatch):
+async def test_run_search_fts_and_n1ql(http_client, monkeypatch):
     zeus = "http://zeus.test:8080"
     bucket, scope, coll = "yelp-data", "_default", "_default"
     search_url = f"{zeus}/v2/{bucket}/{scope}/{coll}/search"
@@ -181,7 +181,7 @@ async def test_run_fast_suggest_fts_and_n1ql(http_client, monkeypatch):
         )
     )
 
-    r = await sug.run_fast_suggest(
+    r = await sug.run_search(
         "sushi",
         zeus_url=zeus,
         bucket=bucket,
@@ -209,7 +209,7 @@ async def test_run_fast_suggest_fts_and_n1ql(http_client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_run_fast_suggest_find_name_only(http_client):
+async def test_run_search_find_name_only(http_client):
     zeus = "http://zeus.test:8080"
     bucket, scope, coll = "yelp-data", "_default", "_default"
     search_url = f"{zeus}/v2/{bucket}/{scope}/{coll}/search"
@@ -236,7 +236,7 @@ async def test_run_fast_suggest_find_name_only(http_client):
         )
     )
 
-    r = await sug.run_fast_suggest(
+    r = await sug.run_search(
         "Pathmark",
         zeus_url=zeus,
         bucket=bucket,
@@ -252,6 +252,12 @@ async def test_run_fast_suggest_find_name_only(http_client):
     assert r.count == 1
     assert r.hits[0].name == "Pathmark"
     assert "zeus_find_name" in r.sources
+
+
+def test_run_search_aliases():
+    """Deprecated fast_suggest names remain bound for one release."""
+    assert sug.run_fast_suggest is sug.run_search
+    assert sug.run_fast_suggest_from_config is sug.run_search_from_config
 
 
 @pytest.mark.asyncio
