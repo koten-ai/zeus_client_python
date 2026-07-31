@@ -144,12 +144,31 @@ def _is_legacy_tools_catalog(doc: dict) -> bool:
     return bool(doc.get("tools"))
 
 
+def _stamp_consistent(doc: dict) -> bool:
+    """True when embedded stamp equals local compute of locked content."""
+    if not isinstance(doc, dict):
+        return False
+    stamped = extract_stamped_hash(doc)
+    if not stamped:
+        return False
+    try:
+        return stamped == compute_contract_hash(doc)
+    except Exception:
+        return False
+
+
 def _should_preserve_local_catalog(local_path: Path, remote_doc: dict) -> str:
     """Return a skip reason when a good local snapshot must not be clobbered.
 
     Startup sync can pull Zeus live templates that are still V1-shaped
     (``tools`` + ``find_nodes``, no stamp). Overwriting a Verify-stamped
     standardized catalog with those causes audit FAIL + 404s on V2 routes.
+
+    Also preserve a self-consistent Verify-stamped local file when the remote
+    still carries a prototype/base-pack stamp that no longer matches the body
+    (``embedded != compute``). Live scope templates often ship
+    ``contract.hash`` from ``prototype/_unbound`` while messages already include
+    scope material; clobbering a restamped local file re-breaks runtime audit.
     """
     if not local_path.is_file():
         return ""
@@ -163,6 +182,11 @@ def _should_preserve_local_catalog(local_path: Path, remote_doc: dict) -> str:
         return "preserve_stamped_local (remote is unstamped tools-only / V1-shaped)"
     if not extract_stamped_hash(remote_doc):
         return "preserve_stamped_local (remote has no embedded contract hash)"
+    if _stamp_consistent(local) and not _stamp_consistent(remote_doc):
+        return (
+            "preserve_stamped_local (remote embedded stamp disagrees with "
+            "content hash; keep consistent local Verify stamp)"
+        )
     return ""
 
 
