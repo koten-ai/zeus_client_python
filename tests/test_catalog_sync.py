@@ -210,3 +210,69 @@ async def test_sync_preserves_stamped_local_over_legacy_tools_remote(
     kept = json.loads(path.read_text(encoding="utf-8"))
     assert kept["contract"]["hash"] == "md5:stampedlocal00000000000000000001"
     assert kept.get("verbs")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_sync_preserves_consistent_local_over_inconsistent_remote_stamp(
+    patch_paths, http_client, sample_config_with_contracts,
+):
+    """Keep a Verify-consistent local file when remote still has a stale prototype stamp."""
+    from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash
+
+    user_dir = patch_paths["user_chat_req_dir"]
+    scope_dir = user_dir / "beer-sample__default"
+    scope_dir.mkdir(parents=True)
+    base = {
+        "_format": "zeus.chat_request.v2",
+        "verbs": [{"type": "function", "function": {"name": "find"}}],
+        "messages": [{"role": "system", "content": "stamped rules clean"}],
+    }
+    good_h = compute_contract_hash(base)
+    local = {
+        **base,
+        "contract": {"hash": good_h, "builder": "CatalogForContract@verify"},
+        "_hash": good_h,
+    }
+    path = scope_dir / "chat_request_analytics_v2.json"
+    path.write_text(json.dumps(local), encoding="utf-8")
+
+    remote = {
+        **base,
+        "messages": [
+            {
+                "role": "system",
+                "content": "stamped rules clean\n\n## SCOPE BRIEF\nscope material",
+            }
+        ],
+        # Prototype / base-pack stamp that no longer matches locked content after edits.
+        "contract": {
+            "hash": "md5:5aacbf1d7a4d9d5de9436cdffbce050f",
+            "builder": "base-4",
+            "scope": "prototype/_unbound",
+        },
+        "_hash": "md5:5aacbf1d7a4d9d5de9436cdffbce050f",
+    }
+    # Force locked-content drift so remote stamp is inconsistent even after brief strip.
+    remote["verbs"] = [
+        {"type": "function", "function": {"name": "find"}},
+        {"type": "function", "function": {"name": "pipeline"}},
+    ]
+    assert compute_contract_hash(remote) != extract_stamped_hash(remote)
+
+    respx.get(f"{ZEUS_URL}/v1/ai/chat_request.json").mock(
+        return_value=httpx.Response(200, json=remote),
+    )
+
+    result = await sync_chat_requests(
+        {**sample_config_with_contracts, "chat_requests_sync": {"modes": ["analytics"]}},
+        force=True,
+    )
+    assert not result.synced
+    assert len(result.skipped) == 1
+    reason = result.skipped[0].get("reason") or ""
+    assert "preserve_stamped_local" in reason
+    assert "disagrees with content hash" in reason
+    kept = json.loads(path.read_text(encoding="utf-8"))
+    assert kept["contract"]["hash"] == good_h
+    assert kept.get("verbs") == local["verbs"]
