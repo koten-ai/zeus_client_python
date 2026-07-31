@@ -1,6 +1,6 @@
 # base-5 Client control plane (0.2.x)
 
-**Status:** base-5 floor in **0.2.0**; **`ai_process_result`** (ZC-WISH-044) in **0.2.1**.  
+**Status:** base-5 floor in **0.2.0**; **`ai_process_result`** (ZC-WISH-044) in **0.2.1**; cheap path no second LLM hop + **fast suggest** in **0.2.2**.  
 **SoT packs:** [zeus_chat_request](https://github.com/koten-ai/zeus_chat_request) `v2/base/base-5.3/` (wire = base-5).  
 **Pin:** production `CURRENT.json` remains **base-1** — do not invent stamps; Hub stamp only.
 
@@ -66,7 +66,7 @@ print(structured.artifacts)  # admin / metrics — not end-user chrome
 | Value | Loop after Zeus tool data |
 | --- | --- |
 | **`true` (package default)** | Insight path — after terminating `return` / pipeline `turn_complete`, one **no-tools** synthesis turn narrates tool JSON (mirrors Zeus Hub Debug “AI on Zeus result”). Non-terminating tools continue the open multi-round loop. |
-| **`false`** | Cheap path — after tools with data, force a short final answer (no open re-plan); after terminate, return the terminal summary immediately without an insight hop. |
+| **`false`** | Cheap path — after tools with data, **no second LLM hop** (use pipeline/tool ``summary`` arg if present, else a static thin line; UI shows Zeus rows); after terminate, return the terminal summary immediately without an insight hop. |
 
 ```python
 # Product / lab cheap path (show tables, skip second billable essay)

@@ -357,34 +357,71 @@ async def test_run_agent_structured_false_returns_four_tuple(patched_loop, monke
 
 @pytest.mark.asyncio
 async def test_ai_process_result_false_cheap_after_tools(patched_loop, monkeypatch):
-    """ai_process_result=false: after Zeus data, force final — no open re-plan."""
+    """ai_process_result=false: after Zeus data, thin final — no second LLM hop."""
     from zeus_client.agent.settings import ClientSettings
+    from zeus_client.agent.tool_round import CHEAP_FINAL_STATIC_ANSWER
 
     llm_calls = {"n": 0}
+    force_final_calls = {"n": 0}
 
     async def llm_tools_once(*_a, **_k):
         llm_calls["n"] += 1
         return None, False, {"role": "assistant", "tool_calls": [{"id": "c1"}]}
 
     async def tools_with_data(*_a, **_k):
-        return None, False, {}, _empty_outcome(tools_executed=1, tools_with_data=1)
+        return None, False, {}, _empty_outcome(
+            tools_executed=1,
+            tools_with_data=1,
+            tool_arg_summary="Businesses in Reno from the graph",
+        )
 
-    async def cheap_synth(*_a, **_k):
-        return "short final from data"
+    async def should_not_force_final(*_a, **_k):
+        force_final_calls["n"] += 1
+        return "should not run"
 
     monkeypatch.setattr(loop_mod, "run_llm_round", llm_tools_once)
     monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_with_data)
-    monkeypatch.setattr(loop_mod, "force_final_llm_answer", cheap_synth)
+    monkeypatch.setattr(loop_mod, "force_final_llm_answer", should_not_force_final)
 
     answer, trace, _, _ = await loop_mod.run_agent(
         "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
         "b", "s", "c", "q", [],
         settings=ClientSettings(ai_process_result=False, company_context="Beer Co"),
     )
-    assert answer == "short final from data"
+    assert answer == "Businesses in Reno from the graph"
+    assert force_final_calls["n"] == 0
     assert trace.get("ai_process_result_exit") == "cheap_final"
-    assert any("ai_process_result=false" in n for n in trace["notes"])
-    assert llm_calls["n"] == 1  # no second open-plan llm_round
+    assert any("without second LLM hop" in n for n in trace["notes"])
+    assert llm_calls["n"] == 1  # plan hop only
+
+
+@pytest.mark.asyncio
+async def test_ai_process_result_false_cheap_static_without_tool_summary(
+    patched_loop, monkeypatch
+):
+    from zeus_client.agent.settings import ClientSettings
+    from zeus_client.agent.tool_round import CHEAP_FINAL_STATIC_ANSWER
+
+    async def llm_tools_once(*_a, **_k):
+        return None, False, {"role": "assistant", "tool_calls": [{"id": "c1"}]}
+
+    async def tools_with_data(*_a, **_k):
+        return None, False, {}, _empty_outcome(tools_executed=1, tools_with_data=1)
+
+    async def should_not_force_final(*_a, **_k):
+        raise AssertionError("force_final_llm_answer must not run on cheap path")
+
+    monkeypatch.setattr(loop_mod, "run_llm_round", llm_tools_once)
+    monkeypatch.setattr(loop_mod, "execute_tool_calls", tools_with_data)
+    monkeypatch.setattr(loop_mod, "force_final_llm_answer", should_not_force_final)
+
+    answer, trace, _, _ = await loop_mod.run_agent(
+        "http://zeus", {}, "http://llm", "key", "model", "v2", "auto",
+        "b", "s", "c", "q", [],
+        settings=ClientSettings(ai_process_result=False),
+    )
+    assert answer == CHEAP_FINAL_STATIC_ANSWER
+    assert trace.get("ai_process_result_exit") == "cheap_final"
 
 
 @pytest.mark.asyncio

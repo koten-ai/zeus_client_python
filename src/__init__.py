@@ -51,6 +51,14 @@ from zeus_client.zeus.dispatch import (
     dispatch_zeus_v2_verb,
     zeus_correlation_headers,
 )
+from zeus_client.zeus.suggest import (
+    CouchbaseQueryConfig,
+    SuggestHit,
+    SuggestOptions,
+    SuggestResult,
+    run_fast_suggest,
+    run_fast_suggest_from_config,
+)
 from zeus_client.zeus.session import (
     continue_session_turn,
     create_zeus_session,
@@ -100,6 +108,7 @@ __all__ = [
     "compute_contract_hash",
     "continue_session_turn",
     "create_zeus_session",
+    "CouchbaseQueryConfig",
     "dispatch_zeus_call",
     "dispatch_zeus_tool",
     "dispatch_zeus_v2_verb",
@@ -128,7 +137,12 @@ __all__ = [
     "resolve_zeus_auth",
     "resolve_zeus_config",
     "run_agent",
+    "run_fast_suggest",
+    "run_fast_suggest_from_config",
     "save_config",
+    "SuggestHit",
+    "SuggestOptions",
+    "SuggestResult",
     "sync_chat_requests",
     "SyncResult",
     "to_toon",

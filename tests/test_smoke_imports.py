@@ -14,6 +14,8 @@ SYMBOLS = [
     "ClientSettings", "load_base_catalog", "list_base_catalogs", "parse_layer_a",
     "decide_policy", "prepare_settings", "merge_rules", "LayerA", "PolicyDecision",
     "effective_ai_process_result",
+    "run_fast_suggest", "run_fast_suggest_from_config",
+    "SuggestHit", "SuggestOptions", "SuggestResult", "CouchbaseQueryConfig",
 ]
 
 
