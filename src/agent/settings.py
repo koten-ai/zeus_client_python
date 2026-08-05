@@ -57,6 +57,9 @@ class ClientSettings:
     # False = cheap path (UI/tables + thin Layer A, no extra open re-plan).
     # ZC-WISH-044 · package default True to mirror Zeus Hub.
     ai_process_result: bool = True
+    # Stamp X-Zeus-Trace: 1 on tool dispatches (sampler force-keep). Lab/debug.
+    # Also honoured via env ZEUS_CLIENT_FORCE_TRACE=1 (see effective_force_trace).
+    force_trace: bool = False
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any] | None) -> "ClientSettings":
@@ -228,6 +231,7 @@ def prepare_settings(settings: ClientSettings | Mapping | None) -> ClientSetting
     if s.company_context:
         s.company_context, _ = truncate_company_context(s.company_context)
     s.ai_process_result = bool(s.ai_process_result)
+    s.force_trace = bool(s.force_trace)
     return s
 
 
@@ -246,3 +250,33 @@ def effective_ai_process_result(
     if isinstance(settings, Mapping) and "ai_process_result" in settings:
         return bool(settings["ai_process_result"])
     return DEFAULT_AI_PROCESS_RESULT
+
+
+def effective_force_trace(
+    settings: ClientSettings | Mapping | None = None,
+    zcfg: Mapping[str, Any] | None = None,
+) -> bool:
+    """Resolve X-Zeus-Trace force-keep: env → settings → zcfg → False.
+
+    Env ``ZEUS_CLIENT_FORCE_TRACE=1|true|yes`` wins (ops kill-switch / lab).
+    """
+    import os
+
+    env = (os.environ.get("ZEUS_CLIENT_FORCE_TRACE") or "").strip().lower()
+    if env in {"1", "true", "yes", "on"}:
+        return True
+    if env in {"0", "false", "no", "off"}:
+        return False
+    if isinstance(settings, ClientSettings):
+        if settings.force_trace:
+            return True
+    elif isinstance(settings, Mapping) and settings.get("force_trace"):
+        return True
+    if isinstance(zcfg, Mapping) and zcfg.get("force_trace"):
+        return True
+    # Also accept nested zeus.force_trace when callers pass full config root.
+    if isinstance(zcfg, Mapping):
+        nested = zcfg.get("zeus")
+        if isinstance(nested, Mapping) and nested.get("force_trace"):
+            return True
+    return False
