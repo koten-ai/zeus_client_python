@@ -4,7 +4,9 @@ import pytest
 from zeus_client.agent.layer_a import (
     normalize_triggers,
     parse_layer_a,
+    peel_layer_a_summary,
     ui_view,
+    user_facing_answer,
     validate_app_output,
     artifacts_view,
 )
@@ -115,3 +117,35 @@ def test_parse_app_output_with_output_request():
         },
     )
     assert layer.app_output == {"offer_code": "X"}
+
+
+def test_peel_layer_a_summary_fenced_yaml_dump():
+    dump = (
+        "```\n"
+        'summary: "Found two great salons in Tampa."\n'
+        "confidence: med\n"
+        'query_decomposition: {"intent": "salons"}\n'
+        'decomposition: {"targets": []}\n'
+        "policy_action: answer\n"
+        "wish_i_knew: []\n"
+        "```"
+    )
+    assert peel_layer_a_summary(dump) == "Found two great salons in Tampa."
+    assert user_facing_answer(dump) == "Found two great salons in Tampa."
+    assert user_facing_answer(dump, ui_text="UI preferred") == "UI preferred"
+
+
+def test_user_facing_answer_passes_prose():
+    prose = "Here are three salons worth visiting."
+    assert peel_layer_a_summary(prose) is None
+    assert user_facing_answer(prose) == prose
+
+
+def test_peel_layer_a_summary_unescapes_newlines():
+    dump = (
+        "summary: \"Line one.\\nLine two.\"\n"
+        "confidence: high\n"
+        "policy_action: answer\n"
+        'query_decomposition: {"intent": "x"}\n'
+    )
+    assert peel_layer_a_summary(dump) == "Line one.\nLine two."

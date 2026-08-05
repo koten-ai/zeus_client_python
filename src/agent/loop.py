@@ -8,12 +8,14 @@ from zeus_client.contract_hash import compute_contract_hash, extract_stamped_has
 
 from zeus_client.agent.audit import run_runtime_contract_audit
 from zeus_client.agent.hooks import AgentHooks
+from zeus_client.agent.layer_a import user_facing_answer
 from zeus_client.agent.prompt_inject import apply_control_plane_inject
 from zeus_client.agent.response import extract_structured_response
 from zeus_client.agent.session_phase import commit_session_turn, setup_contract_and_session
 from zeus_client.agent.settings import (
     ClientSettings,
     effective_ai_process_result,
+    effective_force_trace,
     prepare_settings,
 )
 from zeus_client.agent.tool_round import (
@@ -34,6 +36,7 @@ from zeus_client.zeus.catalog import (
     load_chat_request,
     tools_from_chat_request,
 )
+from zeus_client.zeus.dispatch import apply_zeus_force_trace_header, apply_zeus_mode_header
 from zeus_client.zeus.lint import lint_catalog_assembled, resolve_lint_config
 
 
@@ -110,7 +113,18 @@ async def setup_turn_context(
 
     t0 = time.time()
     zeus_headers, auth_note = await resolve_zeus_auth(zeus_url, zcfg, bucket, scope)
+    # Stamp mode on every agent request so debug hop record envelope can pick it up
+    # (pipeline path still under-instrumented server-side; header is still useful
+    # for standalone verbs and logs).
+    zeus_headers = apply_zeus_mode_header(zeus_headers, mode)
+    zeus_headers = apply_zeus_force_trace_header(
+        zeus_headers, effective_force_trace(prepared, zcfg),
+    )
     trace["notes"].append(f"auth: {auth_note}")
+    if mode:
+        trace["notes"].append(f"X-Zeus-Mode={mode}")
+    if zeus_headers.get("X-Zeus-Trace") == "1":
+        trace["notes"].append("X-Zeus-Trace=1 (force keep)")
     trace["spans"].append({
         "name": "auth.resolve", "cls": "other",
         "at": 0, "ms": int((time.time() - t0) * 1000),
@@ -545,6 +559,20 @@ async def run_agent(
         # Prefer policy UI text for refuse/error
         if structured_response.ui_text and structured_response.policy in ("refuse", "error"):
             answer = structured_response.ui_text
+        else:
+            layer = structured_response.layer_a or {}
+            layer_summary = layer.get("summary") if isinstance(layer, dict) else None
+            cleaned = user_facing_answer(
+                answer,
+                ui_text=structured_response.ui_text,
+                layer_summary=layer_summary if isinstance(layer_summary, str) else None,
+            )
+            if cleaned != (answer or ""):
+                answer = cleaned
+                structured_response.answer = cleaned
+                tc.trace.setdefault("notes", []).append(
+                    "peeled Layer A envelope from user-facing answer"
+                )
         if structured:
             return answer, tc.trace, tc.messages[1:], session_meta, structured_response
 

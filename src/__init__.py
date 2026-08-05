@@ -1,11 +1,11 @@
 """Zeus Python client library."""
 
 from zeus_client.agent.hooks import AgentDecision, AgentHooks
-from zeus_client.agent.layer_a import LayerA, parse_layer_a, normalize_triggers
+from zeus_client.agent.layer_a import LayerA, parse_layer_a, normalize_triggers, peel_layer_a_summary, user_facing_answer, looks_like_layer_a_dump
 from zeus_client.agent.loop import run_agent
 from zeus_client.agent.policy import PolicyDecision, decide_policy
-from zeus_client.agent.response import StructuredAgentResponse, extract_structured_response
-from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings, effective_ai_process_result
+from zeus_client.agent.response import StructuredAgentResponse, extract_structured_response, layer_a_for_session_trace
+from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings, effective_ai_process_result, effective_force_trace
 from zeus_client.config import (
     load_config,
     resolve_llm_provider_config,
@@ -86,6 +86,10 @@ from zeus_client.zeus.session import (
     rehydrate_session,
 )
 from zeus_client.trace.tool_order import build_tool_order
+from zeus_client.trace.session_hops import (
+    select_primary_req_id,
+    build_aggregate_trace_payload,
+)
 
 
 class ZeusClient:
@@ -105,11 +109,16 @@ __all__ = [
     "AgentHooks",
     "ClientSettings",
     "LayerA",
+    "looks_like_layer_a_dump",
+    "peel_layer_a_summary",
+    "user_facing_answer",
     "PolicyDecision",
     "StructuredAgentResponse",
     "decide_policy",
     "effective_ai_process_result",
+    "effective_force_trace",
     "extract_structured_response",
+    "layer_a_for_session_trace",
     "freeze_session_rules",
     "list_base_catalogs",
     "load_base_catalog",
@@ -118,7 +127,9 @@ __all__ = [
     "parse_layer_a",
     "prepare_settings",
     "BASE_DIR",
+    "build_aggregate_trace_payload",
     "build_tool_order",
+    "select_primary_req_id",
     "MAX_ROUNDS",
     "USER_CONFIG_DIR",
     "ZeusClient",

@@ -192,7 +192,33 @@ def test_zeus_correlation_headers_all_fields():
     }
 
 
+def test_zeus_correlation_headers_mode_and_force_trace():
+    h = zeus_correlation_headers(
+        "c", turn_id="t", mode="analytics", force_trace=True,
+    )
+    assert h["X-Zeus-Mode"] == "analytics"
+    assert h["X-Zeus-Trace"] == "1"
+    assert h["X-Zeus-Chat-Id"] == "c"
+
+
 def test_zeus_correlation_headers_partial():
     assert zeus_correlation_headers("") == {}
     assert zeus_correlation_headers("c", turn_id="") == {"X-Zeus-Chat-Id": "c"}
     assert zeus_correlation_headers("", call_id="x") == {"X-Zeus-Call-Id": "x"}
+
+
+def test_apply_zeus_mode_and_force_trace_helpers():
+    from zeus_client.zeus.dispatch import (
+        apply_zeus_force_trace_header,
+        apply_zeus_mode_header,
+    )
+
+    h = apply_zeus_mode_header({}, "analytics")
+    assert h["X-Zeus-Mode"] == "analytics"
+    # does not override existing
+    h2 = apply_zeus_mode_header({"X-Zeus-Mode": "research"}, "analytics")
+    assert h2["X-Zeus-Mode"] == "research"
+    h3 = apply_zeus_force_trace_header(h, True)
+    assert h3["X-Zeus-Trace"] == "1"
+    h4 = apply_zeus_force_trace_header(h, False)
+    assert "X-Zeus-Trace" not in h4

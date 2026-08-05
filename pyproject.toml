@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kotenai-zeus-client"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python client library for Zeus AI data servers"
 readme = "README.md"
 license = "MIT"

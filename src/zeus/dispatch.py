@@ -89,8 +89,20 @@ async def dispatch_zeus_call(api_version, zeus_url, bucket, scope, collection, n
 # contract_status (match|drift|none) is returned on create/trace and recorded
 # for ownership (client drift vs zeus fault) in Detective.
 
-def zeus_correlation_headers(chat_id: str, turn_id: str = "", call_id: str = "") -> dict:
-    """Build X-Zeus-* correlation headers for tool calls and session/trace."""
+def zeus_correlation_headers(
+    chat_id: str,
+    turn_id: str = "",
+    call_id: str = "",
+    *,
+    mode: str = "",
+    force_trace: bool = False,
+) -> dict:
+    """Build X-Zeus-* correlation headers for tool calls and session/trace.
+
+    ``mode`` stamps ``X-Zeus-Mode`` so debug hop record envelope/report get a mode
+    on paths that MergeEnvelope from logging headers.
+    ``force_trace`` sets ``X-Zeus-Trace: 1`` (sampler force-keep; lab/debug).
+    """
     h = {}
     if chat_id:
         h["X-Zeus-Chat-Id"] = str(chat_id)
@@ -98,4 +110,27 @@ def zeus_correlation_headers(chat_id: str, turn_id: str = "", call_id: str = "")
         h["X-Zeus-Turn-Id"] = str(turn_id)
     if call_id:
         h["X-Zeus-Call-Id"] = str(call_id)
+    if mode:
+        h["X-Zeus-Mode"] = str(mode)
+    if force_trace:
+        h["X-Zeus-Trace"] = "1"
+    return h
+
+
+def apply_zeus_mode_header(headers: dict | None, mode: str | None) -> dict:
+    """Return headers with X-Zeus-Mode set when missing and mode is non-empty."""
+    h = dict(headers or {})
+    m = (mode or "").strip()
+    if not m:
+        return h
+    if "X-Zeus-Mode" not in h and "x-zeus-mode" not in {k.lower() for k in h}:
+        h["X-Zeus-Mode"] = m
+    return h
+
+
+def apply_zeus_force_trace_header(headers: dict | None, force: bool) -> dict:
+    """Optionally stamp X-Zeus-Trace: 1 for sampler force-keep."""
+    h = dict(headers or {})
+    if force:
+        h["X-Zeus-Trace"] = "1"
     return h

@@ -459,10 +459,85 @@ async def test_commit_just_created_session(http_client):
         [], [("req-1", "find", 200, "ok", "http://z/find")], trace, HEADERS,
     )
     assert meta["round"] == 2
+    assert meta["primary_req_id"] == "req-1"
     assert any("trace req-1" in n for n in trace["notes"])
     payload = json.loads(turn_route.calls.last.request.content)
     assert payload["round"] == 2
     assert payload["new_turns"] == [{"role": "assistant", "content": "a"}]
+
+
+@pytest.mark.asyncio
+async def test_commit_multi_hop_aggregate_payload(http_client):
+    """All hops get the same rich body; primary (error) is last POST."""
+    trace = {
+        "notes": [],
+        "session": {"created": False, "contract_status": "match"},
+        "steps": [
+            {
+                "type": "return_result",
+                "args": {
+                    "summary": "done",
+                    "query_decomposition": {"intent": "List", "entity": "Business"},
+                    "decomposition": {"targets": ["Business"]},
+                    "confidence": "high",
+                },
+            }
+        ],
+    }
+    sid = "sess-multi"
+    route = respx.post(f"{ZEUS_URL}/v2/session/trace").mock(
+        return_value=httpx.Response(201, json={"contract_status": "match"}),
+    )
+    respx.post(f"{ZEUS_URL}/v2/session/{sid}/turn").mock(
+        return_value=httpx.Response(200, json={"round": 1}),
+    )
+    hops = [
+        {
+            "req_id": "req-pipe",
+            "name": "pipeline",
+            "status": 200,
+            "snippet": '{"status":"ok"}',
+            "url": "http://z/pipeline",
+            "ms": 23,
+            "step_costs": [{"as": "tampa", "status": "ok", "result_size": 0}],
+        },
+        {
+            "req_id": "req-search",
+            "name": "search",
+            "status": 500,
+            "snippet": "search_timeout",
+            "url": "http://z/search",
+            "ms": 2000,
+        },
+    ]
+    meta = await commit_session_turn(
+        ZEUS_URL, sid, True, 1, "cid", "hash", {"tools": []},
+        [{"role": "assistant", "content": "done"}],
+        [], hops, trace, HEADERS,
+    )
+    assert meta["req_ids"] == ["req-pipe", "req-search"]
+    assert meta["primary_req_id"] == "req-search"
+    assert meta["preferred_req_id"] == "req-search"
+    assert route.call_count == 2
+    # Last post is primary (error search)
+    last = json.loads(route.calls.last.request.content)
+    assert last["req_id"] == "req-search"
+    assert last["outcome"] == "error"
+    assert last["zeus_response"]["aggregate"] is True
+    assert last["zeus_response"]["req_ids"] == ["req-pipe", "req-search"]
+    assert last["zeus_response"]["primary_req_id"] == "req-search"
+    assert last["zeus_response"]["layer_a"]["intent"] == "List"
+    assert last["zeus_response"]["layer_a"]["confidence"] == "high"
+    assert len(last["turns"]) == 2
+    assert any("result_size=0" in t["content"] for t in last["turns"])
+    # Both posts carry identical multi-hop body
+    first = json.loads(route.calls[0].request.content)
+    assert first["zeus_response"]["tool_hops"] == last["zeus_response"]["tool_hops"]
+    assert first["zeus_response"]["layer_a"] == last["zeus_response"]["layer_a"]
+    assert first["req_id"] == "req-pipe"
+    assert trace["session"]["preferred_req_id"] == "req-search"
+    assert any("aggregate=1" in n for n in trace["notes"])
+    assert any("layer_a=1" in n for n in trace["notes"])
 
 
 @pytest.mark.asyncio
