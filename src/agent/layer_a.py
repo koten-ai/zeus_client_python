@@ -4,6 +4,8 @@ ZC-WISH-004/005/009/011/012 — base-5 wire.
 """
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Sequence
 
@@ -18,6 +20,35 @@ _G2_UI_FORBIDDEN = frozenset({
     "hooks_jailbreak_score",
 })
 
+# Meta keys that appear alongside ``summary`` in terminate / pipeline-arg dumps.
+# Presence of several of these (plus a summary: line) means the model echoed the
+# Layer A envelope instead of user-facing prose — common on ai_process insight turns.
+_LAYER_A_DUMP_META = (
+    "confidence",
+    "query_decomposition",
+    "decomposition",
+    "policy_action",
+    "subject_confidence",
+    "jail_break_attempt",
+    "wish_i_knew",
+    "business_rules_triggers",
+    "node_refs",
+    "entity_refs",
+    "data_gaps",
+    "app_output",
+    "provenance",
+)
+
+_FENCE_WRAP = re.compile(
+    r"^```(?:json|yaml|yml|text)?\s*\n([\s\S]*?)\n```\s*$",
+    re.IGNORECASE,
+)
+_SUMMARY_QUOTED = re.compile(
+    r'(?m)^summary\s*:\s*("(?:\\.|[^"\\])*")\s*$',
+)
+_SUMMARY_UNQUOTED = re.compile(
+    r"(?m)^summary\s*:\s*(.+?)\s*$",
+)
 
 @dataclass
 class LayerA:
@@ -239,6 +270,121 @@ def parse_layer_a(
             layer.warnings.extend(app_errs)
 
     return layer
+
+
+def _strip_code_fence(text: str) -> str:
+    t = (text or "").strip()
+    if not t:
+        return ""
+    m = _FENCE_WRAP.match(t)
+    if m:
+        return m.group(1).strip()
+    if t.startswith("```"):
+        lines = t.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        return "\n".join(lines).strip()
+    return t
+
+
+def looks_like_layer_a_dump(text: str | None) -> bool:
+    """True when *text* is a Layer A / pipeline-args envelope, not chat prose.
+
+    Insight / final turns sometimes echo the full terminate bag as a fenced
+    YAML-like block (``summary:`` + ``policy_action:`` + ``wish_i_knew:`` …).
+    That must never be shown raw in product UIs.
+    """
+    if not isinstance(text, str):
+        return False
+    body = _strip_code_fence(text)
+    if not body:
+        return False
+    # JSON object form
+    if body.startswith("{") and '"summary"' in body[:800]:
+        meta_hits = sum(1 for k in _LAYER_A_DUMP_META if f'"{k}"' in body)
+        return meta_hits >= 2
+    has_summary = bool(re.search(r"(?m)^summary\s*:", body))
+    if not has_summary:
+        return False
+    meta_hits = sum(
+        1 for k in _LAYER_A_DUMP_META if re.search(rf"(?m)^{re.escape(k)}\s*:", body)
+    )
+    return meta_hits >= 2
+
+
+def peel_layer_a_summary(text: str | None) -> str | None:
+    """If *text* is a Layer A dump, return the ``summary`` prose only; else None."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    if not looks_like_layer_a_dump(text):
+        return None
+    body = _strip_code_fence(text)
+
+    if body.startswith("{"):
+        try:
+            obj = json.loads(body)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            obj = None
+        if isinstance(obj, dict):
+            summary = obj.get("summary") or obj.get("answer") or obj.get("content")
+            if isinstance(summary, str) and summary.strip():
+                return summary.strip()
+
+    m = _SUMMARY_QUOTED.search(body)
+    if m:
+        try:
+            val = json.loads(m.group(1))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            raw = m.group(1)[1:-1]
+            val = (
+                raw.replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace('\\"', '"')
+                .replace("\\\\", "\\")
+            )
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+
+    m = _SUMMARY_UNQUOTED.search(body)
+    if m:
+        val = m.group(1).strip().strip("\"'")
+        if val and not val.startswith("{"):
+            return val.replace("\\n", "\n").strip()
+    return None
+
+
+def user_facing_answer(
+    answer: str | None,
+    *,
+    ui_text: str | None = None,
+    layer_summary: str | None = None,
+) -> str:
+    """Normalize model/tool answer for chat UIs.
+
+    Preference order when the raw answer is a Layer A envelope:
+    1. policy ``ui_text`` (already mapped for refuse/clarify/answer)
+    2. parsed layer ``summary``
+    3. peeled ``summary`` field from the dump
+    Otherwise return the original answer (stripped of empty markers handled by app).
+    """
+    raw = answer if isinstance(answer, str) else ("" if answer is None else str(answer))
+    preferred = ""
+    if isinstance(ui_text, str) and ui_text.strip():
+        preferred = ui_text.strip()
+    elif isinstance(layer_summary, str) and layer_summary.strip():
+        preferred = layer_summary.strip()
+
+    if looks_like_layer_a_dump(raw):
+        if preferred and not looks_like_layer_a_dump(preferred):
+            return preferred
+        peeled = peel_layer_a_summary(raw)
+        if peeled:
+            return peeled
+        if preferred:
+            return preferred
+    return raw
 
 
 def ui_view(layer: LayerA, *, ui_text: str | None = None) -> dict:

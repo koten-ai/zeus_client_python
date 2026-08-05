@@ -355,10 +355,67 @@ async def test_toon_and_req_id_tracking(monkeypatch):
     this_turn_reqs = []
     await tr.execute_tool_calls(
         1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv-9", True, this_turn_reqs,
+        {}, {}, AgentHooks(), {"mode": "analytics"}, trace, lambda: 0, "t1", "conv-9", True, this_turn_reqs,
     )
     assert trace["tool_calls"][0]["ai_content_format"] == "toon"
-    assert this_turn_reqs == [("req-track", "find", 200, '{"rows":[]}', "http://z/find")]
+    assert len(this_turn_reqs) == 1
+    hop = this_turn_reqs[0]
+    assert hop["req_id"] == "req-track"
+    assert hop["name"] == "find"
+    assert hop["status"] == 200
+    assert hop["url"] == "http://z/find"
+    assert '{"rows":[]}' in hop["snippet"]
+    # mode stamped on correlation headers
+    assert trace["tool_calls"][0]["x_zeus_headers"].get("X-Zeus-Mode") == "analytics"
+
+
+@pytest.mark.asyncio
+async def test_force_trace_header_from_zcfg(monkeypatch):
+    captured = {}
+
+    async def capture_dispatch(
+        api_version, zeus_url, bucket, scope, collection, name, args,
+        zeus_headers, corr_headers=None,
+    ):
+        captured["corr"] = corr_headers
+        return 200, "{}", "http://z/find", "r1"
+
+    monkeypatch.setattr(tr, "dispatch_zeus_call", capture_dispatch)
+    tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "{}"}}]
+    await tr.execute_tool_calls(
+        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
+        {"force_trace": True}, {}, AgentHooks(), {"mode": "analytics"}, _trace(),
+        lambda: 0, "t1", "conv", False, [],
+    )
+    assert captured["corr"]["X-Zeus-Trace"] == "1"
+    assert captured["corr"]["X-Zeus-Mode"] == "analytics"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_hop_includes_step_costs(monkeypatch):
+    body = json.dumps({
+        "status": "ok",
+        "meta": {
+            "step_costs": [
+                {"as": "tampa", "status": "ok", "result_size": 0, "ms": 22},
+            ],
+            "steps_executed": 1,
+        },
+    })
+
+    async def fake_dispatch(*_a, **_k):
+        return 200, body, "http://z/pipeline", "req-pipe"
+
+    monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
+    tool_calls = [{"id": "c1", "function": {"name": "pipeline", "arguments": "{\"steps\":[]}"}}]
+    this_turn_reqs = []
+    await tr.execute_tool_calls(
+        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
+        {}, {}, AgentHooks(), {}, _trace(), lambda: 0, "t1", "conv", False, this_turn_reqs,
+    )
+    assert this_turn_reqs[0]["name"] == "pipeline"
+    assert this_turn_reqs[0]["step_costs"][0]["as"] == "tampa"
+    assert this_turn_reqs[0]["result_size"] == 0
 
 
 @pytest.mark.asyncio

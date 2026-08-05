@@ -11,11 +11,13 @@ import httpx
 
 from zeus_client.agent.enrichment import amplify_tool_content
 from zeus_client.agent.hooks import AgentHooks
+from zeus_client.agent.settings import effective_force_trace
 from zeus_client.constants import MAX_TOOLCALLS_PER_ROUND
 from zeus_client.llm.client import cached_tokens_of, llm_chat_payload, llm_payload
 from zeus_client.logging_setup import logger
 from zeus_client.toon import to_toon
 from zeus_client.trace.pipeline import pipeline_step_spans
+from zeus_client.trace.session_hops import TRACE_SNIPPET_MAX, extract_pipeline_meta
 from zeus_client.zeus.auth import resolve_zeus_auth
 from zeus_client.zeus.dispatch import dispatch_zeus_call, zeus_correlation_headers
 
@@ -281,6 +283,14 @@ async def execute_tool_calls(
     return_seen = False
     outcome = ToolRoundOutcome()
 
+    mode = ""
+    if isinstance(ctx, dict):
+        mode = str(ctx.get("mode") or "")
+    force_trace = effective_force_trace(
+        ctx.get("settings") if isinstance(ctx, dict) else None,
+        zcfg if isinstance(zcfg, dict) else None,
+    )
+
     for tc in tool_calls[:MAX_TOOLCALLS_PER_ROUND]:
         fn = tc.get("function", {})
         name = fn.get("name", "")
@@ -316,8 +326,11 @@ async def execute_tool_calls(
         t0 = time.time()
         tool_at = at_ms()
         corr = zeus_correlation_headers(
-            conv_id or "", turn_id=turn_id,
+            conv_id or "",
+            turn_id=turn_id,
             call_id=tc.get("id") or f"call_{rnd}_{len(trace.get('tool_calls', []))}",
+            mode=mode,
+            force_trace=force_trace,
         )
         sent_corr = {k: v for k, v in corr.items() if k.startswith("X-Zeus")}
         tstatus, ttext, dispatch_url, req_id = await dispatch_zeus_call(
@@ -329,6 +342,11 @@ async def execute_tool_calls(
             try:
                 zeus_headers, auth_note = await resolve_zeus_auth(
                     zeus_url, zcfg, bucket, scope, force=True)
+                # Preserve mode / force-trace after re-mint.
+                if mode and "X-Zeus-Mode" not in zeus_headers:
+                    zeus_headers = {**zeus_headers, "X-Zeus-Mode": mode}
+                if force_trace:
+                    zeus_headers = {**zeus_headers, "X-Zeus-Trace": "1"}
                 trace["notes"].append(f"auth: re-minted after 401 ({auth_note})")
                 tstatus, ttext, dispatch_url, req_id = await dispatch_zeus_call(
                     api_version, zeus_url, bucket, scope, collection, name, tc_args,
@@ -371,6 +389,13 @@ async def execute_tool_calls(
             "status": tstatus, "result_text": ttext,
             "result_json": parsed_result, "ctx": ctx,
         })
+        pipe_meta = extract_pipeline_meta(parsed_result) if parsed_result is not None else {}
+        if name == "pipeline" and isinstance(parsed_result, dict):
+            step_costs = (parsed_result.get("meta") or {}).get("step_costs")
+            if step_costs is None and isinstance(parsed_result.get("data"), dict):
+                step_costs = (parsed_result["data"].get("meta") or {}).get("step_costs")
+        else:
+            step_costs = pipe_meta.get("step_costs")
         trace["steps"].append({
             "round": rnd, "type": "tool", "name": name, "args": tc_args,
             "status": tstatus, "ms": tool_ms, "url": dispatch_url,
@@ -379,13 +404,23 @@ async def execute_tool_calls(
             "sent_bytes": len(ai_content.encode("utf-8")),
             "result": ttext[:4000], "result_full": ttext,
             "pipeline_json": tc_args if name == "pipeline" else None,
-            "pipeline_step_costs": (
-                (parsed_result.get("meta") or {}).get("step_costs")
-                if name == "pipeline" and isinstance(parsed_result, dict) else None
-            ),
+            "pipeline_step_costs": step_costs if name == "pipeline" else None,
         })
         if req_id:
-            this_turn_reqs.append((req_id, name, tstatus, (ttext or "")[:300], dispatch_url))
+            snip = (ttext or "")[:TRACE_SNIPPET_MAX]
+            hop = {
+                "req_id": req_id,
+                "name": name,
+                "status": tstatus,
+                "snippet": snip,
+                "url": dispatch_url,
+                "ms": tool_ms,
+                "bytes": len(ttext.encode("utf-8")),
+            }
+            hop.update({k: v for k, v in pipe_meta.items() if k != "ms_meta"})
+            if step_costs is not None:
+                hop["step_costs"] = step_costs
+            this_turn_reqs.append(hop)
 
         outcome.tools_executed += 1
         empty = _tool_result_empty(tstatus, ttext or "", parsed_result)

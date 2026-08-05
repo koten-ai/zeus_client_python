@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from zeus_client.agent.layer_a import user_facing_answer
 from zeus_client.zeus.catalog import get_mini_schema
 
 _DATA_TOOLS = frozenset({"pipeline", "project", "find", "search", "get", "traverse"})
@@ -29,12 +30,94 @@ class StructuredAgentResponse:
 
 
 def _parse_return_payload(trace: dict) -> dict:
+    """Extract terminate bag from trace steps (return / return_result / pipeline)."""
     for step in reversed(trace.get("steps") or []):
-        if step.get("type") in ("return", "return_result"):
-            args = step.get("args")
-            if isinstance(args, dict):
+        stype = step.get("type")
+        args = step.get("args")
+        if not isinstance(args, dict):
+            continue
+        if stype in ("return", "return_result"):
+            return args
+        # Terminating pipeline: Layer A on tool args (type=tool name=pipeline)
+        # or pipeline JSON on the step.
+        name = str(step.get("name") or "").lower()
+        if stype == "tool" and name == "pipeline":
+            if (
+                args.get("summary") is not None
+                or args.get("query_decomposition") is not None
+                or args.get("turn_complete") is True
+                or args.get("confidence") is not None
+            ):
                 return args
+        pipe = step.get("pipeline_json")
+        if isinstance(pipe, dict) and (
+            pipe.get("summary") is not None
+            or pipe.get("query_decomposition") is not None
+            or pipe.get("turn_complete") is True
+        ):
+            return pipe
+    # Last resort: tool_calls list (some paths only stamp there)
+    for tc in reversed(trace.get("tool_calls") or []):
+        if not isinstance(tc, dict):
+            continue
+        if str(tc.get("name") or "").lower() != "pipeline":
+            continue
+        args = tc.get("args")
+        if isinstance(args, dict) and (
+            args.get("summary") is not None
+            or args.get("query_decomposition") is not None
+            or args.get("confidence") is not None
+        ):
+            return args
     return {}
+
+
+def layer_a_for_session_trace(trace: dict | None) -> dict:
+    """Compact Layer A bag for POST /v2/session/trace zeus_response.
+
+    Detective harvests intent / decomposition / layer_a from this when the
+    debug hop record hop has empty AI (external LLM + local return_result).
+    """
+    if not isinstance(trace, dict):
+        return {}
+    payload = _parse_return_payload(trace)
+    if not payload:
+        return {}
+    out: dict = {"via": "client_terminate"}
+    for key in (
+        "summary",
+        "query_decomposition",
+        "decomposition",
+        "confidence",
+        "policy_action",
+        "business_rules_triggers",
+        "wish_i_knew",
+        "data_gaps",
+        "app_output",
+        "subject_confidence",
+        "jail_break_attempt",
+        "node_refs",
+        "entity_refs",
+        "provenance",
+        "synthetic",
+        "turn_complete",
+    ):
+        if key in payload and payload[key] is not None:
+            out[key] = payload[key]
+    # intent: top-level string or query_decomposition.intent
+    intent = payload.get("intent")
+    if isinstance(intent, str) and intent.strip():
+        out["intent"] = intent.strip()
+    elif isinstance(intent, dict) and intent.get("goal"):
+        out["intent"] = str(intent.get("goal"))
+    else:
+        qd = payload.get("query_decomposition")
+        if isinstance(qd, dict) and qd.get("intent") is not None:
+            out["intent"] = qd.get("intent")
+    # Drop empty shells
+    if len(out) <= 1:  # only via
+        return {}
+    return out
 
 
 def _decomposition_from_payload(payload: dict) -> Optional[dict]:
@@ -562,6 +645,16 @@ def extract_structured_response(
             final_answer = decision.ui_text
         elif not final_answer and decision.ui_text:
             final_answer = decision.ui_text
+        else:
+            # Strip Layer A / pipeline-arg dumps (insight turn often echoes them).
+            cleaned = user_facing_answer(
+                final_answer,
+                ui_text=decision.ui_text,
+                layer_summary=layer.summary,
+            )
+            if cleaned != (final_answer or ""):
+                final_answer = cleaned
+                warnings.append("peeled Layer A envelope from answer")
         if decision.soft_require_policy_action_missing:
             warnings.append("soft_require: policy_action missing with brand inject present")
 
