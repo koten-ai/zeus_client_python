@@ -316,44 +316,93 @@ async def setup_contract_and_session(
 async def commit_session_turn(
     zeus_url, sid, enable_sessions, this_user_round, contract_id, contract_hash,
     chat_req, produced_delta, prior_turns, this_turn_reqs, trace, zeus_headers,
+    layer_a=None,
 ):
-    """POST trace deltas and persist the turn shard."""
+    """POST trace deltas and persist the turn shard.
+
+    Multi-hop note (Hub Detective E2E): Zeus keeps **one** TraceDoc per
+    session round. We therefore build one rich multi-hop payload and POST
+    it once per tool ``req_id`` (same body) so every hop's reverse index
+    joins to the same round doc. Primary hop is written **last** so the
+    round doc's ``req_id`` matches the preferred Detective deep-link.
+
+    ``layer_a`` (optional) is the terminate bag (intent / QD / decomp /
+    confidence) so Detective shows Layer A on external client hops.
+    """
+    from zeus_client.trace.session_hops import (
+        build_aggregate_trace_payload,
+        merge_hop_into_trace_session,
+        normalize_hops,
+        ordered_req_ids_for_trace_posts,
+        select_primary_req_id,
+    )
+
+    hops = normalize_hops(this_turn_reqs)
+    primary_rid = select_primary_req_id(hops)
+    req_ids = [h["req_id"] for h in hops if h.get("req_id")]
+
     session_meta = {
         "session_id": sid,
         "round": this_user_round,
         "contract_id": contract_id,
         "contract_hash": contract_hash,
         "contract_status": (trace.get("session") or {}).get("contract_status") or "none",
-        "req_ids": [r[0] for r in this_turn_reqs if r[0]],
+        "req_ids": req_ids,
+        "primary_req_id": primary_rid,
+        "preferred_req_id": primary_rid,
         "enabled": enable_sessions,
     }
 
     if sid and enable_sessions:
         logger.debug(
             f"run_agent: committing traces + turn for sid={sid[:12]}… "
-            f"this_user_round={this_user_round} reqs={len(this_turn_reqs)}"
+            f"this_user_round={this_user_round} reqs={len(hops)}"
         )
-        for rid, nm, st, snip, u in this_turn_reqs:
-            if not rid:
-                continue
-            tr_status, tr_body, _, _ = await post_session_trace(
-                zeus_url, sid, this_user_round, rid,
-                contract_id, contract_hash, chat_req,
-                turns=[{"role": "tool", "content": f"{nm} → {st}"}],
-                zeus_response={"status": st, "url": u, "snippet": snip},
-                outcome="ok" if (isinstance(st, int) and 0 < st < 400) else "error",
-                zeus_headers=zeus_headers)
-            if tr_status in (200, 201):
-                trace["notes"].append(f"trace {rid[:8]}… -> {tr_status}")
-                # Prefer live contract_status from Zeus when present.
-                if isinstance(tr_body, dict):
-                    live_cst = tr_body.get("contract_status")
-                    if live_cst:
-                        session_meta["contract_status"] = live_cst
-                        trace.setdefault("session", {})["contract_status"] = live_cst
-            else:
-                trace["notes"].append(f"trace post {rid[:8]}… -> {tr_status}")
-                trace["session_error"] = trace.get("session_error") or f"trace {tr_status}"
+        # Prefer explicit layer_a; else harvest from trace steps (return / pipeline).
+        la = layer_a
+        if not la and isinstance(trace, dict):
+            try:
+                from zeus_client.agent.response import layer_a_for_session_trace
+                la = layer_a_for_session_trace(trace) or None
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.debug(f"layer_a_for_session_trace failed: {exc}")
+                la = None
+        if hops or la:
+            _, turns, zeus_response, outcome = build_aggregate_trace_payload(
+                hops, layer_a=la,
+            )
+            # If only Layer A (no tool hops), still post once under a synthetic
+            # join — needs a req_id. Skip post without hops+req_id (nothing to join).
+            post_order = ordered_req_ids_for_trace_posts(hops)
+            if not post_order and not hops:
+                # No tool hops: nothing to reverse-index; skip trace POST.
+                # Layer A alone without req_id cannot join Detective.
+                pass
+            for rid in post_order:
+                tr_status, tr_body, _, _ = await post_session_trace(
+                    zeus_url, sid, this_user_round, rid,
+                    contract_id, contract_hash, chat_req,
+                    turns=turns,
+                    zeus_response=zeus_response,
+                    outcome=outcome,
+                    zeus_headers=zeus_headers,
+                )
+                if tr_status in (200, 201):
+                    trace["notes"].append(f"trace {rid[:8]}… -> {tr_status}")
+                    if isinstance(tr_body, dict):
+                        live_cst = tr_body.get("contract_status")
+                        if live_cst:
+                            session_meta["contract_status"] = live_cst
+                            trace.setdefault("session", {})["contract_status"] = live_cst
+                else:
+                    trace["notes"].append(f"trace post {rid[:8]}… -> {tr_status}")
+                    trace["session_error"] = trace.get("session_error") or f"trace {tr_status}"
+            if primary_rid:
+                trace["notes"].append(
+                    f"session_trace primary_req_id={primary_rid[:12]}… "
+                    f"hops={len(hops)} aggregate=1"
+                    + (" layer_a=1" if la else "")
+                )
 
         just_created = bool((trace.get("session") or {}).get("created"))
         if just_created:
@@ -384,7 +433,12 @@ async def commit_session_turn(
         "round": session_meta.get("round", this_user_round),
         "contract_status": session_meta.get("contract_status"),
         "enabled": enable_sessions,
+        "req_ids": req_ids,
     })
+    if primary_rid:
+        trace["session"]["primary_req_id"] = primary_rid
+        trace["session"]["preferred_req_id"] = primary_rid
+    merge_hop_into_trace_session(trace, req_ids=req_ids, primary_req_id=primary_rid)
     if trace.get("session_error"):
         trace["session"]["error"] = trace["session_error"]
 

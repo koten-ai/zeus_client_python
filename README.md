@@ -51,7 +51,7 @@ flowchart LR
 2. **Load catalog** — `load_chat_request` resolves a stamped `chat_request` from the user sync dir, then bundled package data. If the on-disk file has no `## SCOPE BRIEF`, the client borrows the live brief from Zeus and merges it in (brief content is stripped before hashing).
 3. **Contract + session** — `resolve_contract_for_scope` binds `contract_id` / `contract_hash` from config. When durable sessions are enabled, the client creates a new `/v2/session` or rehydrates an existing one, preferring the server-stamped hash embedded in the catalog file.
 4. **LLM rounds** — multi-round tool loop: provider chat completion → Zeus dispatch (V1 tools or V2 verbs) → optional hook interception.
-5. **Commit turn** — per-dispatch trace shards plus a turn shard via `post_session_trace` / `continue_session_turn`.
+5. **Commit turn** — multi-hop session-trace aggregate via `post_session_trace` (same rich body per tool `req_id` so every hop joins Detective; preferred hop last) plus a turn shard via `continue_session_turn`. Agent dispatches stamp `X-Zeus-Mode` (and optional `X-Zeus-Trace: 1`).
 6. **Audit** — runtime contract checks appended to `trace["notes"]`.
 
 Pass `zeus_session_id` and `zeus_round` from the prior turn's `session_meta` to continue a durable session across questions.
@@ -491,6 +491,7 @@ Returned as JSON when `httpx` fails (status `0`). Zeus HTTP `4xx`/`5xx` return t
 | `session_create_failed` | Transport error on `POST /v2/session` | Check Zeus URL, auth, and session collections (`05_sessions_scopes.sh` on server) |
 | `session_turn_failed` | Transport error on `POST /v2/session/{id}/turn` | Same; confirm `session_id` is valid |
 | `session_trace_failed` | Transport error on `POST /v2/session/trace` | Same; trace posting is best-effort |
+| Hub Detective thin on `/pipeline` only | External multi-hop + Zeus pipeline TraceBundle gap | Prefer `/hub/debug/session/{sid}`; open `trace.session.preferred_req_id` / `req_ids[]`. Session-trace body is multi-hop aggregate (`zeus_response.tool_hops`) from client 0.3.1+ |
 | `no session_id` | `continue_session_turn` called with empty id | Ensure session create succeeded or pass `zeus_session_id` from prior `session_meta` |
 | `bad trace params` | Missing session id or `round <= 0` for trace post | Fix session state before commit |
 | HTTP `409` + `payload_hash` in body | Client `contract_hash` does not match Zeus-computed hash | Re-verify catalog in Zeus UI, sync stamped file, align `scope_contracts` hash with stamped `contract.hash` |

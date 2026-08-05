@@ -14,6 +14,10 @@ SYMBOLS = [
     "ClientSettings", "load_base_catalog", "list_base_catalogs", "parse_layer_a",
     "decide_policy", "prepare_settings", "merge_rules", "LayerA", "PolicyDecision",
     "effective_ai_process_result",
+    "looks_like_layer_a_dump",
+    "user_facing_answer",
+    "peel_layer_a_summary",
+    "effective_force_trace",
     "run_search", "run_search_from_config",
     "run_fast_suggest", "run_fast_suggest_from_config",  # deprecated aliases
     "SuggestHit", "SuggestOptions", "SuggestResult", "CouchbaseQueryConfig",
@@ -21,6 +25,7 @@ SYMBOLS = [
     "run_describe", "run_explain", "run_get", "run_find", "run_set",
     "run_order", "run_enrich", "run_project", "run_traverse",
     "run_analyze", "run_return", "run_search_verb",
+    "select_primary_req_id", "build_aggregate_trace_payload",
 ]
 
 
