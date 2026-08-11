@@ -79,6 +79,13 @@ class ClientSettings:
     force_trace: bool = False
     mode: str = "analytics"
     durable_sessions: bool = True
+    # Policy / Layer A control plane (ZCM-011)
+    sticky_flags: Mapping[str, bool] = field(default_factory=dict)
+    messages: Mapping[str, str] = field(default_factory=dict)
+    soft_require_policy_action: bool = True
+    allow_array_triggers: bool = True
+    app_output_on_error: str = "strip"  # "strip" | "fail"
+    output_request: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +164,14 @@ class RuntimeConfig:
                 "force_trace": self.settings.force_trace,
                 "mode": self.settings.mode,
                 "durable_sessions": self.settings.durable_sessions,
+                "soft_require_policy_action": self.settings.soft_require_policy_action,
+                "allow_array_triggers": self.settings.allow_array_triggers,
+                "app_output_on_error": self.settings.app_output_on_error,
+                # sticky_flags / messages / output_request omitted from public dict
+                # when empty; presence of keys only (no secret values).
+                "sticky_flag_keys": sorted(str(k) for k in self.settings.sticky_flags),
+                "message_keys": sorted(str(k) for k in self.settings.messages),
+                "has_output_request": self.settings.output_request is not None,
             },
             "retry": {
                 "max_attempts": self.retry.max_attempts,

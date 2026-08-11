@@ -32,6 +32,18 @@ def _as_bool(value: str | bool | None, default: bool) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _as_str_bool_map(raw: Any) -> dict[str, bool]:
+    if not isinstance(raw, Mapping):
+        return {}
+    return {str(k): bool(v) for k, v in raw.items()}
+
+
+def _as_str_str_map(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, Mapping):
+        return {}
+    return {str(k): str(v) for k, v in raw.items() if v is not None}
+
+
 def _dig(mapping: Mapping[str, Any], *keys: str, default: Any = None) -> Any:
     cur: Any = mapping
     for k in keys:
@@ -109,6 +121,18 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             force_trace=_as_bool(settings.get("force_trace"), False),
             mode=str(settings.get("mode", "analytics")),
             durable_sessions=_as_bool(settings.get("durable_sessions"), True),
+            sticky_flags=_as_str_bool_map(settings.get("sticky_flags")),
+            messages=_as_str_str_map(settings.get("messages")),
+            soft_require_policy_action=_as_bool(
+                settings.get("soft_require_policy_action"), True
+            ),
+            allow_array_triggers=_as_bool(settings.get("allow_array_triggers"), True),
+            app_output_on_error=str(settings.get("app_output_on_error") or "strip"),
+            output_request=(
+                dict(settings["output_request"])
+                if isinstance(settings.get("output_request"), dict)
+                else None
+            ),
         ),
         retry=RetryPolicy(
             max_attempts=int(retry.get("max_attempts", 3)),
@@ -195,6 +219,12 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             durable_sessions=_as_bool(
                 env.get("ZEUS_CLIENT_DURABLE_SESSIONS"), settings.durable_sessions
             ),
+            sticky_flags=settings.sticky_flags,
+            messages=settings.messages,
+            soft_require_policy_action=settings.soft_require_policy_action,
+            allow_array_triggers=settings.allow_array_triggers,
+            app_output_on_error=settings.app_output_on_error,
+            output_request=settings.output_request,
         )
     elif any(
         k in env
@@ -215,6 +245,12 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             durable_sessions=_as_bool(
                 env.get("ZEUS_CLIENT_DURABLE_SESSIONS"), settings.durable_sessions
             ),
+            sticky_flags=settings.sticky_flags,
+            messages=settings.messages,
+            soft_require_policy_action=settings.soft_require_policy_action,
+            allow_array_triggers=settings.allow_array_triggers,
+            app_output_on_error=settings.app_output_on_error,
+            output_request=settings.output_request,
         )
 
     chat_dir = env.get("ZEUS_CLIENT_CHAT_REQUESTS_DIR", cfg.chat_requests_dir)
