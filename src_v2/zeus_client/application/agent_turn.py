@@ -21,8 +21,10 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from zeus_client_v2.application.middleware import MiddlewareChain, MiddlewareContext
+from zeus_client_v2.application.detective import safe_build_detective_briefing
 from zeus_client_v2.application.projectors.public_trace import build_public_trace
-from zeus_client_v2.config.models import ClientSettings, DataTarget
+from zeus_client_v2.application.projectors.session_trace import select_primary_req_id
+from zeus_client_v2.config.models import ClientSettings, DataTarget, DebugPolicy
 from zeus_client_v2.domain.errors import ErrorCode, LlmError, ZeusClientError
 from zeus_client_v2.domain.journal.events import EVENT_NOTE, EVENT_TURN_COMPLETED, EVENT_TURN_STARTED, JournalEvent
 from zeus_client_v2.domain.journal.journal import InMemoryJournal
@@ -43,6 +45,8 @@ from zeus_client_v2.domain.messages import (
 from zeus_client_v2.domain.policy import decide_policy
 from zeus_client_v2.domain.session import SessionHandle
 from zeus_client_v2.ports import LlmPort, LlmRequest, VerbHopResult, VerbRequest, ZeusPort
+
+import os
 
 __all__ = [
     "AgentTurnUseCase",
@@ -165,6 +169,8 @@ class AgentTurnUseCase:
     journal: InMemoryJournal | None = None
     middleware: MiddlewareChain = field(default_factory=MiddlewareChain)
     default_settings: ClientSettings = field(default_factory=ClientSettings)
+    debug_policy: DebugPolicy = field(default_factory=DebugPolicy)
+    hub_base_url: str | None = None
 
     async def run(self, req: TurnRequest) -> TurnResult:
         return await run_agent_turn(
@@ -174,6 +180,8 @@ class AgentTurnUseCase:
             journal=self.journal,
             middleware=self.middleware,
             default_settings=self.default_settings,
+            debug_policy=self.debug_policy,
+            hub_base_url=self.hub_base_url,
         )
 
 
@@ -185,8 +193,12 @@ async def run_agent_turn(
     journal: InMemoryJournal | None = None,
     middleware: MiddlewareChain | None = None,
     default_settings: ClientSettings | None = None,
+    debug_policy: DebugPolicy | None = None,
+    hub_base_url: str | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> TurnResult:
     settings = req.settings or default_settings or ClientSettings()
+    dbg_pol = debug_policy or DebugPolicy()
     mw = middleware or MiddlewareChain()
     turn_id = f"turn_{uuid.uuid4().hex[:12]}"
     t0 = time.time()
@@ -195,6 +207,14 @@ async def run_agent_turn(
     steps: list[dict[str, Any]] = []
     mw_ctx = MiddlewareContext(turn_id=turn_id, user_msg=req.message)
     journal = journal or InMemoryJournal()
+    finish_kw = {
+        "debug_policy": dbg_pol,
+        "hub_base_url": hub_base_url,
+        "target": req.target,
+        "tools": req.tools,
+        "chat_request": req.chat_request,
+        "env": env,
+    }
 
     def _je(etype: str, data: Mapping[str, Any]) -> None:
         journal.append(
@@ -235,6 +255,7 @@ async def run_agent_turn(
             decision=None,
             t0=t0,
             je=_je,
+            **finish_kw,
         )
 
     ai_process = bool(settings.ai_process_result)
@@ -306,6 +327,7 @@ async def run_agent_turn(
                     t0=t0,
                     je=_je,
                     ai_exit=None,
+                    **finish_kw,
                 )
 
             await mw.after_llm(
@@ -446,6 +468,7 @@ async def run_agent_turn(
             t0=t0,
             je=_je,
             ai_exit=exit_kind,
+            **finish_kw,
         )
 
     # Layer A + policy when terminate bag present
@@ -515,6 +538,7 @@ async def run_agent_turn(
         t0=t0,
         je=_je,
         ai_exit=exit_kind,
+        **finish_kw,
     )
 
 
@@ -710,6 +734,12 @@ def _finish(
     t0: float,
     je: Any,
     ai_exit: str | None = None,
+    debug_policy: DebugPolicy | None = None,
+    hub_base_url: str | None = None,
+    target: DataTarget | None = None,
+    tools: tuple[Mapping[str, Any], ...] = (),
+    chat_request: Mapping[str, Any] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> TurnResult:
     structured: StructuredResult | None = None
     layer_map: dict[str, Any] | None = None
@@ -752,9 +782,97 @@ def _finish(
     if "wish_i_knew" in answer:
         answer = (layer.summary if layer and layer.summary else answer.split("wish_i_knew")[0]).strip()
 
+    total_ms = int((time.time() - t0) * 1000)
+    pref: str | None = None
+    try:
+        pref = select_primary_req_id(list(hops))
+    except Exception:
+        pref = None
+
+    detective = None
+    det_notes = list(notes)
+    try:
+        tgt = target
+        target_map = None
+        if tgt is not None:
+            target_map = {
+                "bucket": tgt.bucket,
+                "scope": tgt.scope,
+                "collection": tgt.collection,
+                "mode": settings.mode,
+            }
+        catalog = dict(chat_request) if isinstance(chat_request, Mapping) else None
+        det = safe_build_detective_briefing(
+            enabled=(debug_policy or DebugPolicy()).detective_briefing,
+            env=env,
+            turn_id=turn_id,
+            answer=answer,
+            status=status.value,
+            rounds=rounds,
+            hops=hops,
+            notes=notes,
+            messages=messages,
+            catalog=catalog,
+            tools=tools,
+            layer_a=layer_map,
+            total_ms=total_ms,
+            hub_base_url=hub_base_url,
+            session_id=session.session_id if session else None,
+            target=target_map,
+            contract_status=session.contract_status if session else None,
+            ai_process_result=bool(settings.ai_process_result),
+            ai_process_result_exit=ai_exit,
+            public_trace=public,
+        )
+        if det is None and (debug_policy or DebugPolicy()).detective_briefing:
+            # distinguish kill-switch vs builder failure only loosely
+            if str((env or os.environ).get("ZEUS_CLIENT_DETECTIVE", "1")).lower() in {
+                "0",
+                "false",
+                "no",
+                "off",
+            } or not (debug_policy or DebugPolicy()).detective_briefing:
+                pass
+            else:
+                # enabled but None → soft fail inside safe_build swallowed exception
+                # only note when we expected a briefing (enabled)
+                pass
+        detective = det
+        if detective is None:
+            # If kill-switch off, stay silent; if on and failed, note.
+            enabled_flag = (debug_policy or DebugPolicy()).detective_briefing
+            env_on = str((env or os.environ).get("ZEUS_CLIENT_DETECTIVE", "1")).lower() not in {
+                "0",
+                "false",
+                "no",
+                "off",
+            }
+            if enabled_flag and env_on and answer is not None:
+                # Builder returned None unexpectedly only on exception; kill-switch also None.
+                # We cannot distinguish easily — safe_build returns None for both.
+                pass
+    except Exception as exc:  # noqa: BLE001
+        det_notes.append(f"detective_briefing_failed: {exc}")
+        detective = None
+
+    if detective and "wish_i_knew" in str(detective.get("overview", {}).get("answer_preview", "")):
+        # belt — overview preview already from peeled answer
+        pass
+
+    # Put detective on public_trace for widget consumers
+    if detective is not None:
+        public = dict(public)
+        public["detective"] = detective
+
+    pref_final = pref
+    if pref_final is None and isinstance(detective, Mapping):
+        ov = detective.get("overview")
+        if isinstance(ov, Mapping):
+            pref_final = ov.get("preferred_req_id")  # type: ignore[assignment]
+
     debug = DebugBundle(
         turn_id=turn_id,
-        notes=notes,
+        notes=tuple(det_notes),
         rounds=rounds,
         ai_process_result=bool(settings.ai_process_result),
         ai_process_result_exit=ai_exit,
@@ -762,6 +880,8 @@ def _finish(
         hops=hops,
         journal_event_count=len(journal.events()),
         hooks_jailbreak_score=float(decision.hooks_jailbreak_score) if decision else 0.0,
+        detective=detective,
+        preferred_req_id=pref_final if isinstance(pref_final, str) or pref_final is None else str(pref_final),
     )
     try:
         je(
@@ -770,8 +890,9 @@ def _finish(
                 "status": status.value,
                 "rounds": rounds,
                 "ai_process_result_exit": ai_exit,
-                "total_ms": int((time.time() - t0) * 1000),
+                "total_ms": total_ms,
                 "answer_preview": (answer or "")[:240],
+                "detective": bool(detective),
             },
         )
     except Exception:
