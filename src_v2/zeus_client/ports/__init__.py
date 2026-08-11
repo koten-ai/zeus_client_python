@@ -57,6 +57,7 @@ class LlmRequest:
     tools: tuple[Mapping[str, Any], ...] = ()
     temperature: float | None = None
     max_tokens: int | None = None
+    conv_id: str | None = None  # cache routing key (xAI conv / OpenAI prompt_cache_key)
 
 
 @dataclass(frozen=True, slots=True)
