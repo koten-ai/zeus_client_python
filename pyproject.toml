@@ -4,6 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kotenai-zeus-client"
+# Dual-tree alpha on feat/V2: PyPI/project metadata stays 0.3.1 so demos and
+# zeus_client.__version__ stay consistent. V2 package version is independent:
+# zeus_client_v2.__version__ == "2.0.0a0" (src_v2). Phase 8 cutover bumps this.
 version = "0.3.1"
 description = "Python client library for Zeus AI data servers"
 readme = "README.md"
@@ -31,17 +34,38 @@ Homepage = "https://github.com/koten-ai/zeus_client_python"
 Repository = "https://github.com/koten-ai/zeus_client_python"
 
 [tool.setuptools]
-package-dir = {"zeus_client" = "src"}
+package-dir = {"zeus_client" = "src", "zeus_client_v2" = "src_v2/zeus_client"}
 packages = [
+    # V1 (0.3.1) — default import zeus_client
     "zeus_client",
     "zeus_client.agent",
     "zeus_client.llm",
     "zeus_client.trace",
     "zeus_client.zeus",
+    # V2 dual-tree alpha — import zeus_client_v2
+    "zeus_client_v2",
+    "zeus_client_v2.api",
+    "zeus_client_v2.domain",
+    "zeus_client_v2.domain.journal",
+    "zeus_client_v2.application",
+    "zeus_client_v2.application.detective",
+    "zeus_client_v2.application.projectors",
+    "zeus_client_v2.ports",
+    "zeus_client_v2.adapters",
+    "zeus_client_v2.adapters.zeus_http",
+    "zeus_client_v2.adapters.llm_openai_compatible",
+    "zeus_client_v2.adapters.hub_debug_http",
+    "zeus_client_v2.adapters.catalog_fs",
+    "zeus_client_v2.adapters.secrets_env",
+    "zeus_client_v2.adapters.otlp",
+    "zeus_client_v2.config",
+    "zeus_client_v2.security",
+    "zeus_client_v2.compat",
 ]
 
 [tool.setuptools.package-data]
 zeus_client = ["data/**/*"]
+zeus_client_v2 = ["py.typed"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -51,7 +75,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
-source = ["zeus_client"]
+source = ["zeus_client", "zeus_client_v2"]
 branch = true
 
 [tool.coverage.report]
