@@ -1,4 +1,4 @@
-"""Public data-plane facade on ZeusRuntime (verbs + later search)."""
+"""Public data-plane facade on ZeusRuntime (verbs + typeahead)."""
 
 from __future__ import annotations
 
@@ -38,13 +38,25 @@ class DataAPI:
                 component="api.data",
                 public_message="Zeus port not wired on runtime",
             )
-        return await run_data_verb(
+        result = await run_data_verb(
             zeus,
             name,
             body,
             target=self._rt.config.target,
             mode_header=mode_header or self._rt.config.settings.mode,
         )
+        metrics = self._rt.services.metrics
+        status_class = f"{result.status_code // 100}xx" if result.status_code else "err"
+        metrics.incr(
+            "zeus_client_zeus_hops_total",
+            labels={"verb": name, "status_class": status_class},
+        )
+        if not result.ok:
+            metrics.incr(
+                "zeus_client_errors_total",
+                labels={"code": "zeus_verb_failed"},
+            )
+        return result
 
     async def find(self, body: Mapping[str, Any] | None = None, **kwargs: Any) -> VerbResult:
         return await self.verb("find", body, **kwargs)
@@ -62,7 +74,7 @@ class DataAPI:
         *,
         options: SuggestOptions | None = None,
     ) -> SuggestResult:
-        """No-LLM typeahead (FTS). Never agent-per-keystroke."""
+        """No-LLM typeahead (FTS). Never agent-per-keystroke. Rate-limited per runtime."""
         zeus = self._rt.services.zeus
         if zeus is None:
             raise ZeusClientError(
@@ -70,9 +82,30 @@ class DataAPI:
                 component="api.data",
                 public_message="Zeus port not wired on runtime",
             )
-        return await run_typeahead_search(
+        rl = self._rt.config.rate_limit
+        if rl.typeahead_enabled and not self._rt.services.rate_limiter.allow("typeahead"):
+            self._rt.services.metrics.incr(
+                "zeus_client_rate_limited_total",
+                labels={"surface": "typeahead"},
+            )
+            raise ZeusClientError(
+                code=ErrorCode.CLIENT_RATE_LIMITED,
+                component="api.data.search",
+                public_message="rate limited (client)",
+                details={
+                    "surface": "typeahead",
+                    "rps": rl.typeahead_rps,
+                    "burst": rl.typeahead_burst,
+                },
+            )
+        result = await run_typeahead_search(
             zeus,
             query,
             target=self._rt.config.target,
             options=options,
         )
+        self._rt.services.metrics.incr(
+            "zeus_client_typeahead_total",
+            labels={"source": result.source or "unknown"},
+        )
+        return result

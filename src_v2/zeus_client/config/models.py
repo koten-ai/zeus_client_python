@@ -14,6 +14,7 @@ __all__ = [
     "RetryPolicy",
     "RedactionPolicy",
     "DebugPolicy",
+    "RateLimitPolicy",
     "RuntimeConfig",
 ]
 
@@ -110,6 +111,15 @@ class DebugPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class RateLimitPolicy:
+    """Client-side rate limits (SECURITY §11). Typeahead token bucket defaults."""
+
+    typeahead_enabled: bool = True
+    typeahead_rps: float = 10.0
+    typeahead_burst: float = 20.0
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeConfig:
     """Immutable config after bind (loader output)."""
 
@@ -121,6 +131,7 @@ class RuntimeConfig:
     retry: RetryPolicy = field(default_factory=RetryPolicy)
     redaction: RedactionPolicy = field(default_factory=RedactionPolicy)
     debug: DebugPolicy = field(default_factory=DebugPolicy)
+    rate_limit: RateLimitPolicy = field(default_factory=RateLimitPolicy)
     chat_requests_dir: str | None = None
 
     def __repr__(self) -> str:
@@ -129,7 +140,7 @@ class RuntimeConfig:
             f"RuntimeConfig(profile={self.profile!r}, zeus={self.zeus!r}, "
             f"target={self.target!r}, llm={self.llm!r}, settings={self.settings!r}, "
             f"retry={self.retry!r}, redaction={self.redaction!r}, debug={self.debug!r}, "
-            f"chat_requests_dir={self.chat_requests_dir!r})"
+            f"rate_limit={self.rate_limit!r}, chat_requests_dir={self.chat_requests_dir!r})"
         )
 
     def to_public_dict(self) -> dict[str, Any]:
@@ -187,6 +198,11 @@ class RuntimeConfig:
                 "detective_briefing": self.debug.detective_briefing,
                 "capture_bodies": self.debug.capture_bodies,
                 "transport_replay": self.debug.transport_replay,
+            },
+            "rate_limit": {
+                "typeahead_enabled": self.rate_limit.typeahead_enabled,
+                "typeahead_rps": self.rate_limit.typeahead_rps,
+                "typeahead_burst": self.rate_limit.typeahead_burst,
             },
             "chat_requests_dir": self.chat_requests_dir,
         }

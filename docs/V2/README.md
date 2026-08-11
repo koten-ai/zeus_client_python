@@ -8,10 +8,11 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 | [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) | Phased build plan (0–8), modules, APIs, tests, migration, risks |
 | [SECURITY.md](./SECURITY.md) | Threat model, authz, secrets, redaction, replay, secure defaults |
 | [BEST_PRACTICES.md](./BEST_PRACTICES.md) | Engineering standards: code, API, testing, CI/CD, observability |
+| [MIGRATION.md](./MIGRATION.md) | V1→V2 map, compat shims, demo_yelp notes, cutover gate |
 
 ## Status
 
-**Implementing on `feat/V2`** — dual-tree alpha (`src/` = 0.3.1 `zeus_client`; `src_v2/zeus_client` → `zeus_client_v2`). Claim level **candidate** per `sdk_bootstrap.pins.json`. Not the default import until Phase 8 cutover.
+**Beta candidate on `feat/V2`** — dual-tree (`src/` = 0.3.1 `zeus_client`; `src_v2/zeus_client` → `zeus_client_v2` **2.0.0b1**). Claim level **candidate** per `sdk_bootstrap.pins.json`. Phase 8 hardening + compat + MIGRATION landed; **default-import cutover / GA 2.0.0 deferred** (see MIGRATION cutover gate).
 
 ## Selected architecture (one paragraph)
 

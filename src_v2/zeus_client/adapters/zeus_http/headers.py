@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from zeus_client_v2 import __version__ as PACKAGE_VERSION
+from zeus_client_v2._version import __version__ as PACKAGE_VERSION
 
 __all__ = [
     "apply_mode_header",
