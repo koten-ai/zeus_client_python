@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Mapping
 
 from zeus_client_v2.application.data_verb import VerbResult, run_data_verb
+from zeus_client_v2.application.typeahead import (
+    SuggestOptions,
+    SuggestResult,
+    run_typeahead_search,
+)
 from zeus_client_v2.domain.errors import ErrorCode, ZeusClientError
 
 if TYPE_CHECKING:
@@ -14,7 +19,7 @@ __all__ = ["DataAPI"]
 
 
 class DataAPI:
-    """``rt.data.verb(...)`` / helpers — never exposes pipeline."""
+    """``rt.data.verb(...)`` / ``rt.data.search(...)`` — never exposes pipeline."""
 
     def __init__(self, runtime: ZeusRuntime) -> None:
         self._rt = runtime
@@ -48,5 +53,26 @@ class DataAPI:
         return await self.verb("get", body, **kwargs)
 
     async def search_verb(self, body: Mapping[str, Any] | None = None, **kwargs: Any) -> VerbResult:
-        """Raw V2 search body (typeahead product API is ``search`` use-case later)."""
+        """Raw V2 search body (typeahead product API is ``search``)."""
         return await self.verb("search", body, **kwargs)
+
+    async def search(
+        self,
+        query: str,
+        *,
+        options: SuggestOptions | None = None,
+    ) -> SuggestResult:
+        """No-LLM typeahead (FTS). Never agent-per-keystroke."""
+        zeus = self._rt.services.zeus
+        if zeus is None:
+            raise ZeusClientError(
+                code=ErrorCode.NOT_IMPLEMENTED,
+                component="api.data",
+                public_message="Zeus port not wired on runtime",
+            )
+        return await run_typeahead_search(
+            zeus,
+            query,
+            target=self._rt.config.target,
+            options=options,
+        )
