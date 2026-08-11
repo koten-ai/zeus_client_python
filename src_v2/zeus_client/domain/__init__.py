@@ -19,6 +19,13 @@ from zeus_client_v2.domain.contract import (
 )
 from zeus_client_v2.domain.errors import CatalogError, ErrorCode, ZeusClientError
 from zeus_client_v2.domain.ids import CallId, ChatId, ReqId, SessionId, TurnId
+from zeus_client_v2.domain.layer_a import (
+    LayerA,
+    parse_layer_a,
+    peel_layer_a_summary,
+    user_facing_answer,
+)
+from zeus_client_v2.domain.policy import PolicyDecision, decide_policy
 from zeus_client_v2.domain.session import SessionHandle
 
 __all__ = [
@@ -42,4 +49,10 @@ __all__ = [
     "merge_scope_brief",
     "resolve_catalog_path",
     "scope_chat_requests_subdir",
+    "LayerA",
+    "parse_layer_a",
+    "peel_layer_a_summary",
+    "user_facing_answer",
+    "PolicyDecision",
+    "decide_policy",
 ]
