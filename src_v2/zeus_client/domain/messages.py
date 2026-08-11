@@ -83,6 +83,8 @@ class DebugBundle:
     hops: tuple[Mapping[str, Any], ...] = ()
     journal_event_count: int = 0
     hooks_jailbreak_score: float = 0.0
+    detective: Mapping[str, Any] | None = None
+    preferred_req_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

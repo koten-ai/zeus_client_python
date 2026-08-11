@@ -70,6 +70,8 @@ class AgentAPI:
             journal=self._rt.journal,
             middleware=self._middleware,
             default_settings=self._rt.config.settings,
+            debug_policy=self._rt.config.debug,
+            hub_base_url=None,
         )
 
     def use_case(self) -> AgentTurnUseCase:
