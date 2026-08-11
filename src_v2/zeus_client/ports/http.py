@@ -1,1 +1,22 @@
-"""V2 scaffold — filled in later phases."""
+"""Optional low-level HTTP port."""
+
+from __future__ import annotations
+
+from typing import Any, Mapping, Protocol, runtime_checkable
+
+__all__ = ["HttpPort"]
+
+
+@runtime_checkable
+class HttpPort(Protocol):
+    async def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        json_body: Any = None,
+        timeout_s: float | None = None,
+    ) -> tuple[int, Mapping[str, str], bytes]: ...
+
+    async def aclose(self) -> None: ...

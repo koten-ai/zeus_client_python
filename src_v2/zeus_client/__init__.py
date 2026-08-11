@@ -6,5 +6,7 @@ remains the 0.3.1 tree under ``src/`` until Phase 8 cutover.
 
 from __future__ import annotations
 
+from zeus_client_v2.runtime import ZeusRuntime
+
 __version__ = "2.0.0a0"
-__all__ = ["__version__"]
+__all__ = ["__version__", "ZeusRuntime"]
