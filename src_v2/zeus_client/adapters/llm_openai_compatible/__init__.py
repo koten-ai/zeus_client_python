@@ -1,1 +1,19 @@
-"""V2 scaffold — filled in later phases."""
+"""OpenAI-compatible LLM adapter (xAI, OpenAI, custom OpenAI-style)."""
+
+from __future__ import annotations
+
+from zeus_client_v2.adapters.llm_openai_compatible.client import (
+    OpenAICompatibleLlmClient,
+    build_chat_payload,
+    cache_hints,
+    cached_tokens_of,
+    parse_completion_response,
+)
+
+__all__ = [
+    "OpenAICompatibleLlmClient",
+    "build_chat_payload",
+    "cache_hints",
+    "cached_tokens_of",
+    "parse_completion_response",
+]
