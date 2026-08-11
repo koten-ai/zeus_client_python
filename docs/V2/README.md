@@ -11,7 +11,7 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 
 ## Status
 
-**Design only** — not implemented on `main` as of these docs.
+**Implementing on `feat/V2`** — dual-tree alpha (`src/` = 0.3.1 `zeus_client`; `src_v2/zeus_client` → `zeus_client_v2`). Claim level **candidate** per `sdk_bootstrap.pins.json`. Not the default import until Phase 8 cutover.
 
 ## Selected architecture (one paragraph)
 

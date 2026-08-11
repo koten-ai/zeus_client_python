@@ -2,6 +2,30 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
+> **V2 in progress** on branch `feat/V2` — journaled hexagonal runtime (`zeus_client_v2`). Default `import zeus_client` remains **0.3.1** until Phase 8 cutover. See [docs/V2/](docs/V2/) and `sdk_bootstrap.pins.json`.
+
+## Claim (family honesty)
+
+| Field | Value |
+| --- | --- |
+| **claim_level** | **candidate** (not `supported`) |
+| **client_floor** | `client-floor-5` |
+| **modes** | `agent`, `direct` only |
+| **multi_agent** | no |
+| **plugins** | no |
+| **suite** | `conformance-0.2-dev` (offline) |
+
+Pins file: [`sdk_bootstrap.pins.json`](sdk_bootstrap.pins.json) (HOW_TO G0). Never invent production `contract_hash` / Hub stamps.
+
+Family law and ship bar (sibling design repo):
+
+- [HOW_TO_MAKE_A_CLIENT.md](../zeus_client_design/HOW_TO_MAKE_A_CLIENT.md)
+- [CHECKLIST.md](../zeus_client_design/CHECKLIST.md)
+- [MATRIX.md](../zeus_client_design/MATRIX.md)
+- [COMPAT](../Zeus/ai/zeus_chat_request/COMPAT.md) (engine pack triples — not invented here)
+
+**Note on `ai_process_result`:** pins document product-cheap guidance default `false`; package `ClientSettings.ai_process_result` default remains **`true`** (Hub parity). Cheap products must set it explicitly.
+
 ## Install
 
 ```bash
