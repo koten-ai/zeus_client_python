@@ -9,6 +9,7 @@ from zeus_client_v2.application.projectors.session_trace import (
     project_session_trace,
     select_primary_req_id,
 )
+from zeus_client_v2.application.projectors.public_trace import build_public_trace
 
 __all__ = [
     "AggregateTracePayload",
@@ -16,4 +17,5 @@ __all__ = [
     "build_aggregate_trace_payload",
     "project_session_trace",
     "select_primary_req_id",
+    "build_public_trace",
 ]

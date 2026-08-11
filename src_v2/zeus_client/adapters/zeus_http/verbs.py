@@ -101,13 +101,15 @@ class HttpxZeusPort:
 
     async def call_verb(self, req: VerbRequest) -> VerbHopResult:
         verb = (req.verb or "").strip()
-        if verb == "pipeline":
+        if verb == "pipeline" and not req.allow_pipeline:
             raise ZeusToolError(
                 code=ErrorCode.ZEUS_PIPELINE_NOT_ON_DIRECT,
                 component="adapters.zeus_http.verbs",
                 public_message="zeus pipeline not on direct surface",
             )
-        if verb not in EXPOSED_V2_VERB_SET:
+        if verb == "pipeline" and req.allow_pipeline:
+            pass  # agent-only
+        elif verb not in EXPOSED_V2_VERB_SET:
             raise ZeusToolError(
                 code=ErrorCode.ZEUS_VERB_NOT_ALLOWED,
                 component="adapters.zeus_http.verbs",
