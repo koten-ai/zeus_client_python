@@ -116,6 +116,13 @@ class ZeusRuntime:
 
         return DataAPI(self)
 
+    @property
+    def catalog(self) -> Any:
+        """Catalog-plane facade (load / list / sync)."""
+        from zeus_client_v2.api.catalog import CatalogAPI
+
+        return CatalogAPI(self)
+
     async def __aenter__(self) -> ZeusRuntime:
         self._entered = True
         return self
