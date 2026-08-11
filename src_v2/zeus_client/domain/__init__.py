@@ -19,6 +19,7 @@ from zeus_client_v2.domain.contract import (
 )
 from zeus_client_v2.domain.errors import CatalogError, ErrorCode, ZeusClientError
 from zeus_client_v2.domain.ids import CallId, ChatId, ReqId, SessionId, TurnId
+from zeus_client_v2.domain.session import SessionHandle
 
 __all__ = [
     "TurnId",
@@ -29,6 +30,7 @@ __all__ = [
     "ErrorCode",
     "ZeusClientError",
     "CatalogError",
+    "SessionHandle",
     "SessionHashChoice",
     "ContractService",
     "compute_contract_hash",
