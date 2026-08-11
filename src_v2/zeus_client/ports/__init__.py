@@ -39,6 +39,8 @@ class VerbRequest:
     target: DataTarget
     mode_header: str = "analytics"
     headers: Mapping[str, str] = field(default_factory=dict)
+    # Agent path may dispatch pipeline; Direct public surface must keep False.
+    allow_pipeline: bool = False
 
 
 @dataclass(frozen=True, slots=True)

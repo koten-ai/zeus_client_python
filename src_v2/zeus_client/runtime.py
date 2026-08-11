@@ -123,6 +123,13 @@ class ZeusRuntime:
 
         return CatalogAPI(self)
 
+    @property
+    def agent(self) -> Any:
+        """Agent-plane facade (run_turn)."""
+        from zeus_client_v2.api.agent import AgentAPI
+
+        return AgentAPI(self)
+
     async def __aenter__(self) -> ZeusRuntime:
         self._entered = True
         return self
