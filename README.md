@@ -2,7 +2,7 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
-> **V2 in progress** on branch `feat/V2` — journaled hexagonal runtime (`zeus_client_v2`). Default `import zeus_client` remains **0.3.1** until Phase 8 cutover. See [docs/V2/](docs/V2/) and `sdk_bootstrap.pins.json`.
+> **V2 beta** on branch `feat/V2` — journaled hexagonal runtime (`zeus_client_v2` **2.0.0b1**). Default `import zeus_client` remains **0.3.1** until cutover. See [docs/V2/](docs/V2/), [docs/V2/MIGRATION.md](docs/V2/MIGRATION.md), and `sdk_bootstrap.pins.json`.
 
 ## Claim (family honesty)
 

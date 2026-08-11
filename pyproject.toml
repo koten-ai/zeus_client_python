@@ -61,6 +61,8 @@ packages = [
     "zeus_client_v2.config",
     "zeus_client_v2.security",
     "zeus_client_v2.compat",
+    "zeus_client_v2.compat.v1",
+    "zeus_client_v2.observability",
 ]
 
 [tool.setuptools.package-data]

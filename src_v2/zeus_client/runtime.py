@@ -10,6 +10,8 @@ from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
 from zeus_client_v2.config.loader import load_runtime_config
 from zeus_client_v2.config.models import RuntimeConfig
 from zeus_client_v2.domain.journal import InMemoryJournal
+from zeus_client_v2.observability.metrics import InMemoryMetrics, MetricsPort
+from zeus_client_v2.observability.rate_limit import TokenBucketLimiter
 from zeus_client_v2.ports.clock import Clock, SystemClock
 from zeus_client_v2.ports.id_factory import IdFactory, UuidIdFactory
 from zeus_client_v2.ports.secrets import SecretStorePort
@@ -27,11 +29,14 @@ class Services:
     clock: Clock = field(default_factory=SystemClock)
     ids: IdFactory = field(default_factory=UuidIdFactory)
     redactor: DefaultRedactor = field(default_factory=default_redactor)
+    metrics: MetricsPort = field(default_factory=InMemoryMetrics)
+    rate_limiter: TokenBucketLimiter = field(default_factory=TokenBucketLimiter)
     zeus: Any = None
     llm: Any = None
     catalog: Any = None
     hub_debug: Any = None
     http: Any = None
+    otlp: Any = None
     _closed: bool = False
 
     async def aclose(self) -> None:
@@ -42,10 +47,12 @@ class Services:
         if http is not None and hasattr(http, "aclose"):
             await http.aclose()
         # Adapters may expose aclose as well
-        for name in ("zeus", "llm", "hub_debug"):
+        for name in ("zeus", "llm", "hub_debug", "otlp"):
             dep = getattr(self, name, None)
             if dep is not None and hasattr(dep, "aclose"):
                 await dep.aclose()
+            elif dep is not None and hasattr(dep, "shutdown"):
+                dep.shutdown()
 
 
 class ZeusRuntime:
@@ -65,6 +72,9 @@ class ZeusRuntime:
         clock: Clock | None = None,
         ids: IdFactory | None = None,
         journal: InMemoryJournal | None = None,
+        metrics: MetricsPort | None = None,
+        rate_limiter: TokenBucketLimiter | None = None,
+        otlp: Any = None,
     ) -> None:
         self.config = config
         svc = services or Services()
@@ -76,6 +86,10 @@ class ZeusRuntime:
             svc.ids = ids
         if journal is not None:
             svc.journal = journal
+        if metrics is not None:
+            svc.metrics = metrics
+        if rate_limiter is not None:
+            svc.rate_limiter = rate_limiter
         if zeus is not None:
             svc.zeus = zeus
         if llm is not None:
@@ -86,8 +100,20 @@ class ZeusRuntime:
             svc.hub_debug = hub_debug
         if http is not None:
             svc.http = http
+        if otlp is not None:
+            svc.otlp = otlp
         self._services = svc
         self._entered = False
+        self._configure_rate_limits()
+
+    def _configure_rate_limits(self) -> None:
+        rl = self.config.rate_limit
+        if rl.typeahead_enabled:
+            self._services.rate_limiter.configure(
+                "typeahead",
+                rate=float(rl.typeahead_rps),
+                burst=float(rl.typeahead_burst),
+            )
 
     @classmethod
     def from_config(
@@ -108,6 +134,10 @@ class ZeusRuntime:
     @property
     def journal(self) -> InMemoryJournal:
         return self._services.journal
+
+    @property
+    def metrics(self) -> MetricsPort:
+        return self._services.metrics
 
     @property
     def data(self) -> Any:

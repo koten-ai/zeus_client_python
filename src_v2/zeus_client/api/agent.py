@@ -63,7 +63,7 @@ class AgentAPI:
             model=model or self._rt.config.llm.model,
             enable_sessions=enable_sessions,
         )
-        return await run_agent_turn(
+        result = await run_agent_turn(
             req,
             llm=llm,
             zeus=zeus,
@@ -73,6 +73,20 @@ class AgentAPI:
             debug_policy=self._rt.config.debug,
             hub_base_url=None,
         )
+        metrics = self._rt.services.metrics
+        metrics.incr(
+            "zeus_client_turns_total",
+            labels={
+                "status": result.status.value if hasattr(result.status, "value") else str(result.status),
+                "mode": (settings or self._rt.config.settings).mode,
+            },
+        )
+        if result.error is not None:
+            metrics.incr(
+                "zeus_client_errors_total",
+                labels={"code": result.error.code or "agent_error"},
+            )
+        return result
 
     def use_case(self) -> AgentTurnUseCase:
         return AgentTurnUseCase(

@@ -516,18 +516,18 @@ Library maintainers: security contact in README; private disclosure window befor
 
 ## 23. Implementation checklist (security)
 
-- [ ] `SecretStorePort` + no secrets in config export  
-- [ ] Redactor on journal append and exports  
-- [ ] Prod profile rejects `auth_mode=none` and TLS verify off  
-- [ ] Tool retries default off  
-- [ ] Typeahead rate limiter  
-- [ ] Header charset validation  
-- [ ] Plugin capability deny-by-default for secrets  
-- [ ] Support pack redaction tests  
-- [ ] `pip audit` in CI  
-- [ ] Session isolation: no implicit last-session  
-- [ ] Hub hydrate opt-in  
-- [ ] LIVE replay gated  
+- [ ] `SecretStorePort` + no secrets in config export  ✅  
+- [ ] Redactor on journal append and exports  ✅  
+- [ ] Prod profile rejects `auth_mode=none` and TLS verify off  (profile guidance; tighten at cutover)  
+- [ ] Tool retries default off  ✅  
+- [ ] Typeahead rate limiter  ✅ (ZCP-22)  
+- [ ] Header charset validation  (partial / adapter)  
+- [ ] Plugin capability deny-by-default for secrets  N/A (`plugins=no`)  
+- [ ] Support pack redaction tests  ✅ (detective/support path)  
+- [ ] `pip audit` in CI  deferred  
+- [ ] Session isolation: no implicit last-session  ✅  
+- [ ] Hub hydrate opt-in  ✅  
+- [ ] LIVE replay gated  ✅ 
 
 ---
 

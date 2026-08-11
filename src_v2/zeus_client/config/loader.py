@@ -13,6 +13,7 @@ from zeus_client_v2.config.models import (
     DataTarget,
     DebugPolicy,
     LlmProviderConfig,
+    RateLimitPolicy,
     RedactionPolicy,
     RetryPolicy,
     RuntimeConfig,
@@ -74,6 +75,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
     retry: dict[str, Any] = _map("retry")
     redaction: dict[str, Any] = _map("redaction")
     debug: dict[str, Any] = _map("debug")
+    rate_limit: dict[str, Any] = _map("rate_limit")
 
     auth_mode = str(z.get("auth_mode", "none")).lower()
     if auth_mode not in ("none", "basic", "bearer", "session"):
@@ -148,6 +150,11 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             detective_briefing=_as_bool(debug.get("detective_briefing"), True),
             capture_bodies=_as_bool(debug.get("capture_bodies"), False),
             transport_replay=_as_bool(debug.get("transport_replay"), True),
+        ),
+        rate_limit=RateLimitPolicy(
+            typeahead_enabled=_as_bool(rate_limit.get("typeahead_enabled"), True),
+            typeahead_rps=float(rate_limit.get("typeahead_rps", 10.0)),
+            typeahead_burst=float(rate_limit.get("typeahead_burst", 20.0)),
         ),
         chat_requests_dir=data.get("chat_requests_dir"),
     )
