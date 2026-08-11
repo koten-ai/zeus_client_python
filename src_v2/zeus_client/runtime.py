@@ -109,6 +109,13 @@ class ZeusRuntime:
     def journal(self) -> InMemoryJournal:
         return self._services.journal
 
+    @property
+    def data(self) -> Any:
+        """Data-plane facade (verbs / typeahead)."""
+        from zeus_client_v2.api.data import DataAPI
+
+        return DataAPI(self)
+
     async def __aenter__(self) -> ZeusRuntime:
         self._entered = True
         return self

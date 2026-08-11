@@ -1,5 +1,7 @@
-"""API facade package — agent/data/catalog/debug attach in later phases."""
+"""API facade package."""
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from zeus_client_v2.api.data import DataAPI
+
+__all__ = ["DataAPI"]
