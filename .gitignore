@@ -25,3 +25,5 @@ src/data/chat_requests/*
 # Grok artifacts
 terminals/
 mcps/
+# Conformance adapter local report
+tests/conformance/last_report.json
