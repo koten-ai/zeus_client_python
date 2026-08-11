@@ -130,6 +130,13 @@ class ZeusRuntime:
 
         return AgentAPI(self)
 
+    @property
+    def debug(self) -> Any:
+        """Debug plane — journal export, spans, transport replay."""
+        from zeus_client_v2.api.debug import DebugAPI
+
+        return DebugAPI(self)
+
     async def __aenter__(self) -> ZeusRuntime:
         self._entered = True
         return self
