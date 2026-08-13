@@ -164,7 +164,7 @@ Ship **2.0.0** with claim **candidate** until human MATRIX PR.
 | T6 v2 alias | ZCP-40 | **Done** meta-path submodule redirect |
 | T7 docs | ZCP-41 | **Done** `9eb9ff6` |
 | T8 verify | ZCP-42 | package 238 · yelp 78 · sample 245 |
-| T9 tag + MATRIX | ZCP-43 | **Human** — do not self-award |
+| T9 tag + MATRIX | ZCP-43 | **Human** — do not self-award · runbook [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) |
 
 **Claim:** remains `candidate` until human MATRIX (T9).
 

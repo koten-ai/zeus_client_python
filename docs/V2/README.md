@@ -9,10 +9,11 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 | [SECURITY.md](./SECURITY.md) | Threat model, authz, secrets, redaction, replay, secure defaults |
 | [BEST_PRACTICES.md](./BEST_PRACTICES.md) | Engineering standards: code, API, testing, CI/CD, observability |
 | [MIGRATION.md](./MIGRATION.md) | V1→V2 map, compat shims, demo_yelp notes, cutover gate |
+| [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) | Human gate: tag `v2.0.0`, GH Release, design MATRIX, pins |
 
 ## Status
 
-**Beta candidate on `feat/V2`** — dual-tree (`src/` = 0.3.1 `zeus_client`; `src_v2/zeus_client` → `zeus_client_v2` **2.0.0b1**). Claim level **candidate** per `sdk_bootstrap.pins.json`. Phase 8 hardening + compat + MIGRATION landed. **GA cutover train in progress** on `feat/ZCP-ga-cutover-2.0.0` — epic [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33); see [MIGRATION.md](./MIGRATION.md) §GA cutover train.
+**GA cutover code on `main`** — package **2.0.0**, default `import zeus_client` → **ZeusRuntime** tree; temporary `zeus_client_v2` alias (deprecated). Claim level remains **`candidate`** per `sdk_bootstrap.pins.json` until human MATRIX. Epic [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33); remaining **T9** = [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) ([ZCP-43](https://kotenai.atlassian.net/browse/ZCP-43)).
 
 ## Selected architecture (one paragraph)
 
