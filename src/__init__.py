@@ -90,6 +90,11 @@ from zeus_client.trace.session_hops import (
     select_primary_req_id,
     build_aggregate_trace_payload,
 )
+from zeus_client.trace.tokens import (
+    attach_trace_tokens,
+    normalize_usage,
+    sum_provider_tokens,
+)
 
 
 class ZeusClient:
@@ -130,6 +135,9 @@ __all__ = [
     "build_aggregate_trace_payload",
     "build_tool_order",
     "select_primary_req_id",
+    "sum_provider_tokens",
+    "attach_trace_tokens",
+    "normalize_usage",
     "MAX_ROUNDS",
     "USER_CONFIG_DIR",
     "ZeusClient",

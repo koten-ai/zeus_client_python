@@ -26,6 +26,7 @@ SYMBOLS = [
     "run_order", "run_enrich", "run_project", "run_traverse",
     "run_analyze", "run_return", "run_search_verb",
     "select_primary_req_id", "build_aggregate_trace_payload",
+    "sum_provider_tokens", "attach_trace_tokens", "normalize_usage",
 ]
 
 

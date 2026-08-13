@@ -21,9 +21,10 @@ def build_public_trace(
     policy: str | None,
     flags: Mapping[str, bool] | None,
     steps: Sequence[Mapping[str, Any]] | None = None,
+    tokens: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Widget-friendly projection — never put G2 dumps in answer field."""
-    return {
+    out: dict[str, Any] = {
         "turn_id": turn_id,
         "answer": answer,
         "status": status,
@@ -43,3 +44,6 @@ def build_public_trace(
             else []
         ),
     }
+    if tokens is not None:
+        out["tokens"] = dict(tokens)
+    return out

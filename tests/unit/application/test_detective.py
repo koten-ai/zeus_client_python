@@ -83,6 +83,50 @@ def test_schema_v1_keys_and_playbook_ids():
     }
 
 
+def test_overview_includes_provider_tokens_from_public_trace_steps():
+    brief = build_detective_briefing(
+        turn_id="t-tok",
+        answer="ok",
+        status="ok",
+        rounds=2,
+        public_trace={
+            "steps": [
+                {
+                    "type": "llm",
+                    "usage": {
+                        "prompt_tokens": 100,
+                        "completion_tokens": 20,
+                        "total_tokens": 120,
+                    },
+                },
+                {
+                    "type": "force_final",
+                    "usage": {
+                        "prompt_tokens": 40,
+                        "completion_tokens": 12,
+                        "total_tokens": 52,
+                    },
+                },
+            ],
+            "tokens": {
+                "prompt": 140,
+                "completion": 32,
+                "total": 172,
+                "cached": 0,
+                "extra": 0,
+                "ok": True,
+            },
+        },
+        messages=({"role": "system", "content": SYSTEM_WITH_INJECT},),
+    )
+    tok = brief["overview"]["tokens"]
+    assert tok is not None
+    assert tok["prompt"] == 140
+    assert tok["completion"] == 32
+    assert tok["total"] == 172
+    assert tok["ok"] is True
+
+
 def test_missing_inject_playbook():
     brief = build_detective_briefing(
         answer="hi",

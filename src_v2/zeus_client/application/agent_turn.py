@@ -24,6 +24,7 @@ from zeus_client_v2.application.middleware import MiddlewareChain, MiddlewareCon
 from zeus_client_v2.application.detective import safe_build_detective_briefing
 from zeus_client_v2.application.projectors.public_trace import build_public_trace
 from zeus_client_v2.application.projectors.session_trace import select_primary_req_id
+from zeus_client_v2.application.tokens import sum_provider_tokens
 from zeus_client_v2.config.models import ClientSettings, DataTarget, DebugPolicy
 from zeus_client_v2.domain.errors import ErrorCode, LlmError, ZeusClientError
 from zeus_client_v2.domain.journal.events import EVENT_NOTE, EVENT_TURN_COMPLETED, EVENT_TURN_STARTED, JournalEvent
@@ -583,6 +584,7 @@ async def _insight_hop(
                 "type": "force_final",
                 "cause": "ai_process_result_insight",
                 "content_len": len(content),
+                "usage": dict(resp.usage or {}),
             }
         )
     else:
@@ -777,6 +779,7 @@ def _finish(
         policy=decision.policy if decision else None,
         flags=decision.flags if decision else {},
         steps=steps,
+        tokens=sum_provider_tokens(steps=steps),
     )
     # G2 never in answer
     if "wish_i_knew" in answer:

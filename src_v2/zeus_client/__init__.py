@@ -37,6 +37,9 @@ def __getattr__(name: str):
         "TurnResult": ("zeus_client_v2.domain.messages", "TurnResult"),
         "TurnStatus": ("zeus_client_v2.domain.messages", "TurnStatus"),
         "SessionHandle": ("zeus_client_v2.domain.session", "SessionHandle"),
+        "sum_provider_tokens": ("zeus_client_v2.application.tokens", "sum_provider_tokens"),
+        "attach_trace_tokens": ("zeus_client_v2.application.tokens", "attach_trace_tokens"),
+        "normalize_usage": ("zeus_client_v2.application.tokens", "normalize_usage"),
     }
     if name not in _lazy:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -72,4 +75,7 @@ __all__ = [
     "extract_stamped_hash",
     "peel_layer_a_summary",
     "user_facing_answer",
+    "sum_provider_tokens",
+    "attach_trace_tokens",
+    "normalize_usage",
 ]
