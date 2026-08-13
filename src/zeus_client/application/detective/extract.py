@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.projectors.session_trace import select_primary_req_id
 
@@ -49,7 +50,9 @@ def preferred_req_id(hops: Sequence[Mapping[str, Any]] | None) -> str | None:
         return ids[-1] if ids else None
 
 
-def count_tool_errors(hops: Sequence[Mapping[str, Any]] | None, steps: Sequence[Mapping[str, Any]] | None = None) -> int:
+def count_tool_errors(
+    hops: Sequence[Mapping[str, Any]] | None, steps: Sequence[Mapping[str, Any]] | None = None
+) -> int:
     n = 0
     for h in hops or ():
         if not isinstance(h, Mapping):
@@ -76,9 +79,12 @@ def count_rows_signal(hops: Sequence[Mapping[str, Any]] | None) -> int:
         if h.get("ok") is False:
             continue
         snip = str(h.get("snippet") or "")
-        if any(k in snip for k in ('"rows"', '"items"', '"node_ids"', '"src_keys"')):
-            n += 1
-        elif h.get("ok") is True and snip.strip() and snip.strip() not in ("{}", "null"):
+        if (
+            any(k in snip for k in ('"rows"', '"items"', '"node_ids"', '"src_keys"'))
+            or h.get("ok") is True
+            and snip.strip()
+            and snip.strip() not in ("{}", "null")
+        ):
             n += 1
     return n
 

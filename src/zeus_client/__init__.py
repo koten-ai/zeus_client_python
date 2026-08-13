@@ -8,6 +8,8 @@ See ``docs/V2/MIGRATION.md``.
 
 from __future__ import annotations
 
+from typing import Any
+
 from zeus_client._version import __version__
 from zeus_client.runtime import ZeusRuntime
 
@@ -15,7 +17,7 @@ from zeus_client.runtime import ZeusRuntime
 # through zeus_http.headers → package root). Heavier symbols re-exported below.
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     # Lazy exports keep ``import zeus_client`` free of adapter cycles.
     _lazy = {
         "VerbResult": ("zeus_client.application.data_verb", "VerbResult"),

@@ -1,11 +1,10 @@
 """Catalog discovery, loading, scope-brief helpers, and dead auth shims."""
+
 import json
-from pathlib import Path
 
 import httpx
 import pytest
 import respx
-
 import zeus_client.zeus.catalog as catalog
 from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash
 from zeus_client.zeus.catalog import (
@@ -32,6 +31,7 @@ def test_list_chat_requests_empty_when_missing(patch_paths, monkeypatch):
             p.unlink()
         elif p.is_dir():
             import shutil
+
             shutil.rmtree(p, ignore_errors=True)
     d.rmdir()
     assert list_chat_requests() == []
@@ -145,9 +145,12 @@ def test_merge_scope_brief_messages_and_instructions():
     assert merged_instr["instructions"]["system_prompt"].startswith("SYS")
 
     skip_instr = {"instructions": {"system_prompt": f"SYS\n{BRIEF}"}}
-    assert merge_scope_brief(skip_instr, "more")["instructions"]["system_prompt"].count(
-        "## SCOPE BRIEF",
-    ) == 1
+    assert (
+        merge_scope_brief(skip_instr, "more")["instructions"]["system_prompt"].count(
+            "## SCOPE BRIEF",
+        )
+        == 1
+    )
 
     empty_sp = {"messages": [{"content": "BASE"}], "instructions": {"system_prompt": ""}}
     assert merge_scope_brief(empty_sp, BRIEF)["instructions"]["system_prompt"] == ""
@@ -228,7 +231,12 @@ async def test_load_chat_request_merges_live_brief(patch_paths, http_client):
         return_value=httpx.Response(200, json=live),
     )
     cat, src = await load_chat_request(
-        ZEUS_URL, "v2", "merge", BUCKET, SCOPE, {},
+        ZEUS_URL,
+        "v2",
+        "merge",
+        BUCKET,
+        SCOPE,
+        {},
     )
     assert "## SCOPE BRIEF" in cat["messages"][0]["content"]
     assert "live scope brief" in src
@@ -241,7 +249,12 @@ async def test_load_chat_request_no_brief_and_missing_file(patch_paths, http_cli
         return_value=httpx.Response(200, json={"messages": [{"content": "no brief"}]}),
     )
     cat, src = await load_chat_request(
-        ZEUS_URL, "v2", "analytics", BUCKET, SCOPE, {},
+        ZEUS_URL,
+        "v2",
+        "analytics",
+        BUCKET,
+        SCOPE,
+        {},
     )
     assert "bundled" in src
     assert "live response had no SCOPE BRIEF" in src or "bundled" in src
@@ -304,7 +317,12 @@ async def test_load_chat_request_live_fetch_fails(patch_paths, http_client):
         side_effect=httpx.ConnectError("down"),
     )
     cat, src = await load_chat_request(
-        ZEUS_URL, "v2", "analytics", BUCKET, SCOPE, {},
+        ZEUS_URL,
+        "v2",
+        "analytics",
+        BUCKET,
+        SCOPE,
+        {},
     )
     assert "bundled" in src
     assert "down" in src

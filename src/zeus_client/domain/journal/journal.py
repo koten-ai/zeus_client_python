@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence
 
 from zeus_client.domain.journal.events import JournalEvent
 from zeus_client.domain.journal.export import JournalExport, export_journal
@@ -47,7 +47,9 @@ class InMemoryJournal(ExecutionJournal):
     def get_payload(self, ref: str) -> bytes | None:
         return self.payload_store.get(ref)
 
-    def put_payload(self, data: bytes, *, content_type: str = "application/octet-stream", kind: str = "blob") -> str:
+    def put_payload(
+        self, data: bytes, *, content_type: str = "application/octet-stream", kind: str = "blob"
+    ) -> str:
         return self.payload_store.put(data, content_type=content_type, kind=kind)
 
     def export(self) -> JournalExport:

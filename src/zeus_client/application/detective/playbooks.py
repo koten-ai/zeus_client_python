@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.detective.extract import (
     count_rows_signal,
@@ -110,7 +111,10 @@ def run_playbooks(
                     "Search empty but find/project returned data",
                     "med",
                     "FTS/hybrid empty while graph find later succeeded — common ID/strategy mismatch.",
-                    ["Prefer FTS typeahead for dropdowns", "Do not treat empty hybrid as hard fail"],
+                    [
+                        "Prefer FTS typeahead for dropdowns",
+                        "Do not treat empty hybrid as hard fail",
+                    ],
                 )
             )
 
@@ -121,7 +125,10 @@ def run_playbooks(
                 "Project dotted FK / attributes path",
                 "med",
                 "Tool error suggests dotted attribute or FK projection issue.",
-                ["Check project fields vs entity schema", "Avoid projecting FTS biz: keys as graph ids"],
+                [
+                    "Check project fields vs entity schema",
+                    "Avoid projecting FTS biz: keys as graph ids",
+                ],
             )
         )
 

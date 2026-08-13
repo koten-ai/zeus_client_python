@@ -1,9 +1,7 @@
 """TOON encoding for tool results."""
+
 import importlib
 import json
-import sys
-
-import pytest
 
 import zeus_client.toon as toon_mod
 from zeus_client.toon import to_toon

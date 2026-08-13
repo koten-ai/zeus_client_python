@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 import pytest
 
@@ -97,9 +97,7 @@ RETURN_TOOL = {
 
 @pytest.mark.asyncio
 async def test_direct_answer_no_tools():
-    llm = ScriptedLlm(
-        script=[LlmResponse(content="Hello from Zeus.", tool_calls=())]
-    )
+    llm = ScriptedLlm(script=[LlmResponse(content="Hello from Zeus.", tool_calls=())])
     result = await run_agent_turn(
         TurnRequest(message="hi", tools=()),
         llm=llm,
@@ -255,7 +253,7 @@ async def test_peel_layer_a_dump_from_insight():
         'query_decomposition: {"intent": "x"}\n'
         'decomposition: {"targets": []}\n'
         "policy_action: answer\n"
-        "wish_i_knew: [{\"gap\": \"secret\"}]\n"
+        'wish_i_knew: [{"gap": "secret"}]\n'
         "```"
     )
     llm = ScriptedLlm(
@@ -329,9 +327,7 @@ async def test_middleware_before_zeus_mutates_args():
 
 @pytest.mark.asyncio
 async def test_ai_process_raises_max_rounds_floor():
-    llm = ScriptedLlm(
-        script=[LlmResponse(content="ok", tool_calls=())]
-    )
+    llm = ScriptedLlm(script=[LlmResponse(content="ok", tool_calls=())])
     result = await run_agent_turn(
         TurnRequest(
             message="hi",

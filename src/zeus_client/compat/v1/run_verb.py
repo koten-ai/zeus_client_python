@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.data_verb import VerbResult
 
@@ -13,8 +14,7 @@ if TYPE_CHECKING:
 __all__ = ["run_verb", "run_find"]
 
 _DEPRECATION = (
-    "zeus_client.compat.v1.run_verb is deprecated; "
-    "use ZeusRuntime.data.verb / .find / .get instead"
+    "zeus_client.compat.v1.run_verb is deprecated; use ZeusRuntime.data.verb / .find / .get instead"
 )
 
 

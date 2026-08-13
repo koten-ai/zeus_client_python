@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
-from zeus_client.adapters.zeus_http.verbs import EXPOSED_V2_VERBS, EXPOSED_V2_VERB_SET
+from zeus_client.adapters.zeus_http.verbs import EXPOSED_V2_VERB_SET, EXPOSED_V2_VERBS
 from zeus_client.config.models import DataTarget
 from zeus_client.domain.errors import ErrorCode, ZeusToolError
 from zeus_client.ports import VerbRequest

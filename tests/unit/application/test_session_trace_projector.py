@@ -39,9 +39,7 @@ def test_normalize_legacy_tuple() -> None:
 
 def test_normalize_dict_and_snip_cap() -> None:
     long = "x" * (TRACE_SNIPPET_MAX + 50)
-    hop = normalize_hop(
-        {"req_id": "r", "name": "search", "status": 500, "snippet": long}
-    )
+    hop = normalize_hop({"req_id": "r", "name": "search", "status": 500, "snippet": long})
     assert len(hop["snippet"]) == TRACE_SNIPPET_MAX
 
 
@@ -140,9 +138,7 @@ def test_build_aggregate_trace_payload_multi_hop() -> None:
 
 
 def test_build_aggregate_legacy_tuples() -> None:
-    agg = build_aggregate_trace_payload(
-        [("r1", "find", 200, "rows", "http://z/find")]
-    )
+    agg = build_aggregate_trace_payload([("r1", "find", 200, "rows", "http://z/find")])
     assert agg.primary_req_id == "r1"
     assert agg.outcome == "ok"
     assert agg.zeus_response["req_ids"] == ["r1"]
@@ -188,9 +184,7 @@ def test_build_aggregate_empty() -> None:
     assert agg.turns == ()
     assert agg.zeus_response == {}
     assert agg.outcome == "ok"
-    agg2 = build_aggregate_trace_payload(
-        [], layer_a={"intent": "List", "confidence": "high"}
-    )
+    agg2 = build_aggregate_trace_payload([], layer_a={"intent": "List", "confidence": "high"})
     assert agg2.primary_req_id is None
     assert agg2.turns == ()
     assert agg2.outcome == "ok"
@@ -276,9 +270,7 @@ async def test_project_session_trace_posts_identical_body_primary_last() -> None
 @respx.mock
 async def test_project_session_trace_soft_fail_on_http_error() -> None:
     ZEUS = "http://zeus.test:8080"
-    respx.post(f"{ZEUS}/v2/session/trace").mock(
-        return_value=httpx.Response(500, text="fail")
-    )
+    respx.post(f"{ZEUS}/v2/session/trace").mock(return_value=httpx.Response(500, text="fail"))
     http = HttpxSessionClient(
         endpoint=ZeusEndpointConfig(url=ZEUS),
         secrets=EnvSecretStore({}),

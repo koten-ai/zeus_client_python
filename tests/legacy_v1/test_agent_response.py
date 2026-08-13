@@ -1,13 +1,14 @@
 """Tests for structured zeus_data extraction from agent traces."""
+
 import copy
 
+from tests.fixtures.catalog_brief import base_chat_req
 from zeus_client.agent.response import (
     StructuredAgentResponse,
     extract_structured_response,
     filter_rows_to_schema,
     resolve_field_allowlist,
 )
-from tests.fixtures.catalog_brief import base_chat_req
 
 
 def _trace_with_find(items, entity_type="Beer"):
@@ -469,9 +470,7 @@ def test_entity_type_from_row_field_when_get_has_no_prior_tool():
     resp = extract_structured_response("porter", trace, base_chat_req())
     assert resp.source_tool == "get"
     assert resp.entity_type == "Beer"
-    assert resp.zeus_data == [
-        {"id": "n_1", "entity_type": "Beer", "name": "Porter", "abv": 5.5}
-    ]
+    assert resp.zeus_data == [{"id": "n_1", "entity_type": "Beer", "name": "Porter", "abv": 5.5}]
     assert not any("entity_type unknown" in w for w in resp.warnings)
 
 
@@ -490,9 +489,7 @@ def test_multi_entity_output_schema_uses_inferred_entity_type():
                 "status": 200,
                 "args": {"entity_type": "Hotel"},
                 "result_json": {
-                    "result": {
-                        "items": [{"id": "h1", "name": "Plaza", "city": "Paris"}]
-                    }
+                    "result": {"items": [{"id": "h1", "name": "Plaza", "city": "Paris"}]}
                 },
             },
             {

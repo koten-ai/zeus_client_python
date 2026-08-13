@@ -51,10 +51,7 @@ def test_contract_status_from_rehydrate_none() -> None:
 
 def test_contract_status_incomplete_hashes_prefer_match() -> None:
     # Binding present but incomplete hash material → match (V1 oracle)
-    assert (
-        contract_status_from_rehydrate("cid", "", {"contract_id": "cid", "hash": ""})
-        == "match"
-    )
+    assert contract_status_from_rehydrate("cid", "", {"contract_id": "cid", "hash": ""}) == "match"
 
 
 @pytest.mark.asyncio
@@ -217,9 +214,7 @@ async def test_lifecycle_rehydrate_success() -> None:
 @respx.mock
 async def test_lifecycle_dead_sid_recreates_same_turn() -> None:
     dead = "stale-sid"
-    respx.get(f"{ZEUS}/v2/session/{dead}").mock(
-        return_value=httpx.Response(404, text="gone")
-    )
+    respx.get(f"{ZEUS}/v2/session/{dead}").mock(return_value=httpx.Response(404, text="gone"))
     respx.post(f"{ZEUS}/v2/session").mock(
         return_value=httpx.Response(
             201,
@@ -257,12 +252,8 @@ async def test_lifecycle_dead_sid_recreates_same_turn() -> None:
 @respx.mock
 async def test_lifecycle_dead_sid_and_create_fail_clears_sid() -> None:
     dead = "stale-2"
-    respx.get(f"{ZEUS}/v2/session/{dead}").mock(
-        return_value=httpx.Response(404)
-    )
-    respx.post(f"{ZEUS}/v2/session").mock(
-        return_value=httpx.Response(500, text="fail")
-    )
+    respx.get(f"{ZEUS}/v2/session/{dead}").mock(return_value=httpx.Response(404))
+    respx.post(f"{ZEUS}/v2/session").mock(return_value=httpx.Response(500, text="fail"))
     http = HttpxSessionClient(
         endpoint=ZeusEndpointConfig(url=ZEUS),
         secrets=EnvSecretStore({}),

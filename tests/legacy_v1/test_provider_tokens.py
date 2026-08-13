@@ -1,4 +1,5 @@
 """Hub-identical provider token rollup oracles (ZCP-24 / ZCP-25)."""
+
 from __future__ import annotations
 
 from zeus_client.trace.tokens import (
@@ -21,9 +22,7 @@ def test_normalize_usage_nested_cached():
 
 
 def test_normalize_usage_top_level_cached():
-    u = normalize_usage(
-        {"prompt_tokens": 5, "completion_tokens": 1, "cached_tokens": 3}
-    )
+    u = normalize_usage({"prompt_tokens": 5, "completion_tokens": 1, "cached_tokens": 3})
     assert u["cached"] == 3
     assert u["total"] == 0
 
@@ -75,9 +74,7 @@ def test_tot_prefers_provider_total_even_when_gt_in_plus_out():
 
 
 def test_tot_fallback_in_plus_out_when_total_missing():
-    steps = [
-        {"type": "llm", "usage": {"prompt_tokens": 12, "completion_tokens": 8}}
-    ]
+    steps = [{"type": "llm", "usage": {"prompt_tokens": 12, "completion_tokens": 8}}]
     t = sum_provider_tokens(steps=steps)
     assert t["total"] == 20
     assert t["extra"] == 0

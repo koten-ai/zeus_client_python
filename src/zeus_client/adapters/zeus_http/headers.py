@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from zeus_client._version import __version__ as PACKAGE_VERSION
 

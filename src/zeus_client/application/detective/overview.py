@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.detective.extract import (
     catalog_flags_of,
@@ -76,7 +77,9 @@ def build_overview(
             "has_mini_schema": flags["has_mini_schema"],
         },
         "layer_a_summary": (layer_a or {}).get("summary") if isinstance(layer_a, Mapping) else None,
-        "layer_a_confidence": (layer_a or {}).get("confidence") if isinstance(layer_a, Mapping) else None,
+        "layer_a_confidence": (layer_a or {}).get("confidence")
+        if isinstance(layer_a, Mapping)
+        else None,
         "ai_process_result": ai_process_result,
         "ai_process_result_exit": ai_process_result_exit,
         "hub_links": links,

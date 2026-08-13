@@ -6,9 +6,10 @@ Pure domain — no httpx. Adapters call ``classify_llm_failure`` then raise ``Ll
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
 
 from zeus_client.domain.errors import ErrorCode, default_retryable
 

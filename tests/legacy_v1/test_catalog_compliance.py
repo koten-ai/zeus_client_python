@@ -1,6 +1,6 @@
 """Business-rule compliance tests."""
-import pytest
 
+import pytest
 from zeus_client.zeus.catalog import (
     audit_rows_against_rules,
     inject_business_logic,
@@ -14,7 +14,10 @@ def base_chat_req():
 
 def test_rule_ids_assigned():
     cr = inject_business_logic(
-        base_chat_req(), "Be concise.", {"rule": "No discount below zero."}, validate=False,
+        base_chat_req(),
+        "Be concise.",
+        {"rule": "No discount below zero."},
+        validate=False,
     )
     bl = cr["guidance"]["injections"]["business_logic"]
     assert [r["id"] for r in bl] == ["r1", "r2"]

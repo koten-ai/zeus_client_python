@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.agent_turn import AgentTurnUseCase, run_agent_turn
 from zeus_client.application.middleware import MiddlewareChain
@@ -77,7 +78,9 @@ class AgentAPI:
         metrics.incr(
             "zeus_client_turns_total",
             labels={
-                "status": result.status.value if hasattr(result.status, "value") else str(result.status),
+                "status": result.status.value
+                if hasattr(result.status, "value")
+                else str(result.status),
                 "mode": (settings or self._rt.config.settings).mode,
             },
         )

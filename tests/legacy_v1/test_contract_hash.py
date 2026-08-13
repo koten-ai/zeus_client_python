@@ -1,12 +1,13 @@
 """Contract hash unit tests."""
+
 import zeus_client.contract_hash as ch
 from zeus_client.contract_hash import (
-    compute_contract_hash,
-    extract_stamped_hash,
-    resolve_session_contract_hash,
     _canonicalize,
     _strip_for_hash,
     _strip_scope_brief,
+    compute_contract_hash,
+    extract_stamped_hash,
+    resolve_session_contract_hash,
 )
 
 

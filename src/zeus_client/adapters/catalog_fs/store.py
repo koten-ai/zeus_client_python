@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from zeus_client.domain.catalog import (
     MANIFEST_NAME,
@@ -56,11 +57,7 @@ class FsCatalogStore:
                     f"scope={key.bucket}/{key.scope}; "
                     f"expected under {self.root / scope_chat_requests_subdir(key.bucket, key.scope)} "
                     f"or top-level {self.root / chat_request_filename(key.mode)}"
-                    + (
-                        f" or bundled {self.bundled_dir}"
-                        if self.bundled_dir is not None
-                        else ""
-                    )
+                    + (f" or bundled {self.bundled_dir}" if self.bundled_dir is not None else "")
                 ),
                 details={
                     "mode": key.mode,

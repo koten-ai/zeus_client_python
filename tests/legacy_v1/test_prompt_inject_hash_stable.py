@@ -1,5 +1,4 @@
 """Prompt inject is hash-excluded when spliced after SCOPE BRIEF."""
-from copy import deepcopy
 
 from zeus_client.agent.prompt_inject import apply_control_plane_inject
 from zeus_client.agent.settings import prepare_settings
@@ -8,16 +7,18 @@ from zeus_client.contract_hash import compute_contract_hash
 
 def _catalog_with_brief():
     return {
-        "messages": [{
-            "role": "system",
-            "content": (
-                "You are a helpful agent.\n\n"
-                "## SCOPE BRIEF\n"
-                "bucket=beer scope=_default\n\n"
-                "## MINI-SCHEMA\n"
-                "Beer: name, abv\n"
-            ),
-        }],
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful agent.\n\n"
+                    "## SCOPE BRIEF\n"
+                    "bucket=beer scope=_default\n\n"
+                    "## MINI-SCHEMA\n"
+                    "Beer: name, abv\n"
+                ),
+            }
+        ],
         "verbs": [{"function": {"name": "find", "parameters": {}}}],
         "contract": {"hash": "md5:placeholder"},
     }
@@ -26,17 +27,21 @@ def _catalog_with_brief():
 def test_inject_keeps_contract_hash_stable():
     chat = _catalog_with_brief()
     before = compute_contract_hash(chat)
-    settings = prepare_settings({
-        "company_context": "We are a craft beer marketplace.",
-        "rules": {"seasonal": "Prefer seasonal beers when asked."},
-        "output_request": {
-            "app": {"fields": {
-                "offer_code": {"type": "string", "description": "Promo if any"},
-            }},
-        },
-        "locale": "en-US",
-        "channel": "web",
-    })
+    settings = prepare_settings(
+        {
+            "company_context": "We are a craft beer marketplace.",
+            "rules": {"seasonal": "Prefer seasonal beers when asked."},
+            "output_request": {
+                "app": {
+                    "fields": {
+                        "offer_code": {"type": "string", "description": "Promo if any"},
+                    }
+                },
+            },
+            "locale": "en-US",
+            "channel": "web",
+        }
+    )
     after_doc = apply_control_plane_inject(chat, settings)
     after = compute_contract_hash(after_doc)
     assert before == after
