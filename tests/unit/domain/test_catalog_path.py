@@ -26,6 +26,24 @@ def test_chat_request_filename() -> None:
     assert chat_request_filename("default") == "chat_request_v2.json"
     assert chat_request_filename("") == "chat_request_v2.json"
     assert chat_request_filename("analytics") == "chat_request_analytics_v2.json"
+    # Compound client modes still take the canonical *_v2.json suffix
+    assert (
+        chat_request_filename("analytics_v2_base_6")
+        == "chat_request_analytics_v2_base_6_v2.json"
+    )
+
+
+def test_mode_filename_roundtrip_compound() -> None:
+    """List→load must round-trip; bare chat_request_*_base_6.json is NOT valid."""
+    from zeus_client.domain.catalog import mode_from_filename
+
+    name = "chat_request_analytics_v2_base_6_v2.json"
+    mode = mode_from_filename(name)
+    assert mode == "analytics_v2_base_6"
+    assert chat_request_filename(mode) == name
+    # Misnamed drop (missing trailing _v2) does not round-trip — rename required
+    bad = "chat_request_analytics_v2_base_6.json"
+    assert chat_request_filename(mode_from_filename(bad)) != bad
 
 
 def test_resolve_prefers_scope_dir(tmp_path: Path) -> None:
