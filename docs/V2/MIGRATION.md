@@ -1,20 +1,19 @@
 # Zeus Client V2 — Migration Guide
 
-**Status:** dual-tree **beta** (`zeus_client_v2` **2.0.0b1**, claim `candidate`)  
-**Default import:** still `import zeus_client` → **0.3.1** under `src/`  
-**V2 import:** `import zeus_client_v2`  
-**Cutover (default import = V2, PyPI 2.0.0):** **deferred** until suite required + human MATRIX + one demo BFF green — see §Cutover gate.
+**Status:** **GA cutover landed** on `feat/ZCP-ga-cutover-2.0.0` — package **2.0.0**, claim still **`candidate`** until human MATRIX  
+**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.0.0**)  
+**Deprecated alias:** `import zeus_client_v2` → re-exports `zeus_client` with `DeprecationWarning` (remove ≤2.1.0)  
+**V1 archive:** `src_v1_legacy/` (not installed); free functions via `zeus_client.compat.v1` only
 
 ---
 
-## Why dual-tree still?
-
-Live monorepo demos (`demo_yelp`, etc.) bind `file:../zeus_client_python` and expect `import zeus_client` + `zeus_client_version` **0.3.1**. Phase 8 hardens V2 and ships **compat shims + migration notes** without breaking those BFFs in the same PR as GA tag.
+## Packaging (after cutover)
 
 | Package | Path | Version clock |
 | --- | --- | --- |
-| `zeus_client` | `src/` | `0.3.1` (default) |
-| `zeus_client_v2` | `src_v2/zeus_client/` | `2.0.0b1` |
+| `zeus_client` | `src/zeus_client/` | **2.0.0** (default) |
+| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.0.0** (deprecated alias) |
+| V1 free functions | `src_v1_legacy/` | archive only |
 
 ---
 
@@ -22,7 +21,7 @@ Live monorepo demos (`demo_yelp`, etc.) bind `file:../zeus_client_python` and ex
 
 | V1 | V2 |
 | --- | --- |
-| `async with ZeusClient()` | `async with ZeusRuntime.from_config(...)` |
+| `async with ZeusClient()` | `async with ZeusRuntime(...)` / `from_config` |
 | `run_agent(url, zcfg, base_url, key, model, …)` | `await rt.agent.run_turn(msg, target=..., settings=...)` |
 | `(answer, trace, turns, session_meta)` | `TurnResult` (`answer`, `debug`, `status`, `session`, …) |
 | `run_search` / `run_find` | `rt.data.search` / `rt.data.find` |
