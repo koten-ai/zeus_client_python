@@ -150,6 +150,27 @@ Until then: ship `zeus_client_v2` as **2.0.0bN candidate**.
 
 ---
 
+## GA cutover train (ZCP-33)
+
+**Plan:** `.hermes/plans/2026-08-13_040155-zeus-client-python-v2-ga-cutover.md`  
+**Epic:** [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33) · stories ZCP-34…43 · yelp blocker [ZD-20](https://kotenai.atlassian.net/browse/ZD-20)
+
+| Step | Key | Status entering train |
+| --- | --- | --- |
+| T0 gate audit | ZCP-34 | Done — branch `feat/ZCP-ga-cutover-2.0.0`, pytest 672 |
+| T1 docs hygiene | ZCP-35 | this section + wishlist design PR |
+| T2 prod security | ZCP-36 | production rejects `auth_mode=none` + `tls_verify=false` |
+| T3 alias cleanup | ZCP-37 | drop `run_fast_suggest*`; freeze `__all__` |
+| T4 demo_yelp BFF | ZCP-38 / ZD-20 | **blocker** — migrate before package-dir flip |
+| T5 default import | ZCP-39 | flip + version **2.0.0** |
+| T6–T9 | ZCP-40…43 | alias, docs, verify, tag + human MATRIX |
+
+**Claim:** remains `candidate` until human MATRIX (T9). Agent must not self-award `supported`.
+
+**Hard rule:** demo_yelp native `rt.*` **before** default-import flip (T4 before T5).
+
+---
+
 ## Security review snapshot (ZCP-22)
 
 | Control | Status |
@@ -161,7 +182,7 @@ Until then: ship `zeus_client_v2` as **2.0.0bN candidate**.
 | Tool POST retries default off | **done** (adapter law) |
 | Hub hydrate opt-in | **done** |
 | LIVE replay gated | **done** |
-| Prod rejects `auth_mode=none` | profile guidance — tighten in cutover if needed |
+| Prod rejects `auth_mode=none` | **done** (ZCP-36 — production profile + `tls_verify`) |
 | `pip audit` in CI | **deferred** (ops) |
 | Plugins deny-by-default secrets | N/A (plugins=no) |
 | OTLP optional | **stub** (opt-in factory) |
