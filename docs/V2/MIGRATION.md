@@ -157,11 +157,11 @@ Until then: ship `zeus_client_v2` as **2.0.0bN candidate**.
 
 | Step | Key | Status entering train |
 | --- | --- | --- |
-| T0 gate audit | ZCP-34 | Done — branch `feat/ZCP-ga-cutover-2.0.0`, pytest 672 |
-| T1 docs hygiene | ZCP-35 | this section + wishlist design PR |
-| T2 prod security | ZCP-36 | production rejects `auth_mode=none` + `tls_verify=false` |
-| T3 alias cleanup | ZCP-37 | drop `run_fast_suggest*`; freeze `__all__` |
-| T4 demo_yelp BFF | ZCP-38 / ZD-20 | **blocker** — migrate before package-dir flip |
+| T0 gate audit | ZCP-34 | **Done** — branch `feat/ZCP-ga-cutover-2.0.0`, pytest **672→680** |
+| T1 docs hygiene | ZCP-35 | **Done** — MIGRATION GA section + design wishlist `efbc575` |
+| T2 prod security | ZCP-36 | **Done** — `4c73ed9` rejects auth_mode=none + tls_verify=false |
+| T3 alias cleanup | ZCP-37 | **Done** — `546e280` drop `run_fast_suggest*`; freeze `__all__` |
+| T4 demo_yelp BFF | ZCP-38 / ZD-20 | **In progress** — migrate before package-dir flip |
 | T5 default import | ZCP-39 | flip + version **2.0.0** |
 | T6–T9 | ZCP-40…43 | alias, docs, verify, tag + human MATRIX |
 
