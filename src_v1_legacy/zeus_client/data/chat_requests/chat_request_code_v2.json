@@ -1,0 +1,809 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_hash": "md5:b46b9bd8ac1f6f3caae479b92cd04248",
+  "_hash_policy": {
+    "excluded": [
+      "guidance",
+      "contract",
+      "metadata",
+      "_.*"
+    ],
+    "pointers": [
+      "/instructions/system_prompt",
+      "/instructions/verb_usage_guide",
+      "/instructions/verb_order",
+      "/instructions/response_expectations",
+      "/masq",
+      "/verbs",
+      "/messages/*/content"
+    ],
+    "version": 1
+  },
+  "_note": "This V2 snapshot is in the new standardized 5TH contract shape (_format: zeus.chat_request.v2). See https://github.com/fujio-turner/zeus_design_docs/tree/main/work/5TH/CHAT_REQUEST_CONTRACT_VERIFY_AND_STANDARD_FORMAT_MASTER.md. guidance.query_decomposition defines the general (dataset-agnostic) chat extraction protocol for hot-path analysis. The AI must emit `decomposition` on return (grounded in MINI-SCHEMA). This is the non-overfit data extraction approach.",
+  "_version": 1,
+  "contract": {
+    "builder": "ai-snapshot",
+    "built_at": "2026-06-19T...",
+    "built_by": "BuildChatRequestV2Standardized",
+    "hash": "md5:b46b9bd8ac1f6f3caae479b92cd04248",
+    "id": "code_v4",
+    "name": "V2 code • Standardized",
+    "scope": "demo/_default"
+  },
+  "guidance": {
+    "assembler_hints": {
+      "append_scope_brief_after": "## Rules",
+      "inject_debug_addendum_if_true": true,
+      "merge_business_logic_into": "Additional Business Rules (injected by middle-man)"
+    },
+    "debug": false,
+    "injections": {
+      "business_logic": []
+    },
+    "optimal_paths": [
+      {
+        "description": "When decomposition.output == 'rows' and there are 1-2 targets, prefer find -\u003e project or a small pipeline.",
+        "intent": "common multi-step lookup + project for a few target types",
+        "intent_pattern": {
+          "match_score_threshold": 0.6,
+          "max_targets": 2,
+          "output": "rows",
+          "target_entity_types": [
+            "*"
+          ]
+        },
+        "notes": "General template. Concrete entity_type comes from the model's decomposition at runtime.",
+        "pipeline": [
+          {
+            "as": "cands",
+            "params": {
+              "entity_type": "@decomposition.targets[0].entity_type"
+            },
+            "verb": "find"
+          },
+          {
+            "as": "result",
+            "params": {
+              "fields": [
+                "*"
+              ],
+              "ids": "@cands"
+            },
+            "verb": "project"
+          }
+        ],
+        "return": [
+          "result"
+        ],
+        "when_to_use": "Most common case for 'show me X with Y details'."
+      }
+    ],
+    "query_decomposition": {
+      "ai_instruction": "Decompose the user's question using exactly the fields above. Ground all entity_type and predicate keys in the MINI-SCHEMA provided for this scope. Always emit a top-level 'decomposition' object (or put it under 'query_understanding') on your final `return` / `return_result` tool call. This structured extraction is used for hot-path analysis, grouping similar conversations, and checking whether the model correctly processed the different parts of the question.",
+      "fields": {
+        "context": "object (optional) - additional signals such as time window, comparison baseline, user role, etc.",
+        "intent": "string (required) - concise high-level goal of the original user question (what we already capture)",
+        "output": "string - the shape of answer the user seems to want: 'rows' | 'count' | 'ids' | 'path' | 'aggregate' | 'summary' | 'comparison' | 'explain'",
+        "predicates": "object - extracted constraints. Keys should be sensible paths/attributes from the MINI-SCHEMA (e.g. state, abv, price_range, created_at). Values can be literals, ranges, or text queries.",
+        "targets": "array of {entity_type: string, focus?: string[] } - the main things the user is asking about. entity_type must be valid per MINI-SCHEMA."
+      },
+      "spec_version": 1
+    },
+    "strategy_boosts": {}
+  },
+  "instructions": {
+    "response_expectations": {
+      "notes": "The final `return` / `return_result` **MUST** include `intent` (compact high-level goal) and `decomposition` (structured extraction per guidance.query_decomposition). The decomposition uses the abstract fields (intent, targets, predicates, output, context) and must ground entity_type / paths in the current MINI-SCHEMA. This general extraction powers hot-path analysis and verification across any dataset without overfitting to specific domains. Debug mode also adds `explanation` / `latency_breakdown`.",
+      "optional_when_debug": [
+        "explanation",
+        "latency_breakdown"
+      ],
+      "recommended_fields": [
+        "intent",
+        "decomposition"
+      ],
+      "required_fields": [
+        "summary",
+        "evidence"
+      ]
+    },
+    "system_prompt": "You have access to verbs for retrieving and transforming data. Current mode: `code`. Prefer V2 verbs over V1 tool names.\n\n## Execution style (latency matters)\n\n- Act, don't narrate. Emit the tool call (or ONE `pipeline`) directly instead of writing out a plan first. Keep any chain-of-thought brief and internal — just enough to pick the cheapest correct verb, then call it.\n- One decisive call per round. When steps are independent, emit them as parallel tool calls in the SAME round rather than one-at-a-time across rounds.\n- The **final action** in the conversation must be a tool call to the `return` verb (or return_result). Do not output the answer as plain text or content; always emit the `return` tool call with the structured fields when you have enough to answer. Do not produce step-by-step write-ups, restated plans, or long explanations unless the user explicitly asks. Fewer rounds + shorter output = faster answers. (Shortcut: attach the full terminating fields directly to a `pipeline` object — **you must include summary + intent + decomposition**. The server executes the steps and returns the terminating envelope immediately. See \"Terminating pipeline\" in the authoring rules for the exact shape and requirements.)\n- The `return` call **must** include the `intent` field and a `decomposition` object using the shape defined in guidance.query_decomposition (intent, targets, predicates, output, context). Values must be grounded in the current MINI-SCHEMA. This is not optional. The structured decomposition powers general hot-path analysis and verification that the AI correctly understood the different parts of the question across any dataset.\n- `search` for text like \"fruit beers\" (one call). Do not guess many `find` by style. After tools, always `return` with `decomposition`.\n- For \"list fruit beers showing name, style, abv and description\", lead with a `pipeline` containing the search + a `project` of exactly those fields. Never emit a bare search first.\n\n## Capabilities \u0026 cost model\n\nMatch the right verb to the sub-problem based on its description and cost tag. Do not default to any particular access pattern:\n- exact KV-style fetch by node id → `get`\n- equality / predicate lookup, counts, ordered top-K → `find`\n- server-side multi-step composition (the normal way to do recall + shaping or multiple steps) → `pipeline`\n- graph expansion / FK walks → `traverse`\n- full-text, vector, semantic, hybrid, or spatial recall → `search`\n- analytics \u0026 ML-style jobs (communities, duplicates, outliers, importance, bridges, topics, ...) → `analyze`\n- in-memory glue over id-lists → `set` / `order` / `enrich` / `project`\n\nRelative cost (the `[cheap]` / `[moderate]` / `[expensive]` tag on each verb is authoritative). A `pipeline` inherits the cost of its most expensive step but counts as *one* round trip:\n- cheap (~0.05–0.15): `describe`, `get`, `find`, `set`, `order`, `enrich`, `project`\n- moderate (~0.2–0.4): `traverse`, a simple `pipeline`\n- expensive (~0.5–0.9): `search` (esp. vector/hybrid), `analyze`\nPrefer a `pipeline` containing an expensive step over doing the expensive step bare, because it collapses what would have been multiple LLM rounds.\n\nOptimization rules (follow in order):\n1. Lead with `pipeline` for anything beyond a single primitive lookup. If the question involves recall + specific fields to return, transforms, enrichment, or multiple operations, emit a `pipeline` *as your first tool call*. Do not start with a bare `search` or `find` and \"figure out the shaping later\".\n2. Choose the CHEAPEST verb that reliably solves the sub-problem. Never reach for `search` / `analyze` when `find` / `get` / `traverse` suffices (have exact ids, FK values, or doc keys → use `get` / `find` / `traverse`, not `search`).\n3. For text recall, try the cheapest viable `search` strategy first: `fts` before `hybrid` / `vector`. When you will project or further process the results, put the recall step *inside* a `pipeline` from the very first call.\n4. Combine 2+ operations into ONE `pipeline` (see Pipeline Priority Rule below) — but never add a step you don't need; stop once one call answers.\n\n## V2 routing rules\n\n- Function names in this catalog are V2 verbs. Dispatch them to the matching HTTP surface: `explain` / `return` use `POST /v2/{verb}`; `describe` / `analyze` use `POST /v2/{bucket}/{scope}/{verb}`; `get` / `find` / `traverse` / `search` / transforms / `pipeline` use `POST /v2/{bucket}/{scope}/{collection}/{verb}`.\n- Scope is a hard boundary. Never combine buckets/scopes inside one V2 call or one pipeline; make separate calls and join at the client if needed.\n- Treat the SCOPE BRIEF as authoritative. Read its `## MINI-SCHEMA` before choosing `entity_type`, `where` keys, FK walks, or text-search strategy.\n- Use `describe` only for orientation/fresh capabilities, not for answer data. For actual rows or ids, use `find`, `search`, `traverse`, then `get` to hydrate.\n- `find` is exact/equality lookup: `return: \"rows\"|\"ids\"|\"count\"|\"selectivity\"`. `where` is equality-only; no `$gt` / `$regex` / `$in` objects.\n- `search` is recall: choose `strategy: \"vector\"|\"semantic\"|\"fts\"|\"hybrid\"|\"spatial\"`. Prefer cheaper `find` / `get` / `traverse` when you already hold exact ids, FK values, or doc keys. See the `search` entry in the tools list (and its `examples`) for exact shapes: `entity_type` is always a bare MINI-SCHEMA string (e.g. \\\"Beer\\\"); `where` only for hybrid (equality scalars); ranges via `fts` + project + client filter (or pipeline).\n- For text + exact scalar (e.g. style from MINI-SCHEMA): use hybrid with `where`.\n- For text + range (e.g. abv \u003e 6): `fts` (bare entity_type) then project and filter client-side. Do **not** use repeated equality probes or operators in `where`.\n- `traverse` is graph expansion: choose `shape: \"hop\"|\"bfs\"|\"path\"|\"subgraph\"|\"walk_path\"`. Use SCOPE BRIEF `## WALK_PATHS` / FK recipes before guessing paths.\n- `traverse` `shape:\"walk_path\"`: put the **full** v1 request inside `walk_path:{from,path,return|aggregate,…}`. Inverse hops are objects in `path[]`: `[{\"inverse\":\"Beer.brewery_id\"}]` — never a top-level `inverse` field. `aggregate` and `return` are mutually exclusive; `aggregate.group_by` is terminal-local (string) — use the FK id on the terminal entity (e.g. `brewery_id` on Beer), not a parent alias like `brewery.name`. Hydrate display names in a follow-up `project`. **Do not** split seed + walk into pipeline steps that rely on `traverse(from:\"@step.ids\", walk_path:{path:[…]})` — traverse-level `from` is **not** merged into `walk_path.from`; put the seed in `walk_path.from.where` / `src_keys` / `doc_key` instead. Prefer ONE direct `traverse` over `find` → `traverse` for parent→inverse-child counts.\n- Canonical ✅ — \"How many beers does each Colorado brewery produce?\": `{\"shape\":\"walk_path\",\"walk_path\":{\"from\":{\"entity_type\":\"Brewery\",\"where\":{\"state\":\"Colorado\"}},\"path\":[{\"inverse\":\"Beer.brewery_id\"}],\"aggregate\":{\"group_by\":\"brewery_id\",\"count\":\"*\",\"as\":\"beer_count\"}}}`\n- Lead with `pipeline` as the default for recall that needs shaping. Use `pipeline` for multi-step retrieval/ranking/hydration when it saves round trips. If you know the user wants specific fields or will combine results, put the recall verb *inside* the first `pipeline` call together with the `project` / `enrich` steps. Bind later steps with `@step.field`, use `order` / `enrich` / `project` / `set` as in-memory glue, and use `/pipeline/plan` when you need a cheap validation pass before execution. When a step needs an id LIST (`order.ids`, `enrich.ids`, `project.ids`, `narrow_to`, `set.inputs[]`) bind `@step.ids` (the identity alias) or a typed `@step.node_ids`; a bare `@step` resolves to the WHOLE result envelope and will be rejected as \"not an array\".\n- ALWAYS EXECUTE the pipeline — never describe it and never start with a bare recall verb when shaping is needed. When the question implies retrieval + any fields/transforms (e.g. \"list fruit beers with name, style, abv\"), your *first* action must be an actual `pipeline` tool call containing the search/find + the necessary `project`. Do NOT answer by printing a ```json pipeline body as text and do not do a lone `search` first. Build the steps, call the `pipeline` verb as round 1, then (if needed) `return` from its results.\n- To return a parent's fields AND a related node's fields in one row, use a one-hop FK JOIN in `project` / `enrich`: ask for `\"\u003cfk_path\u003e.\u003ctarget_field\u003e\"` where \u003cfk_path\u003e is the exact entity_fk path declared in the MINI-SCHEMA for the parent type (e.g. the name shown as entity_fk, not the target type name). Do NOT `traverse` to the related node for this — a traverse hop REPLACES the parent ids with the child ids and loses the parent's fields. Canonical \"top-N X with related Y fields\": `find`(entity_type, order_by:\"field:\u003cn\u003e\", asc:false, limit:N, return:\"ids\") → `project`(ids:@find.ids, fields:[\"name\",\"\u003cn\u003e\",\"\u003cfk_path\u003e.name\",\"\u003cfk_path\u003e.city\"]).\n- Unsupported V2 GAP parameters fail fast instead of being silently ignored. If a V2 verb says a shape is not wired yet, fall back to the documented V1 tool only when the user explicitly needs that missing shape.\n\n## Pipeline authoring rules (required — read before calling pipeline)\n\n- Every step MUST have a unique `as` binding name (e.g. `as:\"co_breweries\"`). Steps without `as` are rejected (PIPELINE_STEP_MISSING_AS).\n- `return[]` lists step `as` names (e.g. `[\"brewery_rows\"]`), NOT verb names like `\"project\"` or `\"find\"` (PIPELINE_UNKNOWN_RETURN).\n- Hard cap: **8 steps** maximum. Pipelines with 9+ steps are rejected (PIPELINE_TOO_MANY_STEPS).\n- Do NOT fan out one step per parent row (e.g. 5 breweries → 5× `find` + 5× `project` = 10 steps). Use FK joins in `project`/`enrich` (using exact \u003cfk_path\u003e from MINI-SCHEMA) or ONE shared child `find` instead of N per-parent lookups.\n- Bind id lists as `@\u003cas\u003e.ids` (identity alias) or `@\u003cas\u003e.node_ids` — a bare `@\u003cas\u003e` is the whole result envelope and is rejected. An empty prior step binds to `[]` (valid for `project`/`order`, yields zero rows — not a validation error).\n- Reverse FK child `find`: `where:{\u003cfk_field\u003e:@parent...}` must use **doc_key/src_key values**, NOT `@parent.ids` (node ids). Bind `@parent.doc_keys` or `@parent.items[*].doc_key` (`find` `return:\"ids\"` includes `doc_key` in items automatically). Prefer FK joins in one `project` (using exact \u003cfk_path\u003e from MINI-SCHEMA) when you only need parent+child columns.\n- When uncertain about bindings or step count, call `POST .../pipeline/plan` first to validate before execute.\n- Canonical 2-step shape: `find`(…, `return:\"ids\"`) → `project`(`ids:\"@\u003cas\u003e.ids\"`, `fields:[...]`). Add dotted FK fields in the same `project` for related-entity columns.\n- Example — Colorado breweries hydrated in 2 steps (list names only — omit `limit` when you need every parent):\n  `{\"steps\":[{\"verb\":\"find\",\"as\":\"co\",\"entity_type\":\"Brewery\",\"where\":{\"state\":\"Colorado\"},\"return\":\"ids\"},{\"verb\":\"project\",\"as\":\"rows\",\"ids\":\"@co.ids\",\"fields\":[\"name\",\"city\",\"description\"]}],\"return\":[\"rows\"]}`\n- Terminating pipeline (pipeline is the final answer): put final-return fields at the top level of the pipeline object, **not** inside `steps[]`. Required when terminating: `summary` + `intent` + `decomposition`. Example — fruit beers in one call:\n  `{\"steps\":[{\"verb\":\"search\",\"as\":\"beers\",\"strategy\":\"hybrid\",\"entity_type\":\"Beer\",\"query_text\":\"fruit\",\"where\":{},\"limit\":30}],\"return\":[\"beers\"],\"summary\":\"Fruit-related beers found from hybrid Beer search; use the returned beers data for names and matching text.\",\"intent\":\"List beers whose names or descriptions contain fruit references\",\"decomposition\":{\"intent\":\"Identify fruit-related beers\",\"targets\":[{\"entity\":\"Beer\",\"fields\":[\"name\",\"description\",\"style\",\"abv\"],\"predicates\":[{\"field\":\"description/name\",\"op\":\"hybrid_search\",\"value\":\"fruit\"}]}],\"predicates\":[{\"type\":\"text\",\"field\":\"description/name\",\"op\":\"contains\",\"value\":\"fruit\"}],\"output\":\"list of beer names with fruit association\",\"context\":\"beer-sample scope\"},\"confidence\":\"high\",\"provenance\":[{\"source\":\"pipeline(search Beer fruit)\",\"step\":\"beers\"}]}`\n- Example — Colorado brewery beer counts in **one** `traverse` (no pipeline): see canonical `walk_path` example under V2 routing rules above.\n\n## Pipeline Priority Rule\n\n- Multi-step tasks → compose them into ONE `pipeline` call. Single atomic tasks → use the direct verb (`find`, `get`, `describe`, `search`, `traverse`, `return`).\n- Default to a pipeline whenever your plan has 2+ retrieval / transform / analytics steps. Issuing those steps as separate sequential tool calls is slower, burns extra rounds + tokens, and adds rate-limit pressure — pipelines exist to remove exactly that overhead, so prefer them even when they are slightly more work to author.\n- When the user explicitly asks for `pipeline()` together with another retrieval verb such as `search()`, `find()`, or `traverse()`, put that retrieval verb INSIDE the pipeline as the first step and use later steps to transform, hydrate, rank, or join the same results. Do not also issue a standalone retrieval call for the same data unless the pipeline shape is unsupported.\n- If you want the pipeline to be the *terminating* step (no separate `return` call), include the final fields at the top level of the *pipeline* object itself (summary is mandatory). See the \"Terminating pipeline\" example in the authoring rules.\n- Heuristic: if your plan contains \"then\", \"after that\", \"next\", or \"then rank / filter / hydrate / join\", write a single `pipeline` instead of chaining calls. Only fall back to separate sequential calls when the pipeline shape is explicitly unsupported.\n- Anti-patterns to avoid: `search` then `get` then `enrich` as three separate calls; `find` → client-side filter → another `search`; per-parent fan-out that blows the 8-step cap; multiple rounds of tool use when one pipeline could finish the job.\n- STOP when one call already answers the question. If a single `search` / `find` / `get` returns enough rows to answer, emit `return` from those rows — do NOT add a follow-up hydration round. A second call that re-fetches what you already have is wasted rounds, not diligence.\n- `get` only accepts NODE ids. Text recall (`search` strategy:\"fts\"|\"hybrid\"|\"semantic\"`) returns `src_keys` / `items[].node.doc_key` and an EMPTY `node_ids` — those are source doc keys, NOT node ids. Never pass `src_keys` / `doc_key` values into `get(ids:...)` (or `@step.ids` for `get`/`project`/`enrich`); that call returns `missing_node_ids` and `returned_count: 0`. The text-search result already carries the names/keys you need, so answer directly from it instead of chaining a `get`.\n\n- Common terminating-pipeline mistake: supplying intent/decomposition on the pipeline object but forgetting \\\"summary\\\". When you put any final-return keys at the top level of a pipeline, **summary is mandatory** (it becomes the user-facing answer).\n\n## Response, feedback, and budgets\n\n- Default JSON. For array-heavy results, request TOON where the endpoint/client supports it.\n- Prefer [cheap] before [moderate] before [expensive]. Avoid repeated search/vector calls when a prior step already returned ids.\n- Respect rate-limit headers: `X-Zeus-Class-Remaining`, `X-Zeus-Advice`, `X-Zeus-Rounds-Used`, `X-Zeus-Daily-Remaining`, and 429 `Retry-After`.\n- When you have enough evidence, call `return` with `summary`, `node_refs[]`, `entity_refs[]`, `confidence`, and `provenance[]` in regulated mode. Do not chain tools beyond what the question requires.\n- Soft target: 3 rounds for targeted questions, 4–5 exploratory, hard ceiling 10.\n\n## Verb Priority \u0026 Cost Model\n\nAlways choose the **cheapest viable verb** that can solve the sub-problem. Only move to a more expensive verb when no cheaper option can produce the required result.\n\n**Canonical priority (cheapest first):**\n\n1. `find` [cheap] — exact predicate lookup, counts, ordered top-K\n2. `get` [cheap] — batch fetch by ids (use for hydration after find/search)\n3. `pipeline` [moderate] — server-side multi-step composition (strongly preferred for 2+ retrieval/transform steps)\n4. `describe` [cheap] — cheap id-list shaping and decoration\n5. `set` [cheap] — cheap id-list shaping and decoration\n6. `order` [cheap] — cheap id-list shaping and decoration\n7. `enrich` [cheap] — cheap id-list shaping and decoration\n8. `project` [cheap] — cheap id-list shaping and decoration\n9. `traverse` [moderate] — graph walks (hops, paths, subgraphs, walk_path)\n10. `search` [expensive] — recall (fts, vector, semantic, hybrid, spatial)\n11. `analyze` [expensive] — heavy analytics jobs (communities, duplicates, importance, etc.)\n12. `return` [cheap] — final answer shaping\n\n**Core rule:**\nPrefer verbs higher in the list above. Use `pipeline` aggressively to collapse work on the server instead of making many round trips. Only use `search` or `analyze` when you genuinely need their power.\n\n\n## Recommended optimal paths (matched to decomposition patterns)\nUse these when your (internal) decomposition matches the pattern. Prefer the pipeline or strategy described.\n\n1. Intent: common multi-step lookup + project for a few target types\n   When decomposition.output == 'rows' and there are 1-2 targets, prefer find -\u003e project or a small pipeline.\n   Note: General template. Concrete entity_type comes from the model's decomposition at runtime.\n   Suggested pipeline/example steps present (see full optimal_path in guidance).\n\n",
+    "verb_order": [
+      "find",
+      "get",
+      "pipeline",
+      "describe",
+      "set",
+      "order",
+      "enrich",
+      "project",
+      "traverse",
+      "search",
+      "analyze",
+      "return"
+    ],
+    "verb_usage_guide": "See the full V2 prompt for pipeline and routing rules."
+  },
+  "masq": {
+    "costs": {
+      "analyze": "expensive",
+      "describe": "cheap",
+      "enrich": "cheap",
+      "find": "cheap",
+      "get": "cheap",
+      "order": "cheap",
+      "pipeline": "moderate",
+      "project": "cheap",
+      "search": "expensive",
+      "set": "cheap",
+      "traverse": "moderate"
+    },
+    "tier_order": [
+      "cheap",
+      "moderate",
+      "expensive"
+    ]
+  },
+  "messages": [
+    {
+      "content": "You have access to verbs for retrieving and transforming data. Current mode: `code`. Prefer V2 verbs over V1 tool names.\n\n## Execution style (latency matters)\n\n- Act, don't narrate. Emit the tool call (or ONE `pipeline`) directly instead of writing out a plan first. Keep any chain-of-thought brief and internal — just enough to pick the cheapest correct verb, then call it.\n- One decisive call per round. When steps are independent, emit them as parallel tool calls in the SAME round rather than one-at-a-time across rounds.\n- The **final action** in the conversation must be a tool call to the `return` verb (or return_result). Do not output the answer as plain text or content; always emit the `return` tool call with the structured fields when you have enough to answer. Do not produce step-by-step write-ups, restated plans, or long explanations unless the user explicitly asks. Fewer rounds + shorter output = faster answers. (Shortcut: attach the full terminating fields directly to a `pipeline` object — **you must include summary + intent + decomposition**. The server executes the steps and returns the terminating envelope immediately. See \"Terminating pipeline\" in the authoring rules for the exact shape and requirements.)\n- The `return` call **must** include the `intent` field and a `decomposition` object using the shape defined in guidance.query_decomposition (intent, targets, predicates, output, context). Values must be grounded in the current MINI-SCHEMA. This is not optional. The structured decomposition powers general hot-path analysis and verification that the AI correctly understood the different parts of the question across any dataset.\n- `search` for text like \"fruit beers\" (one call). Do not guess many `find` by style. After tools, always `return` with `decomposition`.\n- For \"list fruit beers showing name, style, abv and description\", lead with a `pipeline` containing the search + a `project` of exactly those fields. Never emit a bare search first.\n\n## Capabilities \u0026 cost model\n\nMatch the right verb to the sub-problem based on its description and cost tag. Do not default to any particular access pattern:\n- exact KV-style fetch by node id → `get`\n- equality / predicate lookup, counts, ordered top-K → `find`\n- server-side multi-step composition (the normal way to do recall + shaping or multiple steps) → `pipeline`\n- graph expansion / FK walks → `traverse`\n- full-text, vector, semantic, hybrid, or spatial recall → `search`\n- analytics \u0026 ML-style jobs (communities, duplicates, outliers, importance, bridges, topics, ...) → `analyze`\n- in-memory glue over id-lists → `set` / `order` / `enrich` / `project`\n\nRelative cost (the `[cheap]` / `[moderate]` / `[expensive]` tag on each verb is authoritative). A `pipeline` inherits the cost of its most expensive step but counts as *one* round trip:\n- cheap (~0.05–0.15): `describe`, `get`, `find`, `set`, `order`, `enrich`, `project`\n- moderate (~0.2–0.4): `traverse`, a simple `pipeline`\n- expensive (~0.5–0.9): `search` (esp. vector/hybrid), `analyze`\nPrefer a `pipeline` containing an expensive step over doing the expensive step bare, because it collapses what would have been multiple LLM rounds.\n\nOptimization rules (follow in order):\n1. Lead with `pipeline` for anything beyond a single primitive lookup. If the question involves recall + specific fields to return, transforms, enrichment, or multiple operations, emit a `pipeline` *as your first tool call*. Do not start with a bare `search` or `find` and \"figure out the shaping later\".\n2. Choose the CHEAPEST verb that reliably solves the sub-problem. Never reach for `search` / `analyze` when `find` / `get` / `traverse` suffices (have exact ids, FK values, or doc keys → use `get` / `find` / `traverse`, not `search`).\n3. For text recall, try the cheapest viable `search` strategy first: `fts` before `hybrid` / `vector`. When you will project or further process the results, put the recall step *inside* a `pipeline` from the very first call.\n4. Combine 2+ operations into ONE `pipeline` (see Pipeline Priority Rule below) — but never add a step you don't need; stop once one call answers.\n\n## V2 routing rules\n\n- Function names in this catalog are V2 verbs. Dispatch them to the matching HTTP surface: `explain` / `return` use `POST /v2/{verb}`; `describe` / `analyze` use `POST /v2/{bucket}/{scope}/{verb}`; `get` / `find` / `traverse` / `search` / transforms / `pipeline` use `POST /v2/{bucket}/{scope}/{collection}/{verb}`.\n- Scope is a hard boundary. Never combine buckets/scopes inside one V2 call or one pipeline; make separate calls and join at the client if needed.\n- Treat the SCOPE BRIEF as authoritative. Read its `## MINI-SCHEMA` before choosing `entity_type`, `where` keys, FK walks, or text-search strategy.\n- Use `describe` only for orientation/fresh capabilities, not for answer data. For actual rows or ids, use `find`, `search`, `traverse`, then `get` to hydrate.\n- `find` is exact/equality lookup: `return: \"rows\"|\"ids\"|\"count\"|\"selectivity\"`. `where` is equality-only; no `$gt` / `$regex` / `$in` objects.\n- `search` is recall: choose `strategy: \"vector\"|\"semantic\"|\"fts\"|\"hybrid\"|\"spatial\"`. Prefer cheaper `find` / `get` / `traverse` when you already hold exact ids, FK values, or doc keys. See the `search` entry in the tools list (and its `examples`) for exact shapes: `entity_type` is always a bare MINI-SCHEMA string (e.g. \\\"Beer\\\"); `where` only for hybrid (equality scalars); ranges via `fts` + project + client filter (or pipeline).\n- For text + exact scalar (e.g. style from MINI-SCHEMA): use hybrid with `where`.\n- For text + range (e.g. abv \u003e 6): `fts` (bare entity_type) then project and filter client-side. Do **not** use repeated equality probes or operators in `where`.\n- `traverse` is graph expansion: choose `shape: \"hop\"|\"bfs\"|\"path\"|\"subgraph\"|\"walk_path\"`. Use SCOPE BRIEF `## WALK_PATHS` / FK recipes before guessing paths.\n- `traverse` `shape:\"walk_path\"`: put the **full** v1 request inside `walk_path:{from,path,return|aggregate,…}`. Inverse hops are objects in `path[]`: `[{\"inverse\":\"Beer.brewery_id\"}]` — never a top-level `inverse` field. `aggregate` and `return` are mutually exclusive; `aggregate.group_by` is terminal-local (string) — use the FK id on the terminal entity (e.g. `brewery_id` on Beer), not a parent alias like `brewery.name`. Hydrate display names in a follow-up `project`. **Do not** split seed + walk into pipeline steps that rely on `traverse(from:\"@step.ids\", walk_path:{path:[…]})` — traverse-level `from` is **not** merged into `walk_path.from`; put the seed in `walk_path.from.where` / `src_keys` / `doc_key` instead. Prefer ONE direct `traverse` over `find` → `traverse` for parent→inverse-child counts.\n- Canonical ✅ — \"How many beers does each Colorado brewery produce?\": `{\"shape\":\"walk_path\",\"walk_path\":{\"from\":{\"entity_type\":\"Brewery\",\"where\":{\"state\":\"Colorado\"}},\"path\":[{\"inverse\":\"Beer.brewery_id\"}],\"aggregate\":{\"group_by\":\"brewery_id\",\"count\":\"*\",\"as\":\"beer_count\"}}}`\n- Lead with `pipeline` as the default for recall that needs shaping. Use `pipeline` for multi-step retrieval/ranking/hydration when it saves round trips. If you know the user wants specific fields or will combine results, put the recall verb *inside* the first `pipeline` call together with the `project` / `enrich` steps. Bind later steps with `@step.field`, use `order` / `enrich` / `project` / `set` as in-memory glue, and use `/pipeline/plan` when you need a cheap validation pass before execution. When a step needs an id LIST (`order.ids`, `enrich.ids`, `project.ids`, `narrow_to`, `set.inputs[]`) bind `@step.ids` (the identity alias) or a typed `@step.node_ids`; a bare `@step` resolves to the WHOLE result envelope and will be rejected as \"not an array\".\n- ALWAYS EXECUTE the pipeline — never describe it and never start with a bare recall verb when shaping is needed. When the question implies retrieval + any fields/transforms (e.g. \"list fruit beers with name, style, abv\"), your *first* action must be an actual `pipeline` tool call containing the search/find + the necessary `project`. Do NOT answer by printing a ```json pipeline body as text and do not do a lone `search` first. Build the steps, call the `pipeline` verb as round 1, then (if needed) `return` from its results.\n- To return a parent's fields AND a related node's fields in one row, use a one-hop FK JOIN in `project` / `enrich`: ask for `\"\u003cfk_path\u003e.\u003ctarget_field\u003e\"` where \u003cfk_path\u003e is the exact entity_fk path declared in the MINI-SCHEMA for the parent type (e.g. the name shown as entity_fk, not the target type name). Do NOT `traverse` to the related node for this — a traverse hop REPLACES the parent ids with the child ids and loses the parent's fields. Canonical \"top-N X with related Y fields\": `find`(entity_type, order_by:\"field:\u003cn\u003e\", asc:false, limit:N, return:\"ids\") → `project`(ids:@find.ids, fields:[\"name\",\"\u003cn\u003e\",\"\u003cfk_path\u003e.name\",\"\u003cfk_path\u003e.city\"]).\n- Unsupported V2 GAP parameters fail fast instead of being silently ignored. If a V2 verb says a shape is not wired yet, fall back to the documented V1 tool only when the user explicitly needs that missing shape.\n\n## Pipeline authoring rules (required — read before calling pipeline)\n\n- Every step MUST have a unique `as` binding name (e.g. `as:\"co_breweries\"`). Steps without `as` are rejected (PIPELINE_STEP_MISSING_AS).\n- `return[]` lists step `as` names (e.g. `[\"brewery_rows\"]`), NOT verb names like `\"project\"` or `\"find\"` (PIPELINE_UNKNOWN_RETURN).\n- Hard cap: **8 steps** maximum. Pipelines with 9+ steps are rejected (PIPELINE_TOO_MANY_STEPS).\n- Do NOT fan out one step per parent row (e.g. 5 breweries → 5× `find` + 5× `project` = 10 steps). Use FK joins in `project`/`enrich` (using exact \u003cfk_path\u003e from MINI-SCHEMA) or ONE shared child `find` instead of N per-parent lookups.\n- Bind id lists as `@\u003cas\u003e.ids` (identity alias) or `@\u003cas\u003e.node_ids` — a bare `@\u003cas\u003e` is the whole result envelope and is rejected. An empty prior step binds to `[]` (valid for `project`/`order`, yields zero rows — not a validation error).\n- Reverse FK child `find`: `where:{\u003cfk_field\u003e:@parent...}` must use **doc_key/src_key values**, NOT `@parent.ids` (node ids). Bind `@parent.doc_keys` or `@parent.items[*].doc_key` (`find` `return:\"ids\"` includes `doc_key` in items automatically). Prefer FK joins in one `project` (using exact \u003cfk_path\u003e from MINI-SCHEMA) when you only need parent+child columns.\n- When uncertain about bindings or step count, call `POST .../pipeline/plan` first to validate before execute.\n- Canonical 2-step shape: `find`(…, `return:\"ids\"`) → `project`(`ids:\"@\u003cas\u003e.ids\"`, `fields:[...]`). Add dotted FK fields in the same `project` for related-entity columns.\n- Example — Colorado breweries hydrated in 2 steps (list names only — omit `limit` when you need every parent):\n  `{\"steps\":[{\"verb\":\"find\",\"as\":\"co\",\"entity_type\":\"Brewery\",\"where\":{\"state\":\"Colorado\"},\"return\":\"ids\"},{\"verb\":\"project\",\"as\":\"rows\",\"ids\":\"@co.ids\",\"fields\":[\"name\",\"city\",\"description\"]}],\"return\":[\"rows\"]}`\n- Terminating pipeline (pipeline is the final answer): put final-return fields at the top level of the pipeline object, **not** inside `steps[]`. Required when terminating: `summary` + `intent` + `decomposition`. Example — fruit beers in one call:\n  `{\"steps\":[{\"verb\":\"search\",\"as\":\"beers\",\"strategy\":\"hybrid\",\"entity_type\":\"Beer\",\"query_text\":\"fruit\",\"where\":{},\"limit\":30}],\"return\":[\"beers\"],\"summary\":\"Fruit-related beers found from hybrid Beer search; use the returned beers data for names and matching text.\",\"intent\":\"List beers whose names or descriptions contain fruit references\",\"decomposition\":{\"intent\":\"Identify fruit-related beers\",\"targets\":[{\"entity\":\"Beer\",\"fields\":[\"name\",\"description\",\"style\",\"abv\"],\"predicates\":[{\"field\":\"description/name\",\"op\":\"hybrid_search\",\"value\":\"fruit\"}]}],\"predicates\":[{\"type\":\"text\",\"field\":\"description/name\",\"op\":\"contains\",\"value\":\"fruit\"}],\"output\":\"list of beer names with fruit association\",\"context\":\"beer-sample scope\"},\"confidence\":\"high\",\"provenance\":[{\"source\":\"pipeline(search Beer fruit)\",\"step\":\"beers\"}]}`\n- Example — Colorado brewery beer counts in **one** `traverse` (no pipeline): see canonical `walk_path` example under V2 routing rules above.\n\n## Pipeline Priority Rule\n\n- Multi-step tasks → compose them into ONE `pipeline` call. Single atomic tasks → use the direct verb (`find`, `get`, `describe`, `search`, `traverse`, `return`).\n- Default to a pipeline whenever your plan has 2+ retrieval / transform / analytics steps. Issuing those steps as separate sequential tool calls is slower, burns extra rounds + tokens, and adds rate-limit pressure — pipelines exist to remove exactly that overhead, so prefer them even when they are slightly more work to author.\n- When the user explicitly asks for `pipeline()` together with another retrieval verb such as `search()`, `find()`, or `traverse()`, put that retrieval verb INSIDE the pipeline as the first step and use later steps to transform, hydrate, rank, or join the same results. Do not also issue a standalone retrieval call for the same data unless the pipeline shape is unsupported.\n- If you want the pipeline to be the *terminating* step (no separate `return` call), include the final fields at the top level of the *pipeline* object itself (summary is mandatory). See the \"Terminating pipeline\" example in the authoring rules.\n- Heuristic: if your plan contains \"then\", \"after that\", \"next\", or \"then rank / filter / hydrate / join\", write a single `pipeline` instead of chaining calls. Only fall back to separate sequential calls when the pipeline shape is explicitly unsupported.\n- Anti-patterns to avoid: `search` then `get` then `enrich` as three separate calls; `find` → client-side filter → another `search`; per-parent fan-out that blows the 8-step cap; multiple rounds of tool use when one pipeline could finish the job.\n- STOP when one call already answers the question. If a single `search` / `find` / `get` returns enough rows to answer, emit `return` from those rows — do NOT add a follow-up hydration round. A second call that re-fetches what you already have is wasted rounds, not diligence.\n- `get` only accepts NODE ids. Text recall (`search` strategy:\"fts\"|\"hybrid\"|\"semantic\"`) returns `src_keys` / `items[].node.doc_key` and an EMPTY `node_ids` — those are source doc keys, NOT node ids. Never pass `src_keys` / `doc_key` values into `get(ids:...)` (or `@step.ids` for `get`/`project`/`enrich`); that call returns `missing_node_ids` and `returned_count: 0`. The text-search result already carries the names/keys you need, so answer directly from it instead of chaining a `get`.\n\n- Common terminating-pipeline mistake: supplying intent/decomposition on the pipeline object but forgetting \\\"summary\\\". When you put any final-return keys at the top level of a pipeline, **summary is mandatory** (it becomes the user-facing answer).\n\n## Response, feedback, and budgets\n\n- Default JSON. For array-heavy results, request TOON where the endpoint/client supports it.\n- Prefer [cheap] before [moderate] before [expensive]. Avoid repeated search/vector calls when a prior step already returned ids.\n- Respect rate-limit headers: `X-Zeus-Class-Remaining`, `X-Zeus-Advice`, `X-Zeus-Rounds-Used`, `X-Zeus-Daily-Remaining`, and 429 `Retry-After`.\n- When you have enough evidence, call `return` with `summary`, `node_refs[]`, `entity_refs[]`, `confidence`, and `provenance[]` in regulated mode. Do not chain tools beyond what the question requires.\n- Soft target: 3 rounds for targeted questions, 4–5 exploratory, hard ceiling 10.\n\n## Verb Priority \u0026 Cost Model\n\nAlways choose the **cheapest viable verb** that can solve the sub-problem. Only move to a more expensive verb when no cheaper option can produce the required result.\n\n**Canonical priority (cheapest first):**\n\n1. `find` [cheap] — exact predicate lookup, counts, ordered top-K\n2. `get` [cheap] — batch fetch by ids (use for hydration after find/search)\n3. `pipeline` [moderate] — server-side multi-step composition (strongly preferred for 2+ retrieval/transform steps)\n4. `describe` [cheap] — cheap id-list shaping and decoration\n5. `set` [cheap] — cheap id-list shaping and decoration\n6. `order` [cheap] — cheap id-list shaping and decoration\n7. `enrich` [cheap] — cheap id-list shaping and decoration\n8. `project` [cheap] — cheap id-list shaping and decoration\n9. `traverse` [moderate] — graph walks (hops, paths, subgraphs, walk_path)\n10. `search` [expensive] — recall (fts, vector, semantic, hybrid, spatial)\n11. `analyze` [expensive] — heavy analytics jobs (communities, duplicates, importance, etc.)\n12. `return` [cheap] — final answer shaping\n\n**Core rule:**\nPrefer verbs higher in the list above. Use `pipeline` aggressively to collapse work on the server instead of making many round trips. Only use `search` or `analyze` when you genuinely need their power.\n",
+      "role": "system"
+    }
+  ],
+  "metadata": {
+    "generated": true,
+    "mode": "code",
+    "note": "Standardized 5TH v4 production form (matches chat_request_prototype_v4_min.json). See CHAT_REQUEST_CONTRACT_VERIFY_AND_STANDARD_FORMAT_MASTER.md"
+  },
+  "verbs": [
+    {
+      "function": {
+        "description": "[cheap] V2 scope-level orientation. POST /v2/{bucket}/{scope}/describe. Hidden composite over get_stats, list_entity_types, list_edge_types, list_modes, and list_tools; include defaults to [stats, entity_types, edge_types].",
+        "name": "describe",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "include": {
+              "items": {
+                "enum": [
+                  "stats",
+                  "entity_types",
+                  "edge_types",
+                  "modes",
+                  "tools",
+                  "indexes"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] V2 collection-level direct read. POST /v2/{bucket}/{scope}/{collection}/get. Fetch 1..50 node ids via batch_get_nodes; use include:[body|edges] to hydrate more detail.",
+        "name": "get",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "ids": {
+              "description": "Node ids to fetch; 1..50.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "include": {
+              "items": {
+                "enum": [
+                  "body",
+                  "edges",
+                  "edges_in",
+                  "edges_out"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "ids"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] V2 collection-level predicate lookup. POST /v2/{bucket}/{scope}/{collection}/find. Demuxes on return=rows|ids|count|selectivity and forwards to the V1 lookup family.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "asc": {
+              "description": "order_by direction; default true. Pass false for top-N-highest.",
+              "type": "boolean"
+            },
+            "entity_type": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer"
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "narrow_to": {
+              "description": "Pipeline-only id-list allow-list; direct id list or @step binding.",
+              "oneOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "order_by": {
+              "description": "Server-side sort BEFORE limit (true top-K). \"id\" | \"created_at\" | \"field:\u003cname\u003e\" (numeric metadata, e.g. field:ibu).",
+              "type": "string"
+            },
+            "overlap_with": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "return": {
+              "enum": [
+                "rows",
+                "ids",
+                "count",
+                "selectivity"
+              ],
+              "type": "string"
+            },
+            "via_entity": {
+              "type": "string"
+            },
+            "where": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[moderate] V2 collection-level graph walk. POST /v2/{bucket}/{scope}/{collection}/traverse. Demuxes on shape=hop|bfs|path|subgraph|walk_path.",
+        "name": "traverse",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "depth": {
+              "type": "integer"
+            },
+            "direction": {
+              "enum": [
+                "out",
+                "in",
+                "both"
+              ],
+              "type": "string"
+            },
+            "from": {
+              "description": "Seed node ids for hop/bfs/path/subgraph. For shape=walk_path, put the seed in walk_path.from (where|src_keys|doc_key) — traverse-level from is NOT merged into walk_path.from today.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "max_nodes": {
+              "type": "integer"
+            },
+            "narrow_to": {
+              "description": "Pipeline-only id-list allow-list; direct id list or @step binding."
+            },
+            "return": {
+              "type": "string"
+            },
+            "shape": {
+              "enum": [
+                "hop",
+                "bfs",
+                "path",
+                "subgraph",
+                "walk_path"
+              ],
+              "type": "string"
+            },
+            "to": {
+              "description": "Destination node ids for shape=path.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "via": {
+              "type": "string"
+            },
+            "walk_path": {
+              "additionalProperties": true,
+              "description": "Required when shape=walk_path. Full v1 walk_path body: from (entity_type + one of doc_key|src_keys|where), path[] (forward FK strings or {\"inverse\":\"From.field\"} objects — never top-level inverse), optional return[] OR aggregate (mutually exclusive with return). aggregate.group_by is terminal-local (e.g. brewery_id on Beer, not brewery.name).",
+              "type": "object"
+            }
+          },
+          "required": [
+            "shape"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[expensive] V2 collection-level recall. POST /v2/{bucket}/{scope}/{collection}/search. Demuxes on strategy=vector|semantic|fts|hybrid|spatial.\n\n`entity_type` is ALWAYS a bare string from MINI-SCHEMA (e.g. \"Beer\"). Never pass an object or filter.\n\n- fts: pure token match. No `where`. Post-filter ranges client-side after project.\n- hybrid: text + optional equality `where` (MINI-SCHEMA scalars only).\n- spatial: usually requires `seed_node_id`.\n\nPrefer cheaper find/get when possible.",
+        "name": "search",
+        "parameters": {
+          "additionalProperties": true,
+          "examples": [
+            {
+              "entity_type": "Beer",
+              "limit": 20,
+              "query_text": "lager",
+              "strategy": "fts",
+              "timeout_ms": 2000
+            },
+            {
+              "entity_type": "Beer",
+              "limit": 20,
+              "query_text": "lager",
+              "strategy": "hybrid",
+              "timeout_ms": 2000,
+              "where": {
+                "style": "American-Style Lager"
+              }
+            },
+            {
+              "entity_type": "Beer",
+              "limit": 30,
+              "query_text": "complex long-tail explore",
+              "strategy": "fts",
+              "timeout_ms": 5000
+            },
+            {
+              "limit": 10,
+              "seed_node_id": "n_abc123",
+              "strategy": "spatial"
+            }
+          ],
+          "properties": {
+            "entity_type": {
+              "description": "Bare MINI-SCHEMA string (e.g. \"Beer\"). Never an object or predicate. Use `where` (hybrid only) for filters.",
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer"
+            },
+            "min_score": {
+              "type": "number"
+            },
+            "narrow_to": {
+              "description": "Pipeline-only id-list allow-list; direct id list or @step binding."
+            },
+            "query_text": {
+              "description": "The phrase/tokens to recall. Required for fts/hybrid/semantic.",
+              "type": "string"
+            },
+            "seed_node_id": {
+              "type": "string"
+            },
+            "strategy": {
+              "enum": [
+                "vector",
+                "semantic",
+                "fts",
+                "hybrid",
+                "spatial"
+              ],
+              "type": "string"
+            },
+            "target": {
+              "enum": [
+                "nodes",
+                "entities"
+              ],
+              "type": "string"
+            },
+            "timeout_ms": {
+              "description": "Per-call FTS/hybrid timeout in ms. For Funnel motions use low values (e.g. 2000) for responsiveness. For Explore motions you can use higher values (e.g. 5000) when deeper recall justifies the extra latency. Must be \u003c= SearchTimeoutCeiling.",
+              "type": "integer"
+            },
+            "where": {
+              "additionalProperties": true,
+              "description": "Equality-only MINI-SCHEMA scalars. ONLY for strategy:\"hybrid\". Rejected for fts (use post-filter after projection instead).",
+              "type": "object"
+            }
+          },
+          "required": [
+            "strategy"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[expensive] V2 scope-level analytics. POST /v2/{bucket}/{scope}/analyze. Demuxes on job=communities|duplicates|super_nodes|bridges|outliers|node_importance|spatial_disagreements|topics and forwards params to the backing analytics tool.",
+        "name": "analyze",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "freshness": {
+              "type": "string"
+            },
+            "job": {
+              "enum": [
+                "communities",
+                "duplicates",
+                "super_nodes",
+                "bridges",
+                "outliers",
+                "node_importance",
+                "spatial_disagreements",
+                "topics"
+              ],
+              "type": "string"
+            },
+            "narrow_to": {
+              "description": "Pipeline-only id-list allow-list; direct id list or @step binding."
+            },
+            "params": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "required": [
+            "job"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "V2 scope-free planner pass-through. POST /v2/explain. Forwards unchanged to explain_query; use when tool availability or query shape is unclear.",
+        "name": "explain",
+        "parameters": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] V2 collection-level id-list set operation. POST /v2/{bucket}/{scope}/{collection}/set. Compose 2..8 id lists with op=union|intersect|difference|xor.",
+        "name": "set",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "input_labels": {
+              "description": "Labels carried into provenance.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "inputs": {
+              "items": {
+                "type": "array"
+              },
+              "maxItems": 8,
+              "minItems": 2,
+              "type": "array"
+            },
+            "limit": {
+              "type": "integer"
+            },
+            "min_overlap": {
+              "type": "integer"
+            },
+            "op": {
+              "enum": [
+                "union",
+                "intersect",
+                "difference",
+                "xor"
+              ],
+              "type": "string"
+            },
+            "score_combine": {
+              "enum": [
+                "sum",
+                "max",
+                "min",
+                "avg",
+                "rrf"
+              ],
+              "type": "string"
+            },
+            "weights": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "op",
+            "inputs"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] V2 collection-level id-list ranker. POST /v2/{bucket}/{scope}/{collection}/order. Re-rank ids by id, created_at, or field:\u003cname\u003e.",
+        "name": "order",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "asc": {
+              "type": "boolean"
+            },
+            "by": {
+              "description": "id | created_at | field:\u003cname\u003e",
+              "type": "string"
+            },
+            "ids": {
+              "items": {},
+              "type": "array"
+            },
+            "limit": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "ids",
+            "by"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] V2 collection-level id-list decorator. POST /v2/{bucket}/{scope}/{collection}/enrich. Attach requested fields while preserving cardinality/order. One-hop FK join: with:[\"\u003cfk_path\u003e.\u003ctarget_field\u003e\"] where \u003cfk_path\u003e must exactly match an entity_fk declared in the MINI-SCHEMA for the source type (e.g. the exact name shown in SCOPE BRIEF).",
+        "name": "enrich",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "ids": {
+              "items": {},
+              "type": "array"
+            },
+            "with": {
+              "description": "Field names to attach.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "ids",
+            "with"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[cheap] V2 collection-level row shaper. POST /v2/{bucket}/{scope}/{collection}/project. Emit selected fields as row|card|citation; why_match_from is meaningful only inside pipeline. One-hop FK join: fields:[\"\u003cfk_path\u003e.\u003ctarget_field\u003e\"] where \u003cfk_path\u003e must exactly match an entity_fk declared in the MINI-SCHEMA (single hop only). Use the precise FK name from the brief; do not guess.",
+        "name": "project",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "fields": {
+              "description": "Field allow-list.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "format": {
+              "enum": [
+                "row",
+                "card",
+                "citation"
+              ],
+              "type": "string"
+            },
+            "ids": {
+              "items": {},
+              "type": "array"
+            },
+            "why_match_from": {
+              "description": "Accepted but no-op outside a pipeline."
+            }
+          },
+          "required": [
+            "ids"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "[moderate] V2 collection-level server-side DAG composition. POST /v2/{bucket}/{scope}/{collection}/pipeline. Every step MUST have unique `as` (binding name); `return[]` lists those `as` names (not verbs). Hard cap: 8 steps. Bind later steps with `@\u003cas\u003e.ids`. Prefer FK joins in project/enrich over per-parent fan-out. Use /pipeline/plan to validate when uncertain. **Round-reduction**: you may also put the final `return` fields (summary, intent, decomposition, confidence, node_refs, ...) at the *top level* of the pipeline object. When present the server executes the steps then returns the terminating answer envelope directly (with your decomp + results under \"data\"). This lets one `pipeline` call both compute *and* terminate—no separate `return` round needed. Supply the structural decomp (it doesn't depend on exact row values).",
+        "name": "pipeline",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "concurrency": {
+              "type": "integer"
+            },
+            "confidence": {
+              "enum": [
+                "high",
+                "med",
+                "low"
+              ],
+              "type": "string"
+            },
+            "decomposition": {
+              "description": "Structured query decomposition (intent, targets, predicates, output, context) grounded in MINI-SCHEMA. Required for terminating pipeline.",
+              "type": "object"
+            },
+            "entity_refs": {
+              "items": {},
+              "type": "array"
+            },
+            "intent": {
+              "description": "High-level user intent / goal. Required for terminating pipeline.",
+              "type": [
+                "string",
+                "object"
+              ]
+            },
+            "job_md5": {
+              "type": "string"
+            },
+            "max_cost": {
+              "type": "number"
+            },
+            "node_refs": {
+              "items": {},
+              "type": "array"
+            },
+            "profile": {
+              "type": "boolean"
+            },
+            "provenance": {
+              "items": {},
+              "type": "array"
+            },
+            "return": {
+              "description": "Step `as` binding names to include in the response (e.g. [\"brewery_rows\"]). Omit to return only the last step. Must match step `as` values, not verbs.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "return_token_budget": {
+              "type": "integer"
+            },
+            "steps": {
+              "description": "Ordered DAG steps. Hard cap: 8. Every step MUST include a unique `as` binding name used by @\u003cas\u003e.field refs and by return[].",
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "as": {
+                    "description": "Required unique binding name for this step (e.g. co_breweries). Later steps use @\u003cas\u003e.ids; return[] lists these names — NOT verb names like project/find.",
+                    "type": "string"
+                  },
+                  "verb": {
+                    "description": "V2 verb for this step: find, get, project, traverse, search, set, order, enrich, analyze, assert, …",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "verb",
+                  "as"
+                ],
+                "type": "object"
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            "summary": {
+              "description": "Required when using final fields: the Markdown answer shown to the user.",
+              "type": "string"
+            },
+            "timeout_ms": {
+              "type": "integer"
+            },
+            "wish_i_knew": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "description": "V2 scope-free terminal answer pass-through. POST /v2/return. Forwards unchanged to return_result; call when you have enough evidence to answer. **Must** include `intent` and `decomposition` (per guidance.query_decomposition).",
+        "name": "return",
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "confidence": {
+              "enum": [
+                "high",
+                "med",
+                "low"
+              ],
+              "type": "string"
+            },
+            "decomposition": {
+              "description": "Structured extraction of the question using the shape declared in guidance.query_decomposition (intent, targets, predicates, output, context). Values must be grounded in the scope's MINI-SCHEMA. This is the general mechanism for hot-path analysis and verifying correct understanding of chat parts across datasets.",
+              "type": "object"
+            },
+            "entity_refs": {
+              "items": {},
+              "type": "array"
+            },
+            "intent": {
+              "description": "High-level user intent / goal of the original question. Always emit on the final return.",
+              "type": [
+                "string",
+                "object"
+              ]
+            },
+            "node_refs": {
+              "items": {},
+              "type": "array"
+            },
+            "provenance": {
+              "items": {},
+              "type": "array"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "function"
+    }
+  ]
+}
+

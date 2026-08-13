@@ -10,14 +10,14 @@ import httpx
 import pytest
 import respx
 
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.adapters.zeus_http.session import HttpxSessionClient
-from zeus_client_v2.application.session_lifecycle import (
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.adapters.zeus_http.session import HttpxSessionClient
+from zeus_client.application.session_lifecycle import (
     SessionLifecycle,
     contract_status_from_rehydrate,
 )
-from zeus_client_v2.config.models import ZeusEndpointConfig
-from zeus_client_v2.domain.session import SessionHandle
+from zeus_client.config.models import ZeusEndpointConfig
+from zeus_client.domain.session import SessionHandle
 
 ZEUS = "http://zeus.test:8080"
 HEADERS = {"X-Zeus-Mode": "analytics"}
@@ -166,7 +166,7 @@ async def test_lifecycle_create_new_session() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_lifecycle_rehydrate_success() -> None:
-    from zeus_client_v2.domain.contract import compute_contract_hash
+    from zeus_client.domain.contract import compute_contract_hash
 
     sid = "sid-live"
     chat_request = {"messages": [{"role": "system", "content": "x"}]}
@@ -375,7 +375,7 @@ async def test_lifecycle_prefers_payload_hash_on_drift() -> None:
         "messages": [{"role": "system", "content": "rules only"}],
         "verbs": [{"type": "function", "function": {"name": "find"}}],
     }
-    from zeus_client_v2.domain.contract import compute_contract_hash
+    from zeus_client.domain.contract import compute_contract_hash
 
     payload_h = compute_contract_hash(chat)
     await life.setup(

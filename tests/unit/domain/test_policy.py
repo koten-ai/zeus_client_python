@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from zeus_client_v2.config.models import ClientSettings
-from zeus_client_v2.domain.layer_a import parse_layer_a
-from zeus_client_v2.domain.policy import decide_policy, sticky_or_flags
+from zeus_client.config.models import ClientSettings
+from zeus_client.domain.layer_a import parse_layer_a
+from zeus_client.domain.policy import decide_policy, sticky_or_flags
 
 
 def _layer(**extra):

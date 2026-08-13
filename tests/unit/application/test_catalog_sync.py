@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from zeus_client_v2.adapters.catalog_fs.store import FsCatalogStore
-from zeus_client_v2.application.catalog_sync import (
+from zeus_client.adapters.catalog_fs.store import FsCatalogStore
+from zeus_client.application.catalog_sync import (
     SyncResult,
     resolve_sync_modes,
     resolve_sync_scopes,
     should_preserve_local_catalog,
     sync_catalogs,
 )
-from zeus_client_v2.domain.contract import compute_contract_hash, extract_stamped_hash
-from zeus_client_v2.ports import CatalogKey
+from zeus_client.domain.contract import compute_contract_hash, extract_stamped_hash
+from zeus_client.ports import CatalogKey
 
 
 def test_resolve_sync_scopes_from_samples() -> None:
@@ -212,9 +212,9 @@ async def test_sync_collects_fetch_errors(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_catalog_api_load_from_store(tmp_path: Path) -> None:
-    from zeus_client_v2.api.catalog import CatalogAPI
-    from zeus_client_v2.config.models import DataTarget, RuntimeConfig
-    from zeus_client_v2.runtime import ZeusRuntime
+    from zeus_client.api.catalog import CatalogAPI
+    from zeus_client.config.models import DataTarget, RuntimeConfig
+    from zeus_client.runtime import ZeusRuntime
 
     user = tmp_path / "user"
     scope = user / "yelp-data__default"

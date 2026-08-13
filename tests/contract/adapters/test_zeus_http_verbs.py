@@ -9,19 +9,19 @@ import httpx
 import pytest
 import respx
 
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.adapters.zeus_http.headers import apply_mode_header
-from zeus_client_v2.adapters.zeus_http.verbs import (
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.adapters.zeus_http.headers import apply_mode_header
+from zeus_client.adapters.zeus_http.verbs import (
     EXPOSED_V2_VERBS,
     HttpxZeusPort,
     verb_url,
 )
-from zeus_client_v2.application.data_verb import run_data_verb
-from zeus_client_v2.config.models import DataTarget, RuntimeConfig, ZeusEndpointConfig
-from zeus_client_v2.domain.errors import ErrorCode, ZeusToolError
-from zeus_client_v2.domain.journal import InMemoryJournal
-from zeus_client_v2.domain.journal.events import EVENT_ZEUS_HOP
-from zeus_client_v2.runtime import ZeusRuntime
+from zeus_client.application.data_verb import run_data_verb
+from zeus_client.config.models import DataTarget, RuntimeConfig, ZeusEndpointConfig
+from zeus_client.domain.errors import ErrorCode, ZeusToolError
+from zeus_client.domain.journal import InMemoryJournal
+from zeus_client.domain.journal.events import EVENT_ZEUS_HOP
+from zeus_client.runtime import ZeusRuntime
 
 
 def test_exposed_verbs_exclude_pipeline() -> None:

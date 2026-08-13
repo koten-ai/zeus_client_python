@@ -6,12 +6,12 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from zeus_client_v2.config.models import ClientSettings
-from zeus_client_v2.domain.layer_a import (
+from zeus_client.config.models import ClientSettings
+from zeus_client.domain.layer_a import (
     parse_layer_a,
     ui_view,
 )
-from zeus_client_v2.domain.policy import decide_policy
+from zeus_client.domain.policy import decide_policy
 
 from tests.conformance.paths import load_json
 
@@ -191,7 +191,7 @@ def run_l2_rules(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any
 
 
 def run_l2_triggers(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
-    from zeus_client_v2.domain.layer_a import normalize_triggers
+    from zeus_client.domain.layer_a import normalize_triggers
 
     data = load_json(case_dir / case["input"]["fixture"])
     rows_ok = True

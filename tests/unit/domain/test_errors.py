@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client_v2.domain.errors import (
+from zeus_client.domain.errors import (
     AuthError,
     CatalogError,
     ConfigError,

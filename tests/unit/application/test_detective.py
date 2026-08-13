@@ -7,17 +7,17 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from zeus_client_v2.application.agent_turn import run_agent_turn
-from zeus_client_v2.application.detective import (
+from zeus_client.application.agent_turn import run_agent_turn
+from zeus_client.application.detective import (
     PLAYBOOK_IDS,
     build_detective_briefing,
     detective_enabled,
     safe_build_detective_briefing,
 )
-from zeus_client_v2.application.detective.hub_hydrate import merge_hub_hydrate
-from zeus_client_v2.config.models import ClientSettings, DebugPolicy
-from zeus_client_v2.domain.messages import TurnRequest
-from zeus_client_v2.ports import LlmResponse, VerbHopResult
+from zeus_client.application.detective.hub_hydrate import merge_hub_hydrate
+from zeus_client.config.models import ClientSettings, DebugPolicy
+from zeus_client.domain.messages import TurnRequest
+from zeus_client.ports import LlmResponse, VerbHopResult
 
 SYSTEM_WITH_INJECT = (
     "You are helpful.\n\n"

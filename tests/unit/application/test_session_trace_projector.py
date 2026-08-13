@@ -9,9 +9,9 @@ import httpx
 import pytest
 import respx
 
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.adapters.zeus_http.session import HttpxSessionClient
-from zeus_client_v2.application.projectors.session_trace import (
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.adapters.zeus_http.session import HttpxSessionClient
+from zeus_client.application.projectors.session_trace import (
     TRACE_SNIPPET_MAX,
     AggregateTracePayload,
     build_aggregate_trace_payload,
@@ -23,8 +23,8 @@ from zeus_client_v2.application.projectors.session_trace import (
     select_primary_hop,
     select_primary_req_id,
 )
-from zeus_client_v2.config.models import ZeusEndpointConfig
-from zeus_client_v2.domain.session import SessionHandle
+from zeus_client.config.models import ZeusEndpointConfig
+from zeus_client.domain.session import SessionHandle
 
 
 def test_normalize_legacy_tuple() -> None:

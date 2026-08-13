@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from zeus_client_v2.domain.layer_a import (
+from zeus_client.domain.layer_a import (
     artifacts_view,
     normalize_triggers,
     parse_layer_a,

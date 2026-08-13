@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client_v2.domain.errors import ErrorCode
-from zeus_client_v2.domain.llm_classify import (
+from zeus_client.domain.errors import ErrorCode
+from zeus_client.domain.llm_classify import (
     LlmErrorClass,
     RetryBudget,
     classify_llm_failure,

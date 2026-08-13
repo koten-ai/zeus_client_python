@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client_v2.domain.ids import CallId, ChatId, ReqId, SessionId, TurnId, new_id
+from zeus_client.domain.ids import CallId, ChatId, ReqId, SessionId, TurnId, new_id
 
 
 def test_turn_id_is_str_subclass_and_distinct_type() -> None:

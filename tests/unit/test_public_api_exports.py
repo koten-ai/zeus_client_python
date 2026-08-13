@@ -1,8 +1,8 @@
-"""Freeze GA public surface for zeus_client_v2 (ZCM-034 / ZCP-37)."""
+"""Freeze GA public surface for zeus_client (ZCM-034 / ZCP-37 / ZCP-39)."""
 
 from __future__ import annotations
 
-import zeus_client_v2 as zc
+import zeus_client as zc
 
 # Expected public names from IG Phase 8 / package root __all__
 # — never application.* internal modules.
@@ -44,13 +44,14 @@ def test_public_all_matches_freeze() -> None:
 def test_public_symbols_importable() -> None:
     missing = [n for n in EXPECTED_PUBLIC if n != "__version__" and not hasattr(zc, n)]
     assert not missing, f"Missing public exports: {missing}"
-    assert zc.__version__.startswith("2.")
+    assert zc.__version__ == "2.0.0"
     assert zc.ZeusRuntime is not None
 
 
 def test_no_application_in_public_all() -> None:
     """Demos must not use application.* — it is internal (not on __all__)."""
     assert "application" not in zc.__all__
-    # Package may still have submodule on disk; public freeze is __all__ only.
-    with __import__("pytest").raises(AttributeError):
+    import pytest
+
+    with pytest.raises(AttributeError):
         _ = zc.agent_turn  # type: ignore[attr-defined]

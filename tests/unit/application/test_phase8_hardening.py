@@ -8,30 +8,30 @@ import httpx
 import pytest
 import respx
 
-from zeus_client_v2 import ZeusRuntime, __version__
-from zeus_client_v2.adapters.otlp import try_build_otlp_exporter
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.adapters.zeus_http.verbs import HttpxZeusPort
-from zeus_client_v2.compat.v1 import run_agent, run_search, run_verb, turn_result_as_v1_tuple
-from zeus_client_v2.config.models import (
+from zeus_client import ZeusRuntime, __version__
+from zeus_client.adapters.otlp import try_build_otlp_exporter
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.adapters.zeus_http.verbs import HttpxZeusPort
+from zeus_client.compat.v1 import run_agent, run_search, run_verb, turn_result_as_v1_tuple
+from zeus_client.config.models import (
     DataTarget,
     RateLimitPolicy,
     RuntimeConfig,
     ZeusEndpointConfig,
 )
-from zeus_client_v2.domain.errors import ErrorCode, ZeusClientError
-from zeus_client_v2.domain.journal import InMemoryJournal
-from zeus_client_v2.domain.messages import DebugBundle, TurnResult, TurnStatus
-from zeus_client_v2.observability.metrics import InMemoryMetrics
-from zeus_client_v2.observability.rate_limit import TokenBucket, TokenBucketLimiter
+from zeus_client.domain.errors import ErrorCode, ZeusClientError
+from zeus_client.domain.journal import InMemoryJournal
+from zeus_client.domain.messages import DebugBundle, TurnResult, TurnStatus
+from zeus_client.observability.metrics import InMemoryMetrics
+from zeus_client.observability.rate_limit import TokenBucket, TokenBucketLimiter
 
 
-def test_v2_version_is_beta() -> None:
-    assert __version__.startswith("2.0.0b")
+def test_package_version_is_2_0_0() -> None:
+    assert __version__ == "2.0.0"
 
 
 def test_public_exports() -> None:
-    import zeus_client_v2 as z
+    import zeus_client as z
 
     for name in (
         "ZeusRuntime",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from zeus_client_v2.security.redact import REDACTED, DefaultRedactor, default_redactor
+from zeus_client.security.redact import REDACTED, DefaultRedactor, default_redactor
 
 
 def test_redact_headers_authorization_and_api_key() -> None:
