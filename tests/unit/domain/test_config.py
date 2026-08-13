@@ -10,8 +10,8 @@ import pytest
 from zeus_client.adapters.secrets_env.store import EnvSecretStore
 from zeus_client.config import (
     apply_profile,
-    load_runtime_config,
     list_profiles,
+    load_runtime_config,
 )
 from zeus_client.config.models import RuntimeConfig, ZeusEndpointConfig
 from zeus_client.domain.errors import ConfigError, ErrorCode
@@ -77,9 +77,7 @@ def test_env_overrides_url_and_bucket(tmp_path: Path) -> None:
 def test_profile_matrix() -> None:
     assert set(list_profiles()) == {"development", "production", "ci"}
     base = RuntimeConfig(
-        zeus=ZeusEndpointConfig(
-            auth_mode="basic", username="u", password_env="ZEUS_PASSWORD"
-        )
+        zeus=ZeusEndpointConfig(auth_mode="basic", username="u", password_env="ZEUS_PASSWORD")
     )
     dev = apply_profile(base, "development")
     prod = apply_profile(base, "production")
@@ -112,7 +110,7 @@ def test_example_config_loads() -> None:
     example = root / "config.example.json"
     assert example.is_file()
     raw = example.read_text(encoding="utf-8")
-    assert "password\"" not in raw or "password_env" in raw
+    assert 'password"' not in raw or "password_env" in raw
     assert "sk-" not in raw
     cfg = load_runtime_config(example, env={})
     assert cfg.zeus.url.startswith("http")

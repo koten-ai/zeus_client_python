@@ -1,13 +1,10 @@
 """Constants and helper tests."""
-from pathlib import Path
-
-import pytest
 
 from zeus_client.constants import (
+    V2_DOCS_VERB_ORDER,
     normalize_api_version,
     v2_tool_order,
     v2_verbs_from_docs_dir,
-    V2_DOCS_VERB_ORDER,
 )
 
 
@@ -28,7 +25,17 @@ def test_v2_verbs_from_docs_dir_missing(tmp_path):
 
 
 def test_v2_verbs_from_docs_dir_complete(tmp_path):
-    for verb in ("describe", "explain", "get", "find", "traverse", "pipeline", "search", "analyze", "return"):
+    for verb in (
+        "describe",
+        "explain",
+        "get",
+        "find",
+        "traverse",
+        "pipeline",
+        "search",
+        "analyze",
+        "return",
+    ):
         (tmp_path / f"{verb}.md").write_text("#", encoding="utf-8")
     (tmp_path / "transforms.md").write_text("#", encoding="utf-8")
     assert v2_verbs_from_docs_dir(tmp_path) == list(V2_DOCS_VERB_ORDER)
@@ -41,7 +48,17 @@ def test_v2_verbs_from_docs_dir_incomplete(tmp_path):
 
 def test_v2_verbs_from_docs_dir_skips_work_docs(tmp_path):
     (tmp_path / "WORK_DOCS.md").write_text("# meta", encoding="utf-8")
-    for verb in ("describe", "explain", "get", "find", "traverse", "pipeline", "search", "analyze", "return"):
+    for verb in (
+        "describe",
+        "explain",
+        "get",
+        "find",
+        "traverse",
+        "pipeline",
+        "search",
+        "analyze",
+        "return",
+    ):
         (tmp_path / f"{verb}.md").write_text("#", encoding="utf-8")
     (tmp_path / "transforms.md").write_text("#", encoding="utf-8")
     assert v2_verbs_from_docs_dir(tmp_path) == list(V2_DOCS_VERB_ORDER)

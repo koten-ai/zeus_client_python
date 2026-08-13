@@ -1,4 +1,5 @@
 """Tests for zeus_client.zeus.verbs — direct V2 runners (no pipeline)."""
+
 from __future__ import annotations
 
 import json
@@ -6,7 +7,6 @@ import json
 import httpx
 import pytest
 import respx
-
 from zeus_client.constants import V2_DOCS_VERB_ORDER
 from zeus_client.zeus import verbs as v
 
@@ -99,9 +99,7 @@ async def test_run_find_collection_path(http_client):
 async def test_run_get_and_search_verb(http_client):
     get_url = f"{ZEUS_URL}/v2/{BUCKET}/{SCOPE}/{COLL}/get"
     search_url = f"{ZEUS_URL}/v2/{BUCKET}/{SCOPE}/{COLL}/search"
-    respx.post(get_url).mock(
-        return_value=httpx.Response(200, json={"items": [{"id": "n1"}]})
-    )
+    respx.post(get_url).mock(return_value=httpx.Response(200, json={"items": [{"id": "n1"}]}))
     respx.post(search_url).mock(
         return_value=httpx.Response(200, json={"result": {"src_keys": ["biz:1"]}})
     )

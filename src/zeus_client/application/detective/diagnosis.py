@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.detective.extract import (
     collect_req_ids,
@@ -42,7 +43,10 @@ def _pipeline_grade(hops: Sequence[Mapping[str, Any]]) -> str:
     pipes = [h for h in hops if isinstance(h, Mapping) and h.get("name") == "pipeline"]
     if not pipes:
         return "n/a"
-    if any(h.get("ok") is False or (isinstance(h.get("status"), int) and h["status"] >= 400) for h in pipes):
+    if any(
+        h.get("ok") is False or (isinstance(h.get("status"), int) and h["status"] >= 400)
+        for h in pipes
+    ):
         return "fail"
     return "pass"
 
@@ -90,7 +94,9 @@ def build_diagnosis(
     )
 
     if playbooks:
-        headline = str(playbooks[0].get("summary") or playbooks[0].get("title") or "Issues detected")
+        headline = str(
+            playbooks[0].get("summary") or playbooks[0].get("title") or "Issues detected"
+        )
     elif prompt_grade == "pass" and error_grade == "pass":
         headline = "Turn looks healthy"
     else:

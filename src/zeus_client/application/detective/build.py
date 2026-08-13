@@ -7,7 +7,8 @@ Never raise into a successful domain turn — callers soft-fail.
 from __future__ import annotations
 
 import os
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.detective.diagnosis import build_diagnosis
 from zeus_client.application.detective.hub_hydrate import merge_hub_hydrate
@@ -71,9 +72,7 @@ def build_detective_briefing(
     layer_a = layer_a if layer_a is not None else pt.get("layer_a")  # type: ignore[assignment]
     turn_id = turn_id or str(pt.get("turn_id") or "")
     ai_process_result = (
-        ai_process_result
-        if ai_process_result is not None
-        else pt.get("ai_process_result")
+        ai_process_result if ai_process_result is not None else pt.get("ai_process_result")
     )
     ai_process_result_exit = (
         ai_process_result_exit

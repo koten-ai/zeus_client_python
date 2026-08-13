@@ -244,10 +244,7 @@ def _rstrip_system_prompt_surfaces(doc: dict) -> tuple[dict, bool]:
     if isinstance(instr, dict):
         sp = instr.get("system_prompt")
         if isinstance(sp, str) and sp:
-            if (
-                SCOPE_BRIEF_MARKER.strip() not in sp
-                and MINI_SCHEMA_MARKER.strip() not in sp
-            ):
+            if SCOPE_BRIEF_MARKER.strip() not in sp and MINI_SCHEMA_MARKER.strip() not in sp:
                 stripped = sp.rstrip(_TRAILING_WS)
                 if stripped != sp:
                     instr["system_prompt"] = stripped

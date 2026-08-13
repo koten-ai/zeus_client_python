@@ -3,9 +3,11 @@
 See zeus_client.trace.tokens for field law. Keep numeric behaviour identical
 so dual-tree oracles share the same vectors.
 """
+
 from __future__ import annotations
 
-from typing import Any, Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import Any
 
 __all__ = [
     "normalize_usage",
@@ -71,9 +73,7 @@ def sum_provider_tokens(
     ai_responses: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     llmish = [
-        s
-        for s in (steps or ())
-        if isinstance(s, Mapping) and s.get("type") in _LLM_STEP_TYPES
+        s for s in (steps or ()) if isinstance(s, Mapping) and s.get("type") in _LLM_STEP_TYPES
     ]
     responses = [r for r in (ai_responses or ()) if isinstance(r, Mapping)]
 
@@ -119,9 +119,7 @@ def sum_provider_tokens(
 
 def attach_trace_tokens(trace: MutableMapping[str, Any]) -> dict[str, Any]:
     steps = trace.get("steps") if isinstance(trace.get("steps"), list) else []
-    ai_responses = (
-        trace.get("ai_responses") if isinstance(trace.get("ai_responses"), list) else []
-    )
+    ai_responses = trace.get("ai_responses") if isinstance(trace.get("ai_responses"), list) else []
     tokens = sum_provider_tokens(steps=steps, ai_responses=ai_responses)
     trace["tokens"] = tokens
     return tokens

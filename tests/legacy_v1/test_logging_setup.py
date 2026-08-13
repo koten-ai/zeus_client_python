@@ -1,4 +1,5 @@
 """Logging configuration import smoke test."""
+
 import importlib
 import logging
 

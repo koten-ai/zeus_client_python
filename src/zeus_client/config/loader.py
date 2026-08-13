@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from zeus_client.config.models import (
-    AuthMode,
     ClientSettings,
     DataTarget,
     DebugPolicy,
@@ -56,6 +56,7 @@ def _dig(mapping: Mapping[str, Any], *keys: str, default: Any = None) -> Any:
 
 def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) -> RuntimeConfig:
     """Build RuntimeConfig from a plain mapping (file JSON shape)."""
+
     def _map(key: str) -> dict[str, Any]:
         raw = data.get(key)
         return dict(raw) if isinstance(raw, Mapping) else {}
@@ -126,9 +127,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             durable_sessions=_as_bool(settings.get("durable_sessions"), True),
             sticky_flags=_as_str_bool_map(settings.get("sticky_flags")),
             messages=_as_str_str_map(settings.get("messages")),
-            soft_require_policy_action=_as_bool(
-                settings.get("soft_require_policy_action"), True
-            ),
+            soft_require_policy_action=_as_bool(settings.get("soft_require_policy_action"), True),
             allow_array_triggers=_as_bool(settings.get("allow_array_triggers"), True),
             app_output_on_error=str(settings.get("app_output_on_error") or "strip"),
             output_request=(
@@ -177,9 +176,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             password_env=env.get("ZEUS_CLIENT_PASSWORD_ENV", z.password_env),
             token_env=env.get("ZEUS_CLIENT_TOKEN_ENV", z.token_env),
             timeout_s=float(env.get("ZEUS_CLIENT_TIMEOUT_S", z.timeout_s)),
-            tls_verify=_as_bool(
-                env.get("ZEUS_CLIENT_TLS_VERIFY"), z.tls_verify
-            ),
+            tls_verify=_as_bool(env.get("ZEUS_CLIENT_TLS_VERIFY"), z.tls_verify),
         )
     else:
         # partial field overrides
@@ -190,9 +187,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             password_env=env.get("ZEUS_CLIENT_PASSWORD_ENV", z.password_env),
             token_env=env.get("ZEUS_CLIENT_TOKEN_ENV", z.token_env),
             timeout_s=float(env.get("ZEUS_CLIENT_TIMEOUT_S", z.timeout_s)),
-            tls_verify=_as_bool(
-                env.get("ZEUS_CLIENT_TLS_VERIFY"), z.tls_verify
-            ),
+            tls_verify=_as_bool(env.get("ZEUS_CLIENT_TLS_VERIFY"), z.tls_verify),
         )
         if z.auth_mode not in ("none", "basic", "bearer", "session"):
             raise ConfigError(
@@ -201,7 +196,11 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
                 public_message=f"zeus.auth_mode invalid: {z.auth_mode!r}",
             )
 
-    if env.get("ZEUS_CLIENT_BUCKET") or env.get("ZEUS_CLIENT_SCOPE") or env.get("ZEUS_CLIENT_COLLECTION"):
+    if (
+        env.get("ZEUS_CLIENT_BUCKET")
+        or env.get("ZEUS_CLIENT_SCOPE")
+        or env.get("ZEUS_CLIENT_COLLECTION")
+    ):
         target = DataTarget(
             bucket=env.get("ZEUS_CLIENT_BUCKET", target.bucket),
             scope=env.get("ZEUS_CLIENT_SCOPE", target.scope),
@@ -226,9 +225,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
         settings = ClientSettings(
             ai_process_result=_as_bool(env.get("ZEUS_CLIENT_AI_PROCESS_RESULT"), True),
             max_rounds=int(env.get("ZEUS_CLIENT_MAX_ROUNDS", settings.max_rounds)),
-            force_trace=_as_bool(
-                env.get("ZEUS_CLIENT_FORCE_TRACE"), settings.force_trace
-            ),
+            force_trace=_as_bool(env.get("ZEUS_CLIENT_FORCE_TRACE"), settings.force_trace),
             mode=env.get("ZEUS_CLIENT_MODE", settings.mode),
             durable_sessions=_as_bool(
                 env.get("ZEUS_CLIENT_DURABLE_SESSIONS"), settings.durable_sessions
@@ -252,9 +249,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
         settings = ClientSettings(
             ai_process_result=settings.ai_process_result,
             max_rounds=int(env.get("ZEUS_CLIENT_MAX_ROUNDS", settings.max_rounds)),
-            force_trace=_as_bool(
-                env.get("ZEUS_CLIENT_FORCE_TRACE"), settings.force_trace
-            ),
+            force_trace=_as_bool(env.get("ZEUS_CLIENT_FORCE_TRACE"), settings.force_trace),
             mode=env.get("ZEUS_CLIENT_MODE", settings.mode),
             durable_sessions=_as_bool(
                 env.get("ZEUS_CLIENT_DURABLE_SESSIONS"), settings.durable_sessions

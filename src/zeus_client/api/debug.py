@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.debug_export import (
     SpanTree,
@@ -40,11 +41,9 @@ class DebugAPI:
         journal = self._rt.journal
         if redact:
             redactor = getattr(self._rt.services, "redactor", None)
-            return export_journal_redacted(
-                journal, turn_id=turn_id, redactor=redactor
-            )
-        from zeus_client.domain.journal.export import export_journal
+            return export_journal_redacted(journal, turn_id=turn_id, redactor=redactor)
         from zeus_client.application.debug_export import filter_export_by_turn
+        from zeus_client.domain.journal.export import export_journal
 
         return filter_export_by_turn(export_journal(journal), turn_id)
 

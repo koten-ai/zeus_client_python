@@ -287,8 +287,10 @@ class OpenAICompatibleLlmClient:
         url = f"{base}/chat/completions"
         client = await self._ensure_client()
 
-        budget = self.budget if self.budget is not None else RetryBudget(
-            max_attempts=self.retry.max_attempts
+        budget = (
+            self.budget
+            if self.budget is not None
+            else RetryBudget(max_attempts=self.retry.max_attempts)
         )
         attempt = 0
         while True:
@@ -331,9 +333,7 @@ class OpenAICompatibleLlmClient:
 
             assert response is not None
             latency_ms = int((time.perf_counter() - t0) * 1000)
-            is_json = (response.headers.get("content-type") or "").startswith(
-                "application/json"
-            )
+            is_json = (response.headers.get("content-type") or "").startswith("application/json")
             body: Any
             if is_json:
                 try:

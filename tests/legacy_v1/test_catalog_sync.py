@@ -1,11 +1,10 @@
 """Tests for chat_request sync from Zeus into the user config directory."""
+
 import json
 
 import httpx
 import pytest
 import respx
-
-import zeus_client.zeus.catalog as catalog
 from zeus_client.zeus.catalog import chat_request_path, load_chat_request
 from zeus_client.zeus.sync import (
     resolve_sync_modes,
@@ -70,7 +69,9 @@ def test_chat_request_path_prefers_synced_scope_dir(patch_paths, monkeypatch):
 @pytest.mark.asyncio
 @respx.mock
 async def test_sync_chat_requests_writes_scope_files(
-    patch_paths, http_client, sample_config_with_contracts,
+    patch_paths,
+    http_client,
+    sample_config_with_contracts,
 ):
     live_analytics = {
         "messages": [{"role": "system", "content": f"rules\n{BRIEF}"}],
@@ -107,7 +108,9 @@ async def test_sync_chat_requests_writes_scope_files(
 @pytest.mark.asyncio
 @respx.mock
 async def test_sync_chat_requests_skips_unchanged(
-    patch_paths, http_client, sample_config_with_contracts,
+    patch_paths,
+    http_client,
+    sample_config_with_contracts,
 ):
     doc = {"messages": [{"role": "system", "content": f"rules\n{BRIEF}"}]}
     respx.get(f"{ZEUS_URL}/v1/ai/chat_request.json").mock(
@@ -131,7 +134,9 @@ async def test_sync_chat_requests_skips_unchanged(
 @pytest.mark.asyncio
 @respx.mock
 async def test_load_chat_request_uses_synced_without_live_fetch(
-    patch_paths, http_client, sample_config_with_contracts,
+    patch_paths,
+    http_client,
+    sample_config_with_contracts,
 ):
     user_dir = patch_paths["user_chat_req_dir"]
     scope_dir = user_dir / "beer-sample__default"
@@ -141,14 +146,20 @@ async def test_load_chat_request_uses_synced_without_live_fetch(
         "verbs": [{"name": "find"}],
     }
     (scope_dir / "chat_request_analytics_v2.json").write_text(
-        json.dumps(synced), encoding="utf-8",
+        json.dumps(synced),
+        encoding="utf-8",
     )
 
     route = respx.get(f"{ZEUS_URL}/v1/ai/chat_request.json")
     route.mock(return_value=httpx.Response(500, text="should not be called"))
 
     cat, src = await load_chat_request(
-        ZEUS_URL, "v2", "analytics", BUCKET, SCOPE, {},
+        ZEUS_URL,
+        "v2",
+        "analytics",
+        BUCKET,
+        SCOPE,
+        {},
     )
     assert "## SCOPE BRIEF" in cat["messages"][0]["content"]
     assert "synced" in src
@@ -158,7 +169,9 @@ async def test_load_chat_request_uses_synced_without_live_fetch(
 @pytest.mark.asyncio
 @respx.mock
 async def test_sync_chat_requests_collects_errors(
-    patch_paths, http_client, sample_config_with_contracts,
+    patch_paths,
+    http_client,
+    sample_config_with_contracts,
 ):
     respx.get(f"{ZEUS_URL}/v1/ai/chat_request.json").mock(
         return_value=httpx.Response(500, text="fail"),
@@ -175,7 +188,9 @@ async def test_sync_chat_requests_collects_errors(
 @pytest.mark.asyncio
 @respx.mock
 async def test_sync_preserves_stamped_local_over_legacy_tools_remote(
-    patch_paths, http_client, sample_config_with_contracts,
+    patch_paths,
+    http_client,
+    sample_config_with_contracts,
 ):
     """Do not clobber a Verify-stamped V2 catalog with an unstamped tools-only pull."""
     user_dir = patch_paths["user_chat_req_dir"]
@@ -215,7 +230,9 @@ async def test_sync_preserves_stamped_local_over_legacy_tools_remote(
 @pytest.mark.asyncio
 @respx.mock
 async def test_sync_preserves_consistent_local_over_inconsistent_remote_stamp(
-    patch_paths, http_client, sample_config_with_contracts,
+    patch_paths,
+    http_client,
+    sample_config_with_contracts,
 ):
     """Keep a Verify-consistent local file when remote still has a stale prototype stamp."""
     from zeus_client.contract_hash import compute_contract_hash, extract_stamped_hash

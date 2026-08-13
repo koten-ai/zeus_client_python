@@ -29,8 +29,7 @@ def validate_production_security(cfg: RuntimeConfig) -> None:
             code=ErrorCode.CONFIG_INVALID,
             component="config.profiles",
             public_message=(
-                "production profile rejects zeus.auth_mode=none; "
-                "use basic, bearer, or session"
+                "production profile rejects zeus.auth_mode=none; use basic, bearer, or session"
             ),
         )
     if cfg.zeus.tls_verify is False:
@@ -38,8 +37,7 @@ def validate_production_security(cfg: RuntimeConfig) -> None:
             code=ErrorCode.CONFIG_INVALID,
             component="config.profiles",
             public_message=(
-                "production profile rejects zeus.tls_verify=false; "
-                "TLS verification is required"
+                "production profile rejects zeus.tls_verify=false; TLS verification is required"
             ),
         )
 

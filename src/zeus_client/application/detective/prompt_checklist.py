@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.detective.extract import (
     catalog_flags_of,
@@ -75,9 +76,7 @@ def build_prompt_checklist(
             status=scope_st,
             group="inject",
             detail="marker ## SCOPE BRIEF" if flags["has_scope_brief"] else "marker missing",
-            fix_hint=None
-            if flags["has_scope_brief"]
-            else "merge_scope_brief / borrow live brief",
+            fix_hint=None if flags["has_scope_brief"] else "merge_scope_brief / borrow live brief",
         )
     )
     mini_st = "pass" if flags["has_mini_schema"] else "fail"
@@ -88,9 +87,7 @@ def build_prompt_checklist(
             status=mini_st,
             group="inject",
             detail="marker ## MINI-SCHEMA" if flags["has_mini_schema"] else "marker missing",
-            fix_hint=None
-            if flags["has_mini_schema"]
-            else "ensure mini-schema in catalog brief",
+            fix_hint=None if flags["has_mini_schema"] else "ensure mini-schema in catalog brief",
         )
     )
 

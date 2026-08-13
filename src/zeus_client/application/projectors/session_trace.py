@@ -15,8 +15,9 @@ Projectors soft-fail — never raise out of a successful domain turn.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, MutableMapping, Optional, Sequence, Union
+from typing import Any, Union
 
 from zeus_client.adapters.zeus_http.session import HttpxSessionClient
 from zeus_client.domain.session import SessionHandle
@@ -153,7 +154,7 @@ def normalize_hops(raw_hops: Sequence[HopLike] | None) -> list[dict[str, Any]]:
     return out
 
 
-def _result_size_of(hop: Mapping[str, Any]) -> Optional[int]:
+def _result_size_of(hop: Mapping[str, Any]) -> int | None:
     if hop.get("result_size") is not None:
         try:
             return int(hop["result_size"])
@@ -212,7 +213,7 @@ def _hop_score(hop: Mapping[str, Any]) -> tuple:
     )
 
 
-def select_primary_hop(hops: Sequence[Mapping[str, Any]]) -> Optional[dict[str, Any]]:
+def select_primary_hop(hops: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
     """Pick the best hop for TraceDoc.req_id / Detective deep-link."""
     ranked = [h for h in hops if h.get("req_id")]
     if not ranked:
@@ -221,7 +222,7 @@ def select_primary_hop(hops: Sequence[Mapping[str, Any]]) -> Optional[dict[str, 
     return dict(ranked[0])
 
 
-def select_primary_req_id(hops: Sequence[HopLike] | None) -> Optional[str]:
+def select_primary_req_id(hops: Sequence[HopLike] | None) -> str | None:
     norm = normalize_hops(hops)
     primary = select_primary_hop(norm)
     return str(primary["req_id"]) if primary else None
@@ -417,7 +418,7 @@ def merge_hop_into_trace_session(
     trace: MutableMapping[str, Any],
     *,
     req_ids: Sequence[str],
-    primary_req_id: Optional[str],
+    primary_req_id: str | None,
 ) -> None:
     """Stamp multi-hop ids onto trace['session'] for client Detective consumers."""
     sess = trace.setdefault("session", {})

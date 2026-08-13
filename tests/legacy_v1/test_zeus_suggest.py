@@ -1,4 +1,5 @@
 """Unit tests for zeus_client.zeus.suggest (no live Zeus/CB)."""
+
 from __future__ import annotations
 
 import json
@@ -6,7 +7,6 @@ import json
 import httpx
 import pytest
 import respx
-
 from zeus_client.zeus import suggest as sug
 
 
@@ -47,9 +47,9 @@ def test_rows_from_project_or_pipeline_shapes():
     assert sug.rows_from_project_or_pipeline({"result": {"rows": [{"name": "B"}]}}) == [
         {"name": "B"}
     ]
-    assert sug.rows_from_project_or_pipeline(
-        {"data": {"rows": {"rows": [{"name": "C"}]}}}
-    ) == [{"name": "C"}]
+    assert sug.rows_from_project_or_pipeline({"data": {"rows": {"rows": [{"name": "C"}]}}}) == [
+        {"name": "C"}
+    ]
 
 
 def test_guess_city():

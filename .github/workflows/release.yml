@@ -1,0 +1,121 @@
+# Tag-driven release for kotenai-zeus-client.
+# Usage (human only — aligns with ZCP-43 / T9):
+#   1. Bump version clocks + CHANGELOG on a PR; merge to main
+#   2. git tag vX.Y.Z && git push origin vX.Y.Z
+#   3. This workflow builds, checks, attaches artifacts; optional PyPI later
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, e.g. v2.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  # id-token: write  # uncomment when enabling PyPI Trusted Publishing
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  COV_FAIL_UNDER: "75"
+
+jobs:
+  release:
+    name: test · build · release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Optional environment protection for future PyPI publish.
+    # environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+
+      - name: Resolve tag version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          case "$TAG" in
+            v*) VER="${TAG#v}" ;;
+            *) echo "tag must start with v"; exit 1 ;;
+          esac
+          PY_VER=$(python -c "import pathlib,re; t=pathlib.Path('pyproject.toml').read_text(); print(re.search(r'^version\s*=\s*\"([^\"]+)\"', t, re.M).group(1))")
+          IMP_VER=$(python -c "from pathlib import Path; ns={}; exec(Path('src/zeus_client/_version.py').read_text(), ns); print(ns['__version__'])")
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$TAG pyproject=$PY_VER _version=$IMP_VER"
+          test "$VER" = "$PY_VER"
+          test "$VER" = "$IMP_VER"
+
+      - name: Full offline suite
+        run: |
+          pytest -q -m "not integration" \
+            --cov=zeus_client \
+            --cov-fail-under=${COV_FAIL_UNDER}
+
+      - name: Build + twine check
+        run: |
+          rm -rf dist build
+          python -m build
+          twine check dist/*
+
+      - name: Extract CHANGELOG section
+        id: notes
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          ver = os.environ["VER"]
+          text = pathlib.Path("CHANGELOG.md").read_text()
+          pat = rf"(?ms)^## {re.escape(ver)}\b.*?(?=^## |\Z)"
+          m = re.search(pat, text)
+          body = m.group(0).strip() if m else f"Release {ver}"
+          pathlib.Path("release_notes_snippet.md").write_text(body + "\n")
+          print(body[:500])
+          PY
+
+      - name: GitHub Release + artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body_path: release_notes_snippet.md
+          files: dist/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- Optional PyPI (enable when Trusted Publisher configured) ---
+      # - name: Publish to PyPI
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     packages-dir: dist/

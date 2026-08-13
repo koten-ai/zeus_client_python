@@ -578,6 +578,24 @@ python -m build
 twine upload dist/*
 ```
 
+## Development quality gates
+
+```bash
+pip install -e ".[dev]"
+make ci          # ruff + mypy + pytest/cov + build/twine
+```
+
+GitHub Actions (`.github/workflows/`):
+
+| Workflow | Trigger | Role |
+| --- | --- | --- |
+| `ci.yml` | PR / push `main` | Required offline gate |
+| `release.yml` | tag `v*` | Build, GitHub Release, optional PyPI |
+| `integration.yml` | manual | Lab-only (non-blocking stub) |
+
+Release (human): bump version clocks + CHANGELOG → merge → `git tag vX.Y.Z && git push origin vX.Y.Z`.  
+Do not self-award MATRIX / claim `supported` from CI green alone. `pip-audit` is non-blocking until ZCP-44.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

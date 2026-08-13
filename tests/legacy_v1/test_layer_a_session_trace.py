@@ -1,5 +1,6 @@
 """Layer A harvest for session_trace / Detective join."""
-from zeus_client.agent.response import layer_a_for_session_trace, _parse_return_payload
+
+from zeus_client.agent.response import _parse_return_payload, layer_a_for_session_trace
 
 
 def test_parse_return_result_step():

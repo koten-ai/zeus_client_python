@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 __all__ = ["build_support_pack"]
 
@@ -19,7 +20,7 @@ def build_support_pack(
     status: str = "",
 ) -> dict[str, Any]:
     lines = [
-        f"# Detective support pack",
+        "# Detective support pack",
         "",
         f"**Headline:** {headline}",
         f"**Turn:** `{turn_id or '-'}`",
@@ -37,9 +38,7 @@ def build_support_pack(
         for p in pbs:
             if not isinstance(p, Mapping):
                 continue
-            lines.append(
-                f"- **{p.get('id')}** ({p.get('severity')}): {p.get('summary')}"
-            )
+            lines.append(f"- **{p.get('id')}** ({p.get('severity')}): {p.get('summary')}")
     if notes:
         lines.extend(["", "## Notes (truncated)"])
         for n in list(notes)[:12]:

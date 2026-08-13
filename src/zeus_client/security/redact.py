@@ -6,7 +6,8 @@ Policy aligned with docs/V2/SECURITY.md §8.2 and family API_LOGGING REDACT rule
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 __all__ = [
     "REDACTED",
@@ -41,9 +42,7 @@ SENSITIVE_KEY_RE = re.compile(
 )
 
 # Bearer / Basic / raw key-ish tokens in free text.
-_BEARER_RE = re.compile(
-    r"(?i)\b(authorization\s*:\s*)?(bearer|basic)\s+\S+"
-)
+_BEARER_RE = re.compile(r"(?i)\b(authorization\s*:\s*)?(bearer|basic)\s+\S+")
 _SK_RE = re.compile(r"(?i)\b(sk-[a-z0-9\-_]{8,}|xai-[a-z0-9\-_]{8,})\b")
 
 

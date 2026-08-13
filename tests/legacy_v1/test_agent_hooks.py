@@ -1,6 +1,6 @@
 """Tests for agent hook surface — migrated from tools/test_hooks_fire.py."""
-import pytest
 
+import pytest
 import zeus_client.agent.tool_round as tr
 from zeus_client.agent.hooks import AgentDecision, AgentHooks
 
@@ -15,9 +15,11 @@ class RecordingHooks(AgentHooks):
 
     async def on_round_start(self, round_num, ctx):
         self.calls.append("on_round_start")
-        return AgentDecision(inject_messages=[
-            {"role": "system", "content": "User profile: loyalty_tier=Gold."},
-        ])
+        return AgentDecision(
+            inject_messages=[
+                {"role": "system", "content": "User profile: loyalty_tier=Gold."},
+            ]
+        )
 
     async def on_ai_response(self, response, ctx):
         self.calls.append("on_ai_response")
@@ -39,29 +41,40 @@ class RecordingHooks(AgentHooks):
 
 async def _fake_llm(base_url, api_key, payload, extra_headers=None):
     return 200, {
-        "choices": [{
-            "finish_reason": "tool_calls",
-            "message": {
-                "role": "assistant",
-                "tool_calls": [{
-                    "id": "call-1", "type": "function",
-                    "function": {"name": "find", "arguments": '{"entity_type":"Beer"}'},
-                }],
-            },
-        }],
+        "choices": [
+            {
+                "finish_reason": "tool_calls",
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {"name": "find", "arguments": '{"entity_type":"Beer"}'},
+                        }
+                    ],
+                },
+            }
+        ],
         "usage": {"total_tokens": 5},
     }
 
 
-async def _fake_dispatch(api_version, zeus_url, bucket, scope, collection, name, args,
-                       zeus_headers, corr_headers=None):
+async def _fake_dispatch(
+    api_version, zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None
+):
     return 200, '{"rows": "RAW data"}', "http://zeus/find", "req-1"
 
 
 def _make_trace():
     return {
-        "steps": [], "spans": [], "ai_requests": [], "ai_responses": [],
-        "tool_calls": [], "notes": [], "session": {"contract_status": "match"},
+        "steps": [],
+        "spans": [],
+        "ai_requests": [],
+        "ai_responses": [],
+        "tool_calls": [],
+        "notes": [],
+        "session": {"contract_status": "match"},
     }
 
 
@@ -82,17 +95,42 @@ async def test_hooks_fire_through_tool_round(patched_tool_round):
     ]
 
     answer, should_break, msg = await tr.run_llm_round(
-        1, "grok-test", messages, [], None, None,
-        "http://llm", "key", hooks, ctx, trace, lambda: 0,
+        1,
+        "grok-test",
+        messages,
+        [],
+        None,
+        None,
+        "http://llm",
+        "key",
+        hooks,
+        ctx,
+        trace,
+        lambda: 0,
     )
     assert not should_break and msg is not None
     assert any("loyalty_tier=Gold" in (m.get("content") or "") for m in messages)
     messages.append(msg)
 
     answer, should_break, _, outcome = await tr.execute_tool_calls(
-        1, msg.get("tool_calls") or [], messages,
-        "v2", "http://zeus", "beer-sample", "_default", None,
-        {}, {}, hooks, ctx, trace, lambda: 0, "turn-1", "conv-1", False, [],
+        1,
+        msg.get("tool_calls") or [],
+        messages,
+        "v2",
+        "http://zeus",
+        "beer-sample",
+        "_default",
+        None,
+        {},
+        {},
+        hooks,
+        ctx,
+        trace,
+        lambda: 0,
+        "turn-1",
+        "conv-1",
+        False,
+        [],
     )
     assert outcome.tools_executed == 1
 
@@ -104,8 +142,13 @@ async def test_hooks_fire_through_tool_round(patched_tool_round):
     for ev in ("round_start", "ai_response", "tool_call_planned", "zeus_result"):
         assert ev in hooks.events, f"missing observe event {ev!r}"
 
-    for cb in ("on_round_start", "on_ai_response", "before_zeus_dispatch",
-               "after_zeus_dispatch", "should_continue"):
+    for cb in (
+        "on_round_start",
+        "on_ai_response",
+        "before_zeus_dispatch",
+        "after_zeus_dispatch",
+        "should_continue",
+    ):
         assert cb in hooks.calls, f"missing hook call {cb!r}"
 
 
