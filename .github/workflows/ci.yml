@@ -78,19 +78,24 @@ jobs:
         with:
           path: zeus_client_python
 
-      # Private sibling — suite fixtures / manifest. Token must read koten-ai/zeus_client_design.
+      # Private sibling suite (optional until KOTEN_CI_PAT is set on this repo).
+      # Prefer secrets.KOTEN_CI_PAT (same as Zeus); fall back to github.token.
+      # Missing/unauthorized design → conformance tests pytest.skip (not fail).
       - name: Checkout zeus_client_design (conformance)
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: koten-ai/zeus_client_design
           path: zeus_client_design
-          token: ${{ secrets.KOTEN_CI_PAT }}
+          token: ${{ secrets.KOTEN_CI_PAT || github.token }}
 
-      - name: Verify design suite path
+      - name: Note design suite availability
         run: |
-          set -euo pipefail
-          test -f ../zeus_client_design/conformance/manifest.json
-          ls -la ../zeus_client_design/conformance | head
+          if [ -f ../zeus_client_design/conformance/manifest.json ]; then
+            echo "design suite present — conformance will run"
+          else
+            echo "::warning::zeus_client_design not available; conformance tests will skip. Add secrets.KOTEN_CI_PAT with read access to koten-ai/zeus_client_design."
+          fi
 
       - uses: actions/setup-python@v5
         with:

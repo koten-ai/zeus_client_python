@@ -11,11 +11,21 @@ from tests.conformance.paths import load_pins, resolve_design_root
 from tests.conformance.run_suite import run_suite
 
 
+def _require_design_root():
+    """Conformance fixtures live in sibling zeus_client_design (pins local:../)."""
+    try:
+        design = resolve_design_root(load_pins())
+    except FileNotFoundError as e:
+        pytest.skip(str(e))
+    if not (design / "conformance" / "manifest.json").is_file():
+        pytest.skip(f"conformance manifest missing under {design}")
+    return design
+
+
 @pytest.mark.asyncio
 async def test_conformance_suite_candidate_offline():
     """Required L0–L2 + detective min tapes green offline against design suite."""
-    pins = load_pins()
-    design = resolve_design_root(pins)
+    design = _require_design_root()
     assert (design / "conformance" / "manifest.json").is_file()
 
     report = await run_suite(
@@ -58,6 +68,7 @@ def test_run_suite_cli_exit_zero():
     import subprocess
     import sys
 
+    _require_design_root()
     root = Path(__file__).resolve().parents[2]
     r = subprocess.run(
         [sys.executable, str(root / "tests" / "conformance" / "run_suite.py")],
