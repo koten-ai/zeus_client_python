@@ -102,6 +102,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             password_env=z.get("password_env") or z.get("password_env_name"),
             token_env=z.get("token_env") or z.get("token_env_name"),
             timeout_s=float(z.get("timeout_s", 30.0)),
+            tls_verify=_as_bool(z.get("tls_verify", z.get("verify_tls", True)), default=True),
         ),
         target=DataTarget(
             bucket=str(t.get("bucket", "yelp-data")),
@@ -176,6 +177,9 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             password_env=env.get("ZEUS_CLIENT_PASSWORD_ENV", z.password_env),
             token_env=env.get("ZEUS_CLIENT_TOKEN_ENV", z.token_env),
             timeout_s=float(env.get("ZEUS_CLIENT_TIMEOUT_S", z.timeout_s)),
+            tls_verify=_as_bool(
+                env.get("ZEUS_CLIENT_TLS_VERIFY"), z.tls_verify
+            ),
         )
     else:
         # partial field overrides
@@ -186,6 +190,9 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             password_env=env.get("ZEUS_CLIENT_PASSWORD_ENV", z.password_env),
             token_env=env.get("ZEUS_CLIENT_TOKEN_ENV", z.token_env),
             timeout_s=float(env.get("ZEUS_CLIENT_TIMEOUT_S", z.timeout_s)),
+            tls_verify=_as_bool(
+                env.get("ZEUS_CLIENT_TLS_VERIFY"), z.tls_verify
+            ),
         )
         if z.auth_mode not in ("none", "basic", "bearer", "session"):
             raise ConfigError(

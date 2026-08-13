@@ -13,7 +13,7 @@ from zeus_client_v2.config import (
     load_runtime_config,
     list_profiles,
 )
-from zeus_client_v2.config.models import RuntimeConfig
+from zeus_client_v2.config.models import RuntimeConfig, ZeusEndpointConfig
 from zeus_client_v2.domain.errors import ConfigError, ErrorCode
 
 
@@ -44,7 +44,19 @@ def test_load_from_tmp_json(tmp_path: Path) -> None:
 
 def test_env_overrides_url_and_bucket(tmp_path: Path) -> None:
     p = tmp_path / "cfg.json"
-    p.write_text(json.dumps({"zeus": {"url": "http://file:1"}}), encoding="utf-8")
+    p.write_text(
+        json.dumps(
+            {
+                "zeus": {
+                    "url": "http://file:1",
+                    "auth_mode": "basic",
+                    "username": "admin",
+                    "password_env": "ZEUS_PASSWORD",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     cfg = load_runtime_config(
         p,
         profile="production",
@@ -64,7 +76,11 @@ def test_env_overrides_url_and_bucket(tmp_path: Path) -> None:
 
 def test_profile_matrix() -> None:
     assert set(list_profiles()) == {"development", "production", "ci"}
-    base = RuntimeConfig()
+    base = RuntimeConfig(
+        zeus=ZeusEndpointConfig(
+            auth_mode="basic", username="u", password_env="ZEUS_PASSWORD"
+        )
+    )
     dev = apply_profile(base, "development")
     prod = apply_profile(base, "production")
     ci = apply_profile(base, "ci")
