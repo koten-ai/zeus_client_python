@@ -142,9 +142,9 @@ Optional OTLP: `zeus_client_v2.adapters.otlp.try_build_otlp_exporter` — no-op 
 | 3 | Production-shaped demo BFF | **Met** — Travel ZD-8, sample ZC-56, yelp ZD-20 |
 | 4 | SECURITY §23 | **Met** — prod rejects auth_mode=none + tls_verify off; pip audit = ZCP-44 |
 | 5 | Versions **2.0.0** | **Met** — `c123f52` |
-| 6 | Design MATRIX `supported` | **Open** — human only (T9) |
+| 6 | Design MATRIX `supported` | **B1 Met** — candidate honesty PR design #13; **B2 `supported` deferred** (human) |
 
-Ship **2.0.0** with claim **candidate** until human MATRIX PR.
+Ship **2.0.0** with claim **candidate** (T9 B1). Family MATRIX `supported` / pins flip = separate B2 train.
 
 ---
 
@@ -164,9 +164,9 @@ Ship **2.0.0** with claim **candidate** until human MATRIX PR.
 | T6 v2 alias | ZCP-40 | **Done** meta-path submodule redirect |
 | T7 docs | ZCP-41 | **Done** `9eb9ff6` |
 | T8 verify | ZCP-42 | package 238 · yelp 78 · sample 245 |
-| T9 tag + MATRIX | ZCP-43 | **Human** — do not self-award · runbook [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) |
+| T9 tag + MATRIX | ZCP-43 | **Done** (B1) — tag `v2.0.0` @ `2728f24` · Release green · design PR #13 · pins stay candidate · Jira Done |
 
-**Claim:** remains `candidate` until human MATRIX (T9).
+**Claim:** remains `candidate` after T9 B1 (no pins flip). Runbook: [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md).
 
 ---
 
