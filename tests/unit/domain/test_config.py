@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.config import (
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.config import (
     apply_profile,
     load_runtime_config,
     list_profiles,
 )
-from zeus_client_v2.config.models import RuntimeConfig, ZeusEndpointConfig
-from zeus_client_v2.domain.errors import ConfigError, ErrorCode
+from zeus_client.config.models import RuntimeConfig, ZeusEndpointConfig
+from zeus_client.domain.errors import ConfigError, ErrorCode
 
 
 def test_ai_process_result_package_default_true() -> None:

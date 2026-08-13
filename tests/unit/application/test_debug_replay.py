@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client_v2.application.debug_export import (
+from zeus_client.application.debug_export import (
     build_span_tree,
     event_type_sequence,
     export_journal_redacted,
     mermaid_timeline,
 )
-from zeus_client_v2.application.replay import (
+from zeus_client.application.replay import (
     ReplayMode,
     assert_event_type_sequence,
     transport_replay,
 )
-from zeus_client_v2.config.models import RuntimeConfig
-from zeus_client_v2.domain.journal import InMemoryJournal, JournalEvent, SpanTracer
-from zeus_client_v2.domain.journal.events import (
+from zeus_client.config.models import RuntimeConfig
+from zeus_client.domain.journal import InMemoryJournal, JournalEvent, SpanTracer
+from zeus_client.domain.journal.events import (
     EVENT_LLM_ROUND,
     EVENT_NOTE,
     EVENT_SPAN_ENDED,
@@ -26,7 +26,7 @@ from zeus_client_v2.domain.journal.events import (
     EVENT_TURN_STARTED,
     EVENT_ZEUS_HOP,
 )
-from zeus_client_v2.runtime import ZeusRuntime
+from zeus_client.runtime import ZeusRuntime
 
 
 def _fill_turn(j: InMemoryJournal, turn_id: str = "turn_a") -> None:

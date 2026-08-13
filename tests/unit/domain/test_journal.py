@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from zeus_client_v2.domain.journal import (
+from zeus_client.domain.journal import (
     JOURNAL_SCHEMA_VERSION,
     InMemoryJournal,
     JournalEvent,
     SpanTracer,
 )
-from zeus_client_v2.domain.journal.events import (
+from zeus_client.domain.journal.events import (
     EVENT_NOTE,
     EVENT_SPAN_ENDED,
     EVENT_SPAN_STARTED,
     EVENT_TURN_COMPLETED,
     EVENT_TURN_STARTED,
 )
-from zeus_client_v2.domain.journal.payload_store import InMemoryPayloadStore
+from zeus_client.domain.journal.payload_store import InMemoryPayloadStore
 
 
 def _evt(event_id: str, ts: int, typ: str = EVENT_NOTE, **kwargs: object) -> JournalEvent:

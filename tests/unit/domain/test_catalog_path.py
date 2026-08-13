@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from zeus_client_v2.domain.catalog import (
+from zeus_client.domain.catalog import (
     chat_request_filename,
     merge_scope_brief,
     resolve_catalog_path,
     scope_chat_requests_subdir,
 )
-from zeus_client_v2.domain.errors import CatalogError, ErrorCode
-from zeus_client_v2.ports import CatalogKey
+from zeus_client.domain.errors import CatalogError, ErrorCode
+from zeus_client.ports import CatalogKey
 
 
 def test_scope_subdir_strips_leading_underscore() -> None:
@@ -134,7 +134,7 @@ def test_merge_scope_brief_rstrips_and_appends() -> None:
 
 
 def test_fs_store_load_raises_catalog_not_found(tmp_path: Path) -> None:
-    from zeus_client_v2.adapters.catalog_fs.store import FsCatalogStore
+    from zeus_client.adapters.catalog_fs.store import FsCatalogStore
 
     store = FsCatalogStore(root=tmp_path / "user", bundled_dir=tmp_path / "bundled")
     (tmp_path / "user").mkdir()
@@ -145,8 +145,8 @@ def test_fs_store_load_raises_catalog_not_found(tmp_path: Path) -> None:
 
 
 def test_fs_store_load_heals_and_returns_document(tmp_path: Path) -> None:
-    from zeus_client_v2.adapters.catalog_fs.store import FsCatalogStore
-    from zeus_client_v2.domain.contract import compute_contract_hash
+    from zeus_client.adapters.catalog_fs.store import FsCatalogStore
+    from zeus_client.domain.contract import compute_contract_hash
 
     user = tmp_path / "user"
     scope = user / "beer-sample__default"

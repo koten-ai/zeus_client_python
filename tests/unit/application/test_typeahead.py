@@ -6,18 +6,18 @@ import httpx
 import pytest
 import respx
 
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.adapters.zeus_http.verbs import HttpxZeusPort
-from zeus_client_v2.application.typeahead import (
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.adapters.zeus_http.verbs import HttpxZeusPort
+from zeus_client.application.typeahead import (
     SuggestHit,
     SuggestOptions,
     merge_hits,
     run_typeahead_search,
     src_keys_from_fts_payload,
 )
-from zeus_client_v2.config.models import DataTarget, RuntimeConfig, ZeusEndpointConfig
-from zeus_client_v2.domain.journal import InMemoryJournal
-from zeus_client_v2.runtime import ZeusRuntime
+from zeus_client.config.models import DataTarget, RuntimeConfig, ZeusEndpointConfig
+from zeus_client.domain.journal import InMemoryJournal
+from zeus_client.runtime import ZeusRuntime
 
 
 def test_merge_hits_dedupes_id_and_name_fts_first() -> None:

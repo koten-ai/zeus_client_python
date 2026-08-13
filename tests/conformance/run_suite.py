@@ -207,7 +207,7 @@ async def run_suite(
         "error": sum(1 for c in cases_out if c["status"] == "error"),
     }
     try:
-        from zeus_client_v2 import __version__ as v2_ver
+        from zeus_client import __version__ as v2_ver
     except Exception:
         v2_ver = "2.0.0a0"
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from zeus_client_v2.security.redact import REDACTED, default_redactor
+from zeus_client.security.redact import REDACTED, default_redactor
 
 
 def test_redact_json_credit_card_and_ssn_keys() -> None:

@@ -8,18 +8,18 @@ import httpx
 import pytest
 import respx
 
-from zeus_client_v2.adapters.llm_openai_compatible import (
+from zeus_client.adapters.llm_openai_compatible import (
     OpenAICompatibleLlmClient,
     build_chat_payload,
     cache_hints,
 )
-from zeus_client_v2.adapters.secrets_env.store import EnvSecretStore
-from zeus_client_v2.config.models import LlmProviderConfig, RetryPolicy
-from zeus_client_v2.domain.errors import ErrorCode, LlmError
-from zeus_client_v2.domain.journal import InMemoryJournal
-from zeus_client_v2.domain.journal.events import EVENT_LLM_ROUND
-from zeus_client_v2.domain.llm_classify import RetryBudget
-from zeus_client_v2.ports import LlmRequest
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.config.models import LlmProviderConfig, RetryPolicy
+from zeus_client.domain.errors import ErrorCode, LlmError
+from zeus_client.domain.journal import InMemoryJournal
+from zeus_client.domain.journal.events import EVENT_LLM_ROUND
+from zeus_client.domain.llm_classify import RetryBudget
+from zeus_client.ports import LlmRequest
 
 
 BASE = "https://api.x.ai/v1"

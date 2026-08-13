@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client_v2.config.models import RuntimeConfig
-from zeus_client_v2.runtime import Services, ZeusRuntime
+from zeus_client.config.models import RuntimeConfig
+from zeus_client.runtime import Services, ZeusRuntime
 
 
 class _FakeHttp:
@@ -21,7 +21,7 @@ class _FakeZeus:
         self.closed = False
 
     async def resolve_auth(self, target, *, force: bool = False):  # noqa: ANN001
-        from zeus_client_v2.ports import AuthContext
+        from zeus_client.ports import AuthContext
 
         return AuthContext(headers={"X-Test": "1"}, mode="none")
 

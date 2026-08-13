@@ -1,30 +1,42 @@
-"""Phase 0 smoke: V2 dual-tree package is importable."""
+"""Post-cutover smoke: default import is Runtime tree; alias deprecates."""
+
+from __future__ import annotations
+
+import warnings
 
 
-def test_v2_version_and_runtime_importable() -> None:
-    import zeus_client_v2 as zc
+def test_default_import_is_runtime_tree() -> None:
+    import zeus_client as zc
 
-    assert zc.__version__.startswith("2.")
-    from zeus_client_v2.runtime import ZeusRuntime
+    assert zc.__version__ == "2.0.0"
+    from zeus_client import ZeusRuntime
 
     assert ZeusRuntime is not None
     assert "ZeusRuntime" in zc.__all__
 
 
-def test_v1_still_importable_as_zeus_client() -> None:
-    """Dual-tree: default import remains 0.3.1 oracle tree."""
-    import zeus_client as zc
-
-    assert hasattr(zc, "__version__") or hasattr(zc, "run_agent")
-    # Package metadata stays 0.3.x until default-import cutover
-    from zeus_client.constants import __version__ as v1
-
-    assert v1.startswith("0.3")
-
-
 def test_compat_v1_importable() -> None:
-    from zeus_client_v2.compat import v1
+    from zeus_client.compat import v1
 
     assert hasattr(v1, "run_agent")
     assert hasattr(v1, "run_search")
     assert hasattr(v1, "run_verb")
+
+
+def test_zeus_client_v2_alias_warns() -> None:
+    # Fresh import path
+    import sys
+
+    for key in list(sys.modules):
+        if key == "zeus_client_v2" or key.startswith("zeus_client_v2."):
+            del sys.modules[key]
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        import zeus_client_v2 as alias
+
+        assert alias.__version__ == "2.0.0"
+        from zeus_client_v2 import ZeusRuntime
+
+        assert ZeusRuntime is not None
+    assert any(issubclass(w.category, DeprecationWarning) for w in caught)

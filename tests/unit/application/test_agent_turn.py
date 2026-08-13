@@ -8,16 +8,16 @@ from typing import Any, Mapping
 
 import pytest
 
-from zeus_client_v2.application.agent_turn import (
+from zeus_client.application.agent_turn import (
     CHEAP_FINAL_STATIC_ANSWER,
     AgentTurnUseCase,
     run_agent_turn,
 )
-from zeus_client_v2.application.middleware import MiddlewareChain, MiddlewareContext, NoopMiddleware
-from zeus_client_v2.config.models import ClientSettings, DataTarget
-from zeus_client_v2.domain.journal import InMemoryJournal
-from zeus_client_v2.domain.messages import TurnRequest, TurnStatus
-from zeus_client_v2.ports import LlmRequest, LlmResponse, VerbHopResult, VerbRequest
+from zeus_client.application.middleware import MiddlewareChain, MiddlewareContext, NoopMiddleware
+from zeus_client.config.models import ClientSettings, DataTarget
+from zeus_client.domain.journal import InMemoryJournal
+from zeus_client.domain.messages import TurnRequest, TurnStatus
+from zeus_client.ports import LlmRequest, LlmResponse, VerbHopResult, VerbRequest
 
 
 @dataclass

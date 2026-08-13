@@ -10,12 +10,12 @@ from copy import deepcopy
 
 import pytest
 
-from zeus_client_v2.application.control_plane_inject import (
+from zeus_client.application.control_plane_inject import (
     InjectSettings,
     apply_control_plane_inject,
     prepare_inject_settings,
 )
-from zeus_client_v2.domain.contract import compute_contract_hash
+from zeus_client.domain.contract import compute_contract_hash
 
 
 def _catalog_with_brief() -> dict:

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client_v2.config.models import RuntimeConfig, ZeusEndpointConfig
-from zeus_client_v2.config.profiles import apply_profile
-from zeus_client_v2.domain.errors import ConfigError, ErrorCode
+from zeus_client.config.models import RuntimeConfig, ZeusEndpointConfig
+from zeus_client.config.profiles import apply_profile
+from zeus_client.domain.errors import ConfigError, ErrorCode
 
 
 def test_production_rejects_auth_mode_none() -> None:

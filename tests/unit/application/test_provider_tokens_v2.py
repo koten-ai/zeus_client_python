@@ -1,7 +1,7 @@
 """V2 dual-tree oracles — identical numbers to tests/test_provider_tokens.py (ZCP-28)."""
 from __future__ import annotations
 
-from zeus_client_v2.application.tokens import (
+from zeus_client.application.tokens import (
     attach_trace_tokens,
     normalize_usage,
     sum_provider_tokens,

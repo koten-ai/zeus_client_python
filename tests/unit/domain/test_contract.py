@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-import zeus_client_v2.domain.contract as ch
-from zeus_client_v2.domain.contract import (
+import zeus_client.domain.contract as ch
+from zeus_client.domain.contract import (
     ContractService,
     SessionHashChoice,
     compute_contract_hash,
