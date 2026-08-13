@@ -1,0 +1,48 @@
+{
+  "profile": "development",
+  "zeus": {
+    "url": "http://127.0.0.1:8080",
+    "auth_mode": "none",
+    "username": null,
+    "password_env": null,
+    "token_env": null,
+    "timeout_s": 30
+  },
+  "target": {
+    "bucket": "yelp-data",
+    "scope": "_default",
+    "collection": "_default"
+  },
+  "llm": {
+    "provider": "xai",
+    "base_url": "https://api.x.ai/v1",
+    "model": "grok-4-1-non-reasoning",
+    "api_key_env": "XAI_API_KEY",
+    "context_window_tokens": 128000,
+    "context_soft_limit": 0.8,
+    "timeout_s": 120
+  },
+  "settings": {
+    "ai_process_result": true,
+    "max_rounds": 8,
+    "force_trace": false,
+    "mode": "analytics",
+    "durable_sessions": true
+  },
+  "retry": {
+    "max_attempts": 3,
+    "base_delay_ms": 200,
+    "max_delay_ms": 5000,
+    "jitter": true
+  },
+  "redaction": {
+    "enabled": true,
+    "preview_max_chars": 2048
+  },
+  "debug": {
+    "detective_briefing": true,
+    "capture_bodies": false,
+    "transport_replay": true
+  },
+  "chat_requests_dir": null
+}
