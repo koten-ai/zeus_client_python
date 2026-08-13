@@ -515,20 +515,24 @@ cd /home/michael/koten-ai/zeus_client/.worktrees/v2-client-python && pytest -q
 
 **Objective:** Publish tag; do **not** auto-flip MATRIX.
 
-**Steps:**
+**Full runbook (authoritative checklist):** [`docs/V2/T9_TAG_MATRIX_HANDOFF.md`](../../docs/V2/T9_TAG_MATRIX_HANDOFF.md)
 
-1. Merge `feat/ZCP-ga-cutover-2.0.0` → `feat/V2` / `main` per team branch policy (prefer PR review).  
-2. Tag:
+**Steps (summary):**
+
+1. ~~Merge cutover branch~~ — **Done** (PR #10 → `main`; CI PR #11).  
+2. **Phase A — tag:** on clean `main`, clocks = 2.0.0, pins still `candidate`, then:
 
 ```bash
-git tag -a v2.0.0 -m "kotenai-zeus-client 2.0.0 — journaled hexagonal runtime GA"
-# push tag only after human approve
+git tag -a v2.0.0 -m "kotenai-zeus-client 2.0.0 — journaled hexagonal runtime GA (claim: candidate until MATRIX)"
+git push origin v2.0.0   # triggers .github/workflows/release.yml → GH Release + dist
 ```
 
-3. **Design repo (human):** open PR on `MATRIX.md` / CHECKLIST — `candidate` → `supported` **only** if suite policy and reviewers agree. Agent must not self-award.  
-4. Update pins in a **follow-up** commit only after MATRIX merges: `claim_level=supported`.  
-5. PyPI publish (human/CI secret) — out of band if not automated.  
-6. Close ZCP cutover epic; comment final SHA + pytest + consumer SHAs.
+3. **Phase B — design PR (human):** refresh stale Python MATRIX row (`0.1.x`/`partial` → `2.0.0` + honest suite).  
+   - **B1** stay **candidate** (default if unsure)  
+   - **B2** award **supported** only with suite + reviewer + COMPAT path  
+4. **Phase C — pins:** `claim_level=supported` **only** after B2 MATRIX merges (separate package commit).  
+5. **Phase D — PyPI:** optional; workflow step still commented until Trusted Publishing.  
+6. **Phase E — Jira:** ZCP-43 + epic ZCP-33 Done with tag SHA, Release URL, MATRIX PR.
 
 **Post-GA (explicitly next train — not this plan):**
 
@@ -641,3 +645,59 @@ Plan complete and saved at:
 **Suggested execute order:** T0 → T1/T2/T3 parallel → **T4 yelp** → T5 cutover → T6 alias → T7 docs → T8 verify → T9 human tag/MATRIX.
 
 Ready to execute using **subagent-driven-development** — fresh subagent per task with two-stage review (spec compliance then code quality). Shall I proceed?
+
+---
+
+## 10. T0 re-audit (2026-08-13 — second pass)
+
+> Hermes re-ran T0 after user asked to “start execution (T0 branch + gate audit)”.
+> Finding: **cutover train already landed and merged to `main`**. No new cutover branch needed.
+
+### 10.1 Git / packaging
+
+| Fact | Value |
+| --- | --- |
+| Workspace HEAD | `main` @ `65a38db` (= `origin/main`) |
+| Cutover branch | `feat/ZCP-ga-cutover-2.0.0` @ `802bacf` (merged via PR **#10**) |
+| Follow-on | PR **#11** CI pipeline merged on top |
+| Local `feat/V2` | **stale** @ `03f9fd0` (pre-cutover dual-tree + tokens) — do not base new work here |
+| `import zeus_client` | **2.0.0** + `ZeusRuntime` |
+| `import zeus_client_v2` | **2.0.0** deprecated alias (`DeprecationWarning`) |
+| Layout | `src/zeus_client/` Runtime tree; `src/zeus_client_v2_alias/`; `src_v1_legacy/` archive |
+| `claim_level` | **candidate** (`sdk_bootstrap.pins.json`, `last_reviewed=2026-08-13`) |
+| Git tag `v2.0.0` | **missing** (T9 open) |
+
+### 10.2 Fresh verification (this pass)
+
+| Suite | Result |
+| --- | --- |
+| Package `pytest -q` on `main` | **239 passed** in 0.46s |
+| demo_yelp `feat/ZD-20-v2-bff` @ `844f61b` | **78 passed** (DeprecationWarnings from `zeus_client_v2` import — expected) |
+| sample worktree `v2-client-python` @ `64f686a` | **245 passed** |
+
+### 10.3 Cutover gate (live)
+
+| # | Gate | Status |
+| --- | --- | --- |
+| 1 | Full pytest green | **Met** — 239 |
+| 2 | Conformance offline candidate | **Met** (prior ZCP-21/42; claim stays candidate) |
+| 3 | Production-shaped demo BFF | **Met** — Travel ZD-8, sample ZC-56, yelp ZD-20 |
+| 4 | SECURITY §23 | **Met** — `validate_production_security` rejects `auth_mode=none` + `tls_verify=false`; pip audit = ZCP-44 |
+| 5 | Versions **2.0.0** | **Met** |
+| 6 | Design MATRIX `supported` | **Open** — human only (ZCP-43 / T9) |
+
+### 10.4 Train status (ZCP-33)
+
+| Step | Key | Status |
+| --- | --- | --- |
+| T0–T8 | ZCP-34…42 | **Done** (see MIGRATION.md §GA cutover train) |
+| T9 tag + MATRIX | ZCP-43 | **Remaining — human** |
+
+### 10.5 T0 decision
+
+- **Do not** recreate `feat/ZCP-ga-cutover-2.0.0` or re-run T1–T8 packaging surgery.
+- **Next executable work (if any before human T9):**
+  1. Optional: merge/FF local `feat/V2` → `main` or delete stale local tip to avoid confusion.
+  2. Optional: demo_yelp swap `zeus_client_v2` → `zeus_client` to silence alias warnings (not a cutover blocker).
+  3. **T9 (human):** annotated tag `v2.0.0`, design MATRIX PR, then pins `claim_level=supported` only after MATRIX merges; PyPI publish out of band.
+- Commit for this section: docs-only plan update optional (working tree on `main`).
