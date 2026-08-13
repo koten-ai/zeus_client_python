@@ -36,12 +36,14 @@ class ZeusEndpointConfig:
     password_env: str | None = None  # env var name only — never the secret
     token_env: str | None = None
     timeout_s: float = 30.0
+    tls_verify: bool = True  # production profile rejects False (SECURITY §23)
 
     def __repr__(self) -> str:
         return (
             f"ZeusEndpointConfig(url={self.url!r}, auth_mode={self.auth_mode!r}, "
             f"username={self.username!r}, password_env={self.password_env!r}, "
-            f"token_env={self.token_env!r}, timeout_s={self.timeout_s!r})"
+            f"token_env={self.token_env!r}, timeout_s={self.timeout_s!r}, "
+            f"tls_verify={self.tls_verify!r})"
         )
 
 
@@ -154,6 +156,7 @@ class RuntimeConfig:
                 "password_env": self.zeus.password_env,
                 "token_env": self.zeus.token_env,
                 "timeout_s": self.zeus.timeout_s,
+                "tls_verify": self.zeus.tls_verify,
             },
             "target": {
                 "bucket": self.target.bucket,

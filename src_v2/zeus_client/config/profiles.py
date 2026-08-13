@@ -7,14 +7,41 @@ from zeus_client_v2.config.models import (
     RedactionPolicy,
     RuntimeConfig,
 )
+from zeus_client_v2.domain.errors import ConfigError, ErrorCode
 
-__all__ = ["PROFILES", "apply_profile", "list_profiles"]
+__all__ = ["PROFILES", "apply_profile", "list_profiles", "validate_production_security"]
 
 PROFILES = ("development", "production", "ci")
 
 
 def list_profiles() -> tuple[str, ...]:
     return PROFILES
+
+
+def validate_production_security(cfg: RuntimeConfig) -> None:
+    """Fail closed on insecure production combos (SECURITY §23 / §14).
+
+    Raises:
+        ConfigError: when ``auth_mode=none`` or TLS verify is disabled.
+    """
+    if cfg.zeus.auth_mode == "none":
+        raise ConfigError(
+            code=ErrorCode.CONFIG_INVALID,
+            component="config.profiles",
+            public_message=(
+                "production profile rejects zeus.auth_mode=none; "
+                "use basic, bearer, or session"
+            ),
+        )
+    if cfg.zeus.tls_verify is False:
+        raise ConfigError(
+            code=ErrorCode.CONFIG_INVALID,
+            component="config.profiles",
+            public_message=(
+                "production profile rejects zeus.tls_verify=false; "
+                "TLS verification is required"
+            ),
+        )
 
 
 def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
@@ -31,7 +58,7 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
             ),
         )
     if name in ("prod", "production"):
-        return base.with_overrides(
+        out = base.with_overrides(
             profile="production",
             redaction=RedactionPolicy(enabled=True, preview_max_chars=2_048),
             debug=DebugPolicy(
@@ -40,6 +67,8 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
                 transport_replay=True,
             ),
         )
+        validate_production_security(out)
+        return out
     if name == "ci":
         return base.with_overrides(
             profile="ci",
