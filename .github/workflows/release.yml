@@ -32,18 +32,29 @@ jobs:
     name: test · build · release
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Optional environment protection for future PyPI publish.
-    # environment: pypi
+    defaults:
+      run:
+        working-directory: zeus_client_python
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout package
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          path: zeus_client_python
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Checkout zeus_client_design (conformance)
+        uses: actions/checkout@v4
+        with:
+          repository: koten-ai/zeus_client_design
+          path: zeus_client_design
+          token: ${{ secrets.KOTEN_CI_PAT }}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: zeus_client_python/pyproject.toml
 
       - name: Install
         run: |
@@ -108,8 +119,8 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
-          body_path: release_notes_snippet.md
-          files: dist/*
+          body_path: zeus_client_python/release_notes_snippet.md
+          files: zeus_client_python/dist/*
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -118,4 +129,4 @@ jobs:
       # - name: Publish to PyPI
       #   uses: pypa/gh-action-pypi-publish@release/v1
       #   with:
-      #     packages-dir: dist/
+      #     packages-dir: zeus_client_python/dist/
