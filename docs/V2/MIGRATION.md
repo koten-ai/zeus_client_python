@@ -124,49 +124,49 @@ Optional OTLP: `zeus_client_v2.adapters.otlp.try_build_otlp_exporter` — no-op 
 
 ## demo_yelp / BFF notes
 
-1. Keep monorepo path on **`zeus_client` 0.3.1** until cutover PR.  
-2. Health chrome should keep reading `zeus_client.__version__` (0.3.1) — do **not** point at `zeus_client_v2` for product version until cutover.  
-3. New V2 spike route (optional): import `zeus_client_v2`, build `ZeusRuntime`, wire `HttpxZeusPort` + LLM from existing demo config.  
-4. Typeahead: map `/api/suggest` → `rt.data.search` (not `run_agent`).  
-5. Reviews list: `rt.data.find` + optional N1QL hydrate outside the client when needed.  
-6. Detective: prefer `result.debug.detective` over inventing Hub HTML scrapes.  
-7. After cutover: swap import, run demo `pytest -q`, confirm `GET /api/health` versions.
+1. **demo_yelp** migrated (ZD-20 `844f61b`) — native `rt.*`; health may report alias or default import version **2.0.0**.  
+2. Prefer `import zeus_client` going forward; `zeus_client_v2` still works with DeprecationWarning.  
+3. Typeahead: `/api/suggest` → `rt.data.search`.  
+4. Reviews / detail: `rt.data.find` + app-side N1QL hydrate when needed.  
+5. Detective: prefer `result.debug.detective`.  
+6. After package upgrade: reinstall editable client, `pytest -q`, confirm health `zeus_client_version`.
 
 ---
 
-## Cutover gate (when default import becomes V2)
+## Cutover gate
 
-Do **not** claim GA / flip default until **all** of:
+| # | Gate | Status |
+| --- | --- | --- |
+| 1 | Full `pytest -q` green | **Met** — package **238** (V1 oracles → `tests/legacy_v1`) |
+| 2 | Conformance offline required | **Met** (candidate) |
+| 3 | Production-shaped demo BFF | **Met** — Travel ZD-8, sample ZC-56, yelp ZD-20 |
+| 4 | SECURITY §23 | **Met** — prod rejects auth_mode=none + tls_verify off; pip audit = ZCP-44 |
+| 5 | Versions **2.0.0** | **Met** — `c123f52` |
+| 6 | Design MATRIX `supported` | **Open** — human only (T9) |
 
-1. Full `pytest -q` green (V1 oracle tree can move to `compat` or archive).  
-2. Conformance required offline cases green (honest `candidate` → only then consider `supported` with human MATRIX).  
-3. One production-shaped demo BFF migrated and smoke-tested.  
-4. Security checklist in [SECURITY.md](./SECURITY.md) §23 implemented or ticketed.  
-5. `project.version` / `__version__` aligned to **2.0.0**.  
-6. Design-repo MATRIX row updated in a **separate** design PR (no self-award).
-
-Until then: ship `zeus_client_v2` as **2.0.0bN candidate**.
+Ship **2.0.0** with claim **candidate** until human MATRIX PR.
 
 ---
 
 ## GA cutover train (ZCP-33)
 
 **Plan:** `.hermes/plans/2026-08-13_040155-zeus-client-python-v2-ga-cutover.md`  
-**Epic:** [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33) · stories ZCP-34…43 · yelp blocker [ZD-20](https://kotenai.atlassian.net/browse/ZD-20)
+**Epic:** [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33) · stories ZCP-34…43 · yelp [ZD-20](https://kotenai.atlassian.net/browse/ZD-20)
 
-| Step | Key | Status entering train |
+| Step | Key | Status |
 | --- | --- | --- |
-| T0 gate audit | ZCP-34 | **Done** — branch `feat/ZCP-ga-cutover-2.0.0`, pytest **672→680** |
-| T1 docs hygiene | ZCP-35 | **Done** — MIGRATION GA section + design wishlist `efbc575` |
-| T2 prod security | ZCP-36 | **Done** — `4c73ed9` rejects auth_mode=none + tls_verify=false |
-| T3 alias cleanup | ZCP-37 | **Done** — `546e280` drop `run_fast_suggest*`; freeze `__all__` |
-| T4 demo_yelp BFF | ZCP-38 / ZD-20 | **In progress** — migrate before package-dir flip |
-| T5 default import | ZCP-39 | flip + version **2.0.0** |
-| T6–T9 | ZCP-40…43 | alias, docs, verify, tag + human MATRIX |
+| T0 gate audit | ZCP-34 | **Done** |
+| T1 docs hygiene | ZCP-35 | **Done** |
+| T2 prod security | ZCP-36 | **Done** `4c73ed9` |
+| T3 alias cleanup | ZCP-37 | **Done** `546e280` |
+| T4 demo_yelp BFF | ZCP-38 / ZD-20 | **Done** yelp `844f61b` · 78 pytest |
+| T5 default import | ZCP-39 | **Done** `c123f52` · 2.0.0 |
+| T6 v2 alias | ZCP-40 | **Done** meta-path submodule redirect |
+| T7 docs | ZCP-41 | **Done** `9eb9ff6` |
+| T8 verify | ZCP-42 | package 238 · yelp 78 · sample 245 |
+| T9 tag + MATRIX | ZCP-43 | **Human** — do not self-award |
 
-**Claim:** remains `candidate` until human MATRIX (T9). Agent must not self-award `supported`.
-
-**Hard rule:** demo_yelp native `rt.*` **before** default-import flip (T4 before T5).
+**Claim:** remains `candidate` until human MATRIX (T9).
 
 ---
 
