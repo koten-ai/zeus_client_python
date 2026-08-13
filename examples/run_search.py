@@ -1,35 +1,27 @@
-#!/usr/bin/env python3
-"""Fast-tier typeahead via V2 ``search`` (no LLM) against yelp-data.
+"""Minimal typeahead via rt.data.search (2.0+)."""
 
-Usage (with Zeus up and config.json pointing at it)::
-
-    python examples/run_search.py "sushi"
-    python examples/run_search.py "Pathmark"
-
-Debounce this in your UI; use ``run_agent`` only on full submit.
-"""
 from __future__ import annotations
 
 import asyncio
-import json
-import sys
 
-from zeus_client import ZeusClient, load_config, run_search_from_config
-from zeus_client.zeus.suggest import SuggestOptions
+from zeus_client import SuggestOptions, ZeusRuntime
+from zeus_client.adapters.catalog_fs.store import FsCatalogStore
+from zeus_client.adapters.secrets_env.store import EnvSecretStore
+from zeus_client.adapters.zeus_http import HttpxZeusPort
+from zeus_client.config.loader import load_runtime_config
 
 
-async def main(query: str) -> int:
-    async with ZeusClient():
-        cfg = await load_config()
-        result = await run_search_from_config(
-            query,
-            cfg,
-            options=SuggestOptions(limit=8, fts_timeout_ms=2000),
+async def main() -> None:
+    cfg = load_runtime_config("config.json", profile="development")
+    secrets = EnvSecretStore()
+    catalog = FsCatalogStore(root=cfg.chat_requests_dir or "data/chat_requests")
+    async with ZeusRuntime(cfg, secrets=secrets, catalog=catalog) as rt:
+        rt.services.zeus = HttpxZeusPort(
+            endpoint=rt.config.zeus, secrets=secrets, journal=rt.journal
         )
-        print(json.dumps(result.to_dict(), indent=2, default=str))
-        return 0 if not result.error else 1
+        sug = await rt.data.search("sushi", options=SuggestOptions(limit=8))
+        print(sug.to_dict())
 
 
 if __name__ == "__main__":
-    q = " ".join(sys.argv[1:]).strip() or "sushi"
-    raise SystemExit(asyncio.run(main(q)))
+    asyncio.run(main())
