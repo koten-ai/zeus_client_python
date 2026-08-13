@@ -12,7 +12,7 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 
 ## Status
 
-**Beta candidate on `feat/V2`** — dual-tree (`src/` = 0.3.1 `zeus_client`; `src_v2/zeus_client` → `zeus_client_v2` **2.0.0b1**). Claim level **candidate** per `sdk_bootstrap.pins.json`. Phase 8 hardening + compat + MIGRATION landed; **default-import cutover / GA 2.0.0 deferred** (see MIGRATION cutover gate).
+**Beta candidate on `feat/V2`** — dual-tree (`src/` = 0.3.1 `zeus_client`; `src_v2/zeus_client` → `zeus_client_v2` **2.0.0b1**). Claim level **candidate** per `sdk_bootstrap.pins.json`. Phase 8 hardening + compat + MIGRATION landed. **GA cutover train in progress** on `feat/ZCP-ga-cutover-2.0.0` — epic [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33); see [MIGRATION.md](./MIGRATION.md) §GA cutover train.
 
 ## Selected architecture (one paragraph)
 

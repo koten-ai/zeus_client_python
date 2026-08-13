@@ -518,7 +518,7 @@ Library maintainers: security contact in README; private disclosure window befor
 
 - [ ] `SecretStorePort` + no secrets in config export  ✅  
 - [ ] Redactor on journal append and exports  ✅  
-- [ ] Prod profile rejects `auth_mode=none` and TLS verify off  (profile guidance; tighten at cutover)  
+- [ ] Prod profile rejects `auth_mode=none` and TLS verify off  ✅ (ZCP-36 cutover)  
 - [ ] Tool retries default off  ✅  
 - [ ] Typeahead rate limiter  ✅ (ZCP-22)  
 - [ ] Header charset validation  (partial / adapter)  
