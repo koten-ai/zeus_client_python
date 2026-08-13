@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.typeahead import SuggestOptions, SuggestResult
 from zeus_client.config.models import DataTarget
@@ -14,8 +15,7 @@ if TYPE_CHECKING:
 __all__ = ["run_search"]
 
 _DEPRECATION = (
-    "zeus_client.compat.v1.run_search is deprecated; "
-    "use ZeusRuntime.data.search(...) instead"
+    "zeus_client.compat.v1.run_search is deprecated; use ZeusRuntime.data.search(...) instead"
 )
 
 

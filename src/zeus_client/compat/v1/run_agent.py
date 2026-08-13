@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.config.models import ClientSettings, DataTarget
 from zeus_client.domain.messages import TurnResult
@@ -14,8 +15,7 @@ if TYPE_CHECKING:
 __all__ = ["run_agent", "turn_result_as_v1_tuple"]
 
 _DEPRECATION = (
-    "zeus_client.compat.v1.run_agent is deprecated; "
-    "use ZeusRuntime.agent.run_turn(...) instead"
+    "zeus_client.compat.v1.run_agent is deprecated; use ZeusRuntime.agent.run_turn(...) instead"
 )
 
 

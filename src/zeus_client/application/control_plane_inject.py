@@ -9,9 +9,10 @@ No brief marker → no splice (avoids thrashing the stamp).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import Any, Mapping
+from typing import Any
 
 __all__ = [
     "COMPANY_CONTEXT_SOFT_WORDS",
@@ -145,8 +146,7 @@ def validate_output_request(output_request: Any) -> dict[str, Any]:
     for name, spec in fields.items():
         if not isinstance(spec, dict):
             raise ValueError(
-                f"output_request.app.fields[{name!r}] must be "
-                f"{{type, description}} object"
+                f"output_request.app.fields[{name!r}] must be {{type, description}} object"
             )
         if "type" not in spec:
             raise ValueError(f"output_request field {name!r} missing type")

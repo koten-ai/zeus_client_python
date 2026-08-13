@@ -6,8 +6,9 @@ Optional N1QL hydrate only when explicitly configured (no implicit :8093).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from zeus_client.config.models import DataTarget
 from zeus_client.ports import VerbRequest

@@ -1,4 +1,5 @@
 """Shared pytest fixtures for zeus_client tests."""
+
 import json
 import shutil
 from pathlib import Path
@@ -83,7 +84,9 @@ def patch_paths(monkeypatch, tmp_path, sample_config):
         monkeypatch.setattr(f"{target}.CHAT_LOG_PATH", chat_log, raising=False)
         monkeypatch.setattr(f"{target}.BASE_DIR", user_config_dir, raising=False)
         monkeypatch.setattr(f"{target}.USER_CONFIG_DIR", user_config_dir, raising=False)
-        monkeypatch.setattr(f"{target}.user_chat_requests_dir", _user_chat_requests_dir, raising=False)
+        monkeypatch.setattr(
+            f"{target}.user_chat_requests_dir", _user_chat_requests_dir, raising=False
+        )
 
     return {
         "config_path": config_path,

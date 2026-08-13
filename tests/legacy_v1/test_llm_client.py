@@ -1,8 +1,8 @@
 """Upstream LLM client helpers."""
+
 import httpx
 import pytest
 import respx
-
 from zeus_client.llm.client import (
     cache_hints,
     cached_tokens_of,
@@ -30,9 +30,14 @@ def test_cached_tokens_of_branches():
     assert cached_tokens_of("text") is None
     assert cached_tokens_of({}) is None
     assert cached_tokens_of({"usage": {"cached_tokens": 9}}) == 9
-    assert cached_tokens_of({
-        "usage": {"prompt_tokens_details": {"cached_tokens": 42}},
-    }) == 42
+    assert (
+        cached_tokens_of(
+            {
+                "usage": {"prompt_tokens_details": {"cached_tokens": 42}},
+            }
+        )
+        == 42
+    )
 
 
 def test_llm_payload_with_and_without_tools():
@@ -52,13 +57,18 @@ def test_llm_payload_with_and_without_tools():
 @respx.mock
 async def test_llm_chat_payload_json_and_text(http_client):
     route = respx.post(f"{BASE}/chat/completions")
-    route.mock(return_value=httpx.Response(
-        200,
-        headers={"content-type": "application/json"},
-        json={"choices": []},
-    ))
+    route.mock(
+        return_value=httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            json={"choices": []},
+        )
+    )
     status, body = await llm_chat_payload(
-        BASE, KEY, {"model": "grok"}, extra_headers={"X-Test": "1"},
+        BASE,
+        KEY,
+        {"model": "grok"},
+        extra_headers={"X-Test": "1"},
     )
     assert status == 200
     assert body == {"choices": []}

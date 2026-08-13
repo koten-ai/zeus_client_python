@@ -7,8 +7,9 @@ per ``docs/ai_api/FAMILY_LLM_ERRORS.md``.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
 
 __all__ = [
     "ErrorCode",

@@ -1,6 +1,6 @@
 """Module-level hook shims in zeus_client.agent.hooks."""
-import pytest
 
+import pytest
 from zeus_client.agent import hooks
 
 
@@ -15,6 +15,10 @@ async def test_module_level_before_zeus_dispatch_passthrough():
 @pytest.mark.asyncio
 async def test_module_level_after_zeus_dispatch_passthrough():
     text = await hooks.after_zeus_dispatch(
-        "find_nodes", {}, 200, '{"rows":[]}', {"round": 2},
+        "find_nodes",
+        {},
+        200,
+        '{"rows":[]}',
+        {"round": 2},
     )
     assert text == '{"rows":[]}'

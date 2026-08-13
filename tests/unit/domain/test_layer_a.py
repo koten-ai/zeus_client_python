@@ -124,9 +124,7 @@ def test_parse_app_output_with_output_request():
     layer = parse_layer_a(
         _valid_return(app_output={"offer_code": "X"}),
         output_request={
-            "app": {
-                "fields": {"offer_code": {"type": "string", "description": "code"}}
-            },
+            "app": {"fields": {"offer_code": {"type": "string", "description": "code"}}},
         },
     )
     assert layer.app_output == {"offer_code": "X"}

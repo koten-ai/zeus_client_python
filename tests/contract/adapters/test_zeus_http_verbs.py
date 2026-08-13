@@ -32,13 +32,9 @@ def test_exposed_verbs_exclude_pipeline() -> None:
 
 def test_verb_url_shapes() -> None:
     t = DataTarget(bucket="yelp-data", scope="_default", collection="_default")
-    assert verb_url("http://z:8080", t, "find").endswith(
-        "/v2/yelp-data/_default/_default/find"
-    )
+    assert verb_url("http://z:8080", t, "find").endswith("/v2/yelp-data/_default/_default/find")
     assert verb_url("http://z:8080", t, "explain").endswith("/v2/explain")
-    assert verb_url("http://z:8080", t, "describe").endswith(
-        "/v2/yelp-data/_default/describe"
-    )
+    assert verb_url("http://z:8080", t, "describe").endswith("/v2/yelp-data/_default/describe")
 
 
 def test_mode_header_always_set() -> None:
@@ -85,9 +81,9 @@ async def test_find_verb_captures_req_id_and_journals() -> None:
     hops = [e for e in journal.events() if e.type == EVENT_ZEUS_HOP]
     assert len(hops) == 1
     assert hops[0].data["req_id"] == "req-abc-123"
-    assert "Authorization" not in json.dumps(hops[0].data.get("headers", {})) or hops[
-        0
-    ].data["headers"].get("Authorization") in (None, "[REDACTED]")
+    assert "Authorization" not in json.dumps(hops[0].data.get("headers", {})) or hops[0].data[
+        "headers"
+    ].get("Authorization") in (None, "[REDACTED]")
 
 
 @pytest.mark.asyncio
@@ -133,9 +129,7 @@ async def test_pipeline_rejected_on_public_api() -> None:
 async def test_runtime_data_verb_wiring() -> None:
     base = "http://zeus.test:8080"
     respx.post(url__startswith=f"{base}/v2/").mock(
-        return_value=httpx.Response(
-            200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r1"}
-        )
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r1"})
     )
     cfg = RuntimeConfig(zeus=ZeusEndpointConfig(url=base, auth_mode="none"))
     journal = InMemoryJournal()

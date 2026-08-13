@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.adapters.catalog_fs.store import FsCatalogStore
 from zeus_client.application.catalog_sync import SyncResult, sync_catalogs
@@ -77,7 +77,8 @@ class CatalogAPI:
                 )
 
             async def _fetch(bucket: str, scope: str, mode: str) -> dict:
-                return await remote.fetch_chat_request(bucket, scope, mode)
+                result = await remote.fetch_chat_request(bucket, scope, mode)
+                return dict(result) if not isinstance(result, dict) else result
 
             fetch = _fetch
 

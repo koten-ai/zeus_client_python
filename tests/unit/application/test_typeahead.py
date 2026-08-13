@@ -30,9 +30,7 @@ def test_merge_hits_dedupes_id_and_name_fts_first() -> None:
 
 
 def test_src_keys_from_fts_payload() -> None:
-    keys = src_keys_from_fts_payload(
-        {"result": {"src_keys": ["biz:a", "biz:b", "biz:a"]}}
-    )
+    keys = src_keys_from_fts_payload({"result": {"src_keys": ["biz:a", "biz:b", "biz:a"]}})
     assert keys == ["biz:a", "biz:b"]
 
 
@@ -96,9 +94,7 @@ async def test_rt_data_search() -> None:
         )
     )
     cfg = RuntimeConfig(zeus=ZeusEndpointConfig(url=base, auth_mode="none"))
-    port = HttpxZeusPort(
-        endpoint=cfg.zeus, secrets=EnvSecretStore(environ={}), turn_id="t"
-    )
+    port = HttpxZeusPort(endpoint=cfg.zeus, secrets=EnvSecretStore(environ={}), turn_id="t")
     async with ZeusRuntime(cfg, zeus=port) as rt:
         r = await rt.data.search("ab")
         assert r.fts_req_id == "s1"

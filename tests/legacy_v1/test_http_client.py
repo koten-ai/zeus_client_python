@@ -1,7 +1,7 @@
 """Shared httpx AsyncClient singleton."""
+
 import httpx
 import pytest
-
 import zeus_client.http_client as hc
 
 

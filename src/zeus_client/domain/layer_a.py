@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 __all__ = [
     "LayerA",
@@ -70,15 +71,15 @@ class LayerA:
     """Parsed terminate / return bag."""
 
     summary: str = ""
-    query_decomposition: Optional[dict] = None
-    decomposition: Optional[dict] = None
-    confidence: Optional[str] = None
-    policy_action: Optional[str] = None
+    query_decomposition: dict | None = None
+    decomposition: dict | None = None
+    confidence: str | None = None
+    policy_action: str | None = None
     business_rules_triggers: dict[str, bool] = field(default_factory=dict)
-    app_output: Optional[dict] = None
-    jail_break_attempt: Optional[float] = None
-    wish_i_knew: Optional[list] = None
-    data_gaps: Optional[list] = None
+    app_output: dict | None = None
+    jail_break_attempt: float | None = None
+    wish_i_knew: list | None = None
+    data_gaps: list | None = None
     entity_refs: Any = None
     node_refs: Any = None
     provenance: Any = None
@@ -105,14 +106,10 @@ def normalize_triggers(
         return {str(k): bool(v) for k, v in raw.items()}, warnings
     if isinstance(raw, list):
         if not allow_array:
-            warnings.append(
-                "business_rules_triggers array rejected (allow_array_triggers=False)"
-            )
+            warnings.append("business_rules_triggers array rejected (allow_array_triggers=False)")
             return {}, warnings
         if not rule_ids:
-            warnings.append(
-                "business_rules_triggers array without rule_ids mapping; ignored"
-            )
+            warnings.append("business_rules_triggers array without rule_ids mapping; ignored")
             return {}, warnings
         out: dict[str, bool] = {}
         for i, rid in enumerate(rule_ids):
@@ -151,7 +148,7 @@ def validate_app_output(
     fields_spec: Mapping[str, Any] | None,
     *,
     on_error: str = "strip",
-) -> tuple[Optional[dict], list[str]]:
+) -> tuple[dict | None, list[str]]:
     """Type-check app_output values against output_request.app.fields."""
     errors: list[str] = []
     if fields_spec is None:
@@ -179,10 +176,7 @@ def validate_app_output(
         if _value_matches_type(val, str(tname)):
             out[name] = val
         else:
-            msg = (
-                f"app_output.{name} type mismatch: expected {tname}, "
-                f"got {type(val).__name__}"
-            )
+            msg = f"app_output.{name} type mismatch: expected {tname}, got {type(val).__name__}"
             errors.append(msg)
             if on_error != "strip":
                 return None, errors
@@ -310,9 +304,7 @@ def looks_like_layer_a_dump(text: str | None) -> bool:
     has_summary = bool(re.search(r"(?m)^summary\s*:", body))
     if not has_summary:
         return False
-    meta_hits = sum(
-        1 for k in _LAYER_A_DUMP_META if re.search(rf"(?m)^{re.escape(k)}\s*:", body)
-    )
+    meta_hits = sum(1 for k in _LAYER_A_DUMP_META if re.search(rf"(?m)^{re.escape(k)}\s*:", body))
     return meta_hits >= 2
 
 

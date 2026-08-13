@@ -7,9 +7,10 @@ custom ``MetricsPort``. Labels stay low-cardinality.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Mapping, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 __all__ = [
     "MetricsPort",
@@ -28,9 +29,13 @@ def _label_key(labels: Mapping[str, str] | None) -> tuple[tuple[str, str], ...]:
 
 @runtime_checkable
 class MetricsPort(Protocol):
-    def incr(self, name: str, *, labels: Mapping[str, str] | None = None, amount: float = 1.0) -> None: ...
+    def incr(
+        self, name: str, *, labels: Mapping[str, str] | None = None, amount: float = 1.0
+    ) -> None: ...
 
-    def observe(self, name: str, value: float, *, labels: Mapping[str, str] | None = None) -> None: ...
+    def observe(
+        self, name: str, value: float, *, labels: Mapping[str, str] | None = None
+    ) -> None: ...
 
     def snapshot(self) -> dict[str, object]: ...
 
@@ -53,7 +58,9 @@ class InMemoryMetrics:
         repr=False,
     )
 
-    def incr(self, name: str, *, labels: Mapping[str, str] | None = None, amount: float = 1.0) -> None:
+    def incr(
+        self, name: str, *, labels: Mapping[str, str] | None = None, amount: float = 1.0
+    ) -> None:
         key = _label_key(labels)
         with self._lock:
             self._counters[name][key] += float(amount)
@@ -97,7 +104,9 @@ class InMemoryMetrics:
 class NullMetrics:
     """No-op metrics sink."""
 
-    def incr(self, name: str, *, labels: Mapping[str, str] | None = None, amount: float = 1.0) -> None:
+    def incr(
+        self, name: str, *, labels: Mapping[str, str] | None = None, amount: float = 1.0
+    ) -> None:
         return None
 
     def observe(self, name: str, value: float, *, labels: Mapping[str, str] | None = None) -> None:

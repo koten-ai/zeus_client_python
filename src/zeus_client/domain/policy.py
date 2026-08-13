@@ -5,9 +5,9 @@ Model triggers are signals; Client policy is law. G2 scores stay in artifacts on
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Mapping
 
 from zeus_client.config.models import ClientSettings
 from zeus_client.domain.layer_a import LayerA, artifacts_view, ui_view
@@ -61,9 +61,7 @@ DEFAULT_MESSAGE_JAILBREAK_SOFT = (
     "I can only help with questions about our product using store data. "
     "I can't ignore those limits or invent offers that are not in our system."
 )
-DEFAULT_MESSAGE_FAILURE = (
-    "Sorry — I can't complete that request. Could you rephrase what you need?"
-)
+DEFAULT_MESSAGE_FAILURE = "Sorry — I can't complete that request. Could you rephrase what you need?"
 
 
 def default_jailbreak_rules() -> dict[str, str]:
@@ -143,11 +141,7 @@ def decide_policy(
     jba_f = float(jba) if isinstance(jba, (int, float)) else 0.0
 
     soft_missing = False
-    if (
-        settings.soft_require_policy_action
-        and brand_inject_present
-        and not layer.policy_action
-    ):
+    if settings.soft_require_policy_action and brand_inject_present and not layer.policy_action:
         soft_missing = True
 
     if hooks_must_refuse:
@@ -158,9 +152,7 @@ def decide_policy(
         policy = POLICY_ERROR
         forced = True
         reason = "layer_a_validation_failed"
-    elif jailbreak_keys_hit(layer.business_rules_triggers) and (
-        jba_f >= 0.5 or score >= 0.5
-    ):
+    elif jailbreak_keys_hit(layer.business_rules_triggers) and (jba_f >= 0.5 or score >= 0.5):
         policy = POLICY_REFUSE
         forced = True
         reason = "jailbreak_triggers_and_score"

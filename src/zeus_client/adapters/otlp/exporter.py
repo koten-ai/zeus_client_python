@@ -7,8 +7,9 @@ can be projected as spans. Missing deps never break the runtime path.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 __all__ = ["OTLPExporter", "NullOTLPExporter", "try_build_otlp_exporter"]
 

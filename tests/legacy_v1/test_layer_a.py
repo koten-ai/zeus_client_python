@@ -1,14 +1,13 @@
 """Layer A parse, triggers, app_output, G-split."""
-import pytest
 
 from zeus_client.agent.layer_a import (
+    artifacts_view,
     normalize_triggers,
     parse_layer_a,
     peel_layer_a_summary,
     ui_view,
     user_facing_answer,
     validate_app_output,
-    artifacts_view,
 )
 
 
@@ -31,11 +30,13 @@ def test_required_four_ok():
 
 
 def test_missing_summary_errors():
-    layer = parse_layer_a({
-        "query_decomposition": {},
-        "decomposition": {},
-        "confidence": "med",
-    })
+    layer = parse_layer_a(
+        {
+            "query_decomposition": {},
+            "decomposition": {},
+            "confidence": "med",
+        }
+    )
     assert not layer.ok
     assert any("summary" in e for e in layer.errors)
 
@@ -47,9 +48,11 @@ def test_qd_must_be_object():
 
 
 def test_object_triggers():
-    layer = parse_layer_a(_valid_return(
-        business_rules_triggers={"no_invent_data": True, "coupon": False},
-    ))
+    layer = parse_layer_a(
+        _valid_return(
+            business_rules_triggers={"no_invent_data": True, "coupon": False},
+        )
+    )
     assert layer.business_rules_triggers["no_invent_data"] is True
     assert layer.business_rules_triggers["coupon"] is False
 
@@ -71,11 +74,13 @@ def test_array_triggers_rejected_when_disabled():
 
 
 def test_ui_view_strips_g2():
-    layer = parse_layer_a(_valid_return(
-        jail_break_attempt=0.9,
-        wish_i_knew=[{"gap": "x"}],
-        business_rules_triggers={"no_prompt_dump": True},
-    ))
+    layer = parse_layer_a(
+        _valid_return(
+            jail_break_attempt=0.9,
+            wish_i_knew=[{"gap": "x"}],
+            business_rules_triggers={"no_prompt_dump": True},
+        )
+    )
     ui = ui_view(layer)
     assert "wish_i_knew" not in ui
     assert "jail_break_attempt" not in ui
@@ -94,7 +99,9 @@ def test_artifacts_keep_g2_and_dual_score():
 def test_app_output_type_check_strip():
     fields = {"offer_code": {"type": "string", "description": "promo"}}
     out, errs = validate_app_output(
-        {"offer_code": 123}, fields, on_error="strip",
+        {"offer_code": 123},
+        fields,
+        on_error="strip",
     )
     assert out == {}
     assert errs
@@ -103,7 +110,9 @@ def test_app_output_type_check_strip():
 def test_app_output_ok():
     fields = {"offer_code": {"type": "string", "description": "promo"}}
     out, errs = validate_app_output(
-        {"offer_code": "SAVE10"}, fields, on_error="strip",
+        {"offer_code": "SAVE10"},
+        fields,
+        on_error="strip",
     )
     assert out == {"offer_code": "SAVE10"}
     assert not errs
@@ -143,7 +152,7 @@ def test_user_facing_answer_passes_prose():
 
 def test_peel_layer_a_summary_unescapes_newlines():
     dump = (
-        "summary: \"Line one.\\nLine two.\"\n"
+        'summary: "Line one.\\nLine two."\n'
         "confidence: high\n"
         "policy_action: answer\n"
         'query_decomposition: {"intent": "x"}\n'

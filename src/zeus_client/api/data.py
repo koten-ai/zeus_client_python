@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.data_verb import VerbResult, run_data_verb
 from zeus_client.application.typeahead import (

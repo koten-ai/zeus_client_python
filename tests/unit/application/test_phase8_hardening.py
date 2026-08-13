@@ -14,7 +14,6 @@ from zeus_client.adapters.secrets_env.store import EnvSecretStore
 from zeus_client.adapters.zeus_http.verbs import HttpxZeusPort
 from zeus_client.compat.v1 import run_agent, run_search, run_verb, turn_result_as_v1_tuple
 from zeus_client.config.models import (
-    DataTarget,
     RateLimitPolicy,
     RuntimeConfig,
     ZeusEndpointConfig,
@@ -23,7 +22,7 @@ from zeus_client.domain.errors import ErrorCode, ZeusClientError
 from zeus_client.domain.journal import InMemoryJournal
 from zeus_client.domain.messages import DebugBundle, TurnResult, TurnStatus
 from zeus_client.observability.metrics import InMemoryMetrics
-from zeus_client.observability.rate_limit import TokenBucket, TokenBucketLimiter
+from zeus_client.observability.rate_limit import TokenBucket
 
 
 def test_package_version_is_2_0_0() -> None:

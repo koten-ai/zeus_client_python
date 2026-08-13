@@ -1,4 +1,5 @@
 """ZC-35: conflict linter for open chat_request rules."""
+
 from __future__ import annotations
 
 import json
@@ -6,19 +7,19 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-
-from zeus_client import ConflictReport, hash_policy_summary, lint_chat_request
+from tests.fixtures.catalog_brief import base_chat_req
 from zeus_client.contract_hash import (
     HASH_EXCLUDED_ROOTS,
     LOCKED_POINTERS,
     compute_contract_hash,
 )
 from zeus_client.zeus.lint import (
+    Finding,
     inventory_open_rules,
     score_findings,
-    Finding,
 )
-from tests.fixtures.catalog_brief import base_chat_req
+
+from zeus_client import ConflictReport, hash_policy_summary, lint_chat_request
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lint_conflict_chat_request.json"
 BUNDLED_ANALYTICS = (
@@ -64,7 +65,10 @@ def test_lint_conflict_fixture_flags_high_severity():
     # Structural pipeline issues
     assert "optimal_path_unknown_verb" in check_ids or "optimal_path_missing_as" in check_ids
     assert "locked" in report.locked_paths_note.lower()
-    assert "never rewritten" in report.locked_paths_note.lower() or "not rewritten" in report.locked_paths_note.lower()
+    assert (
+        "never rewritten" in report.locked_paths_note.lower()
+        or "not rewritten" in report.locked_paths_note.lower()
+    )
 
 
 def test_lint_does_not_mutate_input():
@@ -140,8 +144,14 @@ def test_duplicate_rule_text():
 def test_optimal_path_unknown_verb_and_return():
     cr = base_chat_req()
     cr["verbs"] = [
-        {"function": {"name": "find", "parameters": {"type": "object", "properties": {}}}, "type": "function"},
-        {"function": {"name": "return", "parameters": {"type": "object", "properties": {}}}, "type": "function"},
+        {
+            "function": {"name": "find", "parameters": {"type": "object", "properties": {}}},
+            "type": "function",
+        },
+        {
+            "function": {"name": "return", "parameters": {"type": "object", "properties": {}}},
+            "type": "function",
+        },
     ]
     cr["guidance"]["optimal_paths"] = [
         {
@@ -161,7 +171,11 @@ def test_score_findings_bands():
     assert score_findings([]) == (0, "none")
     low = [Finding("x", "low", "m", "p")]
     assert score_findings(low)[1] == "low"
-    med = [Finding("x", "medium", "m", "p"), Finding("y", "medium", "m", "p"), Finding("z", "medium", "m", "p")]
+    med = [
+        Finding("x", "medium", "m", "p"),
+        Finding("y", "medium", "m", "p"),
+        Finding("z", "medium", "m", "p"),
+    ]
     score, band = score_findings(med)
     assert score == 30
     assert band == "medium"
