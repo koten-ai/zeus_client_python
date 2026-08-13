@@ -56,9 +56,7 @@ def test_strip_for_hash_excludes_metadata() -> None:
         "contract": {"hash": "md5:abc"},
         "metadata": {"at": 1},
         "model": "gpt",
-        "messages": [
-            {"role": "system", "content": "x" + ch.SCOPE_BRIEF_MARKER + " brief"}
-        ],
+        "messages": [{"role": "system", "content": "x" + ch.SCOPE_BRIEF_MARKER + " brief"}],
     }
     out = ch._strip_for_hash(obj)
     assert "_hidden" not in out
@@ -145,9 +143,7 @@ def test_trailing_newline_plus_scope_brief_merge_stable() -> None:
     drifted["messages"][0]["content"] = "rules only\n"
     assert compute_contract_hash(drifted) != h0
 
-    merged = _merge_scope_brief_local(
-        base, "## SCOPE BRIEF\nscope: demo/_default\nmode: analytics"
-    )
+    merged = _merge_scope_brief_local(base, "## SCOPE BRIEF\nscope: demo/_default\nmode: analytics")
     assert compute_contract_hash(merged) == h0
     assert "## SCOPE BRIEF" in merged["messages"][0]["content"]
 
@@ -169,9 +165,7 @@ def test_heal_trailing_ws_stamp_drift_rewrites_stamp_and_stabilizes_merge() -> N
     dirty["_hash"] = h_dirty
 
     # Without heal: brief merge changes the content hash vs embedded stamp.
-    merged_dirty = _merge_scope_brief_local(
-        deepcopy(dirty), "## SCOPE BRIEF\nscope: demo/_default"
-    )
+    merged_dirty = _merge_scope_brief_local(deepcopy(dirty), "## SCOPE BRIEF\nscope: demo/_default")
     assert compute_contract_hash(merged_dirty) == h_clean
     assert extract_stamped_hash(merged_dirty) == h_dirty
     assert extract_stamped_hash(merged_dirty) != compute_contract_hash(merged_dirty)

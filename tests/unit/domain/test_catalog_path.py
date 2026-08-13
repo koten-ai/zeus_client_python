@@ -28,8 +28,7 @@ def test_chat_request_filename() -> None:
     assert chat_request_filename("analytics") == "chat_request_analytics_v2.json"
     # Compound client modes still take the canonical *_v2.json suffix
     assert (
-        chat_request_filename("analytics_v2_base_6")
-        == "chat_request_analytics_v2_base_6_v2.json"
+        chat_request_filename("analytics_v2_base_6") == "chat_request_analytics_v2_base_6_v2.json"
     )
 
 
@@ -175,9 +174,7 @@ def test_fs_store_load_heals_and_returns_document(tmp_path: Path) -> None:
     }
     h = compute_contract_hash(body)
     body["contract"] = {"hash": h}
-    (scope / "chat_request_analytics_v2.json").write_text(
-        json.dumps(body), encoding="utf-8"
-    )
+    (scope / "chat_request_analytics_v2.json").write_text(json.dumps(body), encoding="utf-8")
     store = FsCatalogStore(root=user)
     doc = store.load(CatalogKey(mode="analytics", bucket="beer-sample", scope="_default"))
     assert doc.contract_hash == h

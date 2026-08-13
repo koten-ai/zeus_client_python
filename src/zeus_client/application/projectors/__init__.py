@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from zeus_client.application.projectors.public_trace import build_public_trace
 from zeus_client.application.projectors.session_trace import (
     AggregateTracePayload,
     SessionTraceProjectResult,
@@ -9,7 +10,6 @@ from zeus_client.application.projectors.session_trace import (
     project_session_trace,
     select_primary_req_id,
 )
-from zeus_client.application.projectors.public_trace import build_public_trace
 
 __all__ = [
     "AggregateTracePayload",

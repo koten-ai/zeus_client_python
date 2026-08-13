@@ -7,8 +7,9 @@ optional single-req trace helpers only.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from zeus_client.adapters.zeus_http.session import HttpxSessionClient
 from zeus_client.config.models import DataTarget
@@ -227,9 +228,7 @@ class SessionLifecycle:
         just_created = bool(handle.created)
         if just_created:
             turn_round = int(handle.round) + 1
-            turn_turns = [
-                m for m in produced_delta if (m.get("role") or "") != "user"
-            ]
+            turn_turns = [m for m in produced_delta if (m.get("role") or "") != "user"]
         else:
             turn_round = int(handle.round)
             turn_turns = list(produced_delta)

@@ -17,7 +17,7 @@ import inspect
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -94,9 +94,7 @@ def _assert_dt(observe: dict[str, Any], expect: dict[str, Any]) -> list[str]:
     return diffs
 
 
-async def _run_one(
-    design_root: Path, entry: dict[str, Any]
-) -> dict[str, Any]:
+async def _run_one(design_root: Path, entry: dict[str, Any]) -> dict[str, Any]:
     case_id = entry["id"]
     rel = entry["path"]
     case_dir = design_root / "conformance" / rel
@@ -163,15 +161,13 @@ async def run_suite(
     pins = load_pins()
     design_root = resolve_design_root(pins)
     manifest = load_manifest(design_root)
-    suite_version = manifest.get("suite_version") or (pins.get("suite") or {}).get(
-        "suite_version"
-    )
+    suite_version = manifest.get("suite_version") or (pins.get("suite") or {}).get("suite_version")
     claim = pins.get("claim") or {}
     levels = levels or set((pins.get("suite") or {}).get("required_levels") or ["L0", "L1", "L2"])
     # Always include detective levels for candidate min tapes
     levels = set(levels) | {"L_detective", "L_rewind"}
 
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     cases_out: list[dict[str, Any]] = []
     for entry in manifest.get("cases") or []:
         st = entry.get("status", "required")
@@ -186,7 +182,7 @@ async def run_suite(
             continue
         if entry.get("level") not in levels and not entry["id"].startswith("DT."):
             # still run DT if detective levels requested
-            if not (entry.get("level") in levels):
+            if entry.get("level") not in levels:
                 continue
         # candidate min: all required L0-L2 + DT required/required_rewind
         if st not in ("required", "required_rewind") and st != "required":
@@ -198,7 +194,7 @@ async def run_suite(
         result = await _run_one(design_root, entry)
         cases_out.append(result)
 
-    finished = datetime.now(timezone.utc).isoformat()
+    finished = datetime.now(UTC).isoformat()
     summary = {
         "total": len(cases_out),
         "passed": sum(1 for c in cases_out if c["status"] == "passed"),

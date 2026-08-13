@@ -15,19 +15,25 @@ Session commit / Detective are soft-optional; projectors never raise out of ok t
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
-from zeus_client.application.middleware import MiddlewareChain, MiddlewareContext
 from zeus_client.application.detective import safe_build_detective_briefing
+from zeus_client.application.middleware import MiddlewareChain, MiddlewareContext
 from zeus_client.application.projectors.public_trace import build_public_trace
 from zeus_client.application.projectors.session_trace import select_primary_req_id
 from zeus_client.application.tokens import sum_provider_tokens
 from zeus_client.config.models import ClientSettings, DataTarget, DebugPolicy
 from zeus_client.domain.errors import ErrorCode, LlmError, ZeusClientError
-from zeus_client.domain.journal.events import EVENT_NOTE, EVENT_TURN_COMPLETED, EVENT_TURN_STARTED, JournalEvent
+from zeus_client.domain.journal.events import (
+    EVENT_TURN_COMPLETED,
+    EVENT_TURN_STARTED,
+    JournalEvent,
+)
 from zeus_client.domain.journal.journal import InMemoryJournal
 from zeus_client.domain.layer_a import (
     LayerA,
@@ -45,9 +51,7 @@ from zeus_client.domain.messages import (
 )
 from zeus_client.domain.policy import decide_policy
 from zeus_client.domain.session import SessionHandle
-from zeus_client.ports import LlmPort, LlmRequest, VerbHopResult, VerbRequest, ZeusPort
-
-import os
+from zeus_client.ports import LlmPort, LlmRequest, VerbRequest, ZeusPort
 
 __all__ = [
     "AgentTurnUseCase",
@@ -348,9 +352,7 @@ async def run_agent_turn(
                     "round": rnd,
                     "type": "llm",
                     "tool_calls": [
-                        (tc.get("function") or {}).get("name")
-                        if isinstance(tc, Mapping)
-                        else None
+                        (tc.get("function") or {}).get("name") if isinstance(tc, Mapping) else None
                         for tc in tool_calls
                     ],
                     "usage": dict(llm_resp.usage or {}),
@@ -416,19 +418,11 @@ async def run_agent_turn(
                     if answer and not _recent_assistant_has(messages, answer):
                         messages.append({"role": "assistant", "content": answer})
                     exit_kind = "cheap_terminal"
-                    notes.append(
-                        "ai_process_result=false after terminate; cheap terminal envelope"
-                    )
+                    notes.append("ai_process_result=false after terminate; cheap terminal envelope")
                 break
 
-            if (
-                not ai_process
-                and outcome.tools_executed > 0
-                and outcome.tools_with_data > 0
-            ):
-                answer = (
-                    (outcome.tool_arg_summary or "").strip() or CHEAP_FINAL_STATIC_ANSWER
-                )
+            if not ai_process and outcome.tools_executed > 0 and outcome.tools_with_data > 0:
+                answer = (outcome.tool_arg_summary or "").strip() or CHEAP_FINAL_STATIC_ANSWER
                 if not _recent_assistant_has(messages, answer):
                     messages.append({"role": "assistant", "content": answer})
                 exit_kind = "cheap_final"
@@ -495,13 +489,14 @@ async def run_agent_turn(
             layer_summary=layer.summary if layer else None,
         )
     if decision is not None:
-        if decision.forced and decision.policy in ("refuse", "error"):
-            final_answer = decision.ui_text or final_answer
-        elif not (final_answer or "").strip():
+        if (
+            decision.forced
+            and decision.policy in ("refuse", "error")
+            or not (final_answer or "").strip()
+        ):
             final_answer = decision.ui_text or final_answer
         elif decision.policy == "clarify" and decision.ui_text:
             final_answer = decision.ui_text
-
 
     # Belt: never leave G2 markers if peel missed
     if "wish_i_knew" in final_answer and layer is not None and layer.summary:
@@ -711,7 +706,6 @@ async def _execute_tool_calls(
             ):
                 outcome.return_args = cand
 
-
     outcome.return_seen = return_seen
     outcome.terminal_summary = final_summary if return_seen else None
     return outcome
@@ -783,7 +777,9 @@ def _finish(
     )
     # G2 never in answer
     if "wish_i_knew" in answer:
-        answer = (layer.summary if layer and layer.summary else answer.split("wish_i_knew")[0]).strip()
+        answer = (
+            layer.summary if layer and layer.summary else answer.split("wish_i_knew")[0]
+        ).strip()
 
     total_ms = int((time.time() - t0) * 1000)
     pref: str | None = None
@@ -829,12 +825,16 @@ def _finish(
         )
         if det is None and (debug_policy or DebugPolicy()).detective_briefing:
             # distinguish kill-switch vs builder failure only loosely
-            if str((env or os.environ).get("ZEUS_CLIENT_DETECTIVE", "1")).lower() in {
-                "0",
-                "false",
-                "no",
-                "off",
-            } or not (debug_policy or DebugPolicy()).detective_briefing:
+            if (
+                str((env or os.environ).get("ZEUS_CLIENT_DETECTIVE", "1")).lower()
+                in {
+                    "0",
+                    "false",
+                    "no",
+                    "off",
+                }
+                or not (debug_policy or DebugPolicy()).detective_briefing
+            ):
                 pass
             else:
                 # enabled but None → soft fail inside safe_build swallowed exception
@@ -884,7 +884,9 @@ def _finish(
         journal_event_count=len(journal.events()),
         hooks_jailbreak_score=float(decision.hooks_jailbreak_score) if decision else 0.0,
         detective=detective,
-        preferred_req_id=pref_final if isinstance(pref_final, str) or pref_final is None else str(pref_final),
+        preferred_req_id=pref_final
+        if isinstance(pref_final, str) or pref_final is None
+        else str(pref_final),
     )
     try:
         je(

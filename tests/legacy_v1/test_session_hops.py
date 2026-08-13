@@ -1,4 +1,5 @@
 """Tests for multi-hop session-trace helpers (Hub Detective E2E)."""
+
 from zeus_client.trace.session_hops import (
     TRACE_SNIPPET_MAX,
     build_aggregate_trace_payload,
@@ -28,12 +29,14 @@ def test_normalize_dict_and_snip_cap():
 
 
 def test_normalize_hops_dedupes_req_id():
-    hops = normalize_hops([
-        ("a", "find", 200, "", "u1"),
-        ("a", "find", 200, "", "u1"),
-        ("b", "search", 500, "err", "u2"),
-        ("", "x", 200, "", ""),
-    ])
+    hops = normalize_hops(
+        [
+            ("a", "find", 200, "", "u1"),
+            ("a", "find", 200, "", "u1"),
+            ("b", "search", 500, "err", "u2"),
+            ("", "x", 200, "", ""),
+        ]
+    )
     assert [h["req_id"] for h in hops] == ["a", "b"]
 
 
@@ -113,9 +116,11 @@ def test_build_aggregate_trace_payload_multi_hop():
 
 
 def test_build_aggregate_legacy_tuples():
-    primary, turns, zresp, outcome = build_aggregate_trace_payload([
-        ("r1", "find", 200, "rows", "http://z/find"),
-    ])
+    primary, turns, zresp, outcome = build_aggregate_trace_payload(
+        [
+            ("r1", "find", 200, "rows", "http://z/find"),
+        ]
+    )
     assert primary == "r1"
     assert outcome == "ok"
     assert zresp["req_ids"] == ["r1"]
@@ -158,7 +163,8 @@ def test_select_primary_hop_empty():
 def test_build_aggregate_empty():
     assert build_aggregate_trace_payload([]) == (None, [], {}, "ok")
     primary, turns, zresp, outcome = build_aggregate_trace_payload(
-        [], layer_a={"intent": "List", "confidence": "high"},
+        [],
+        layer_a={"intent": "List", "confidence": "high"},
     )
     assert primary is None
     assert turns == []

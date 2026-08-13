@@ -1,8 +1,8 @@
 """base-5 catalog load by base_id (ZC-WISH-001)."""
+
 from pathlib import Path
 
 import pytest
-
 from zeus_client.zeus.base_catalog import (
     find_base_catalog_path,
     list_base_catalogs,
@@ -45,11 +45,16 @@ def test_load_missing_raises():
 
 def test_lineage_mismatch_raises(tmp_path):
     import json
+
     p = tmp_path / "chat_request_analytics_base-5.3.json"
-    p.write_text(json.dumps({
-        "_lineage": {"base_id": "base-5.2"},
-        "messages": [{"role": "system", "content": "x"}],
-    }))
+    p.write_text(
+        json.dumps(
+            {
+                "_lineage": {"base_id": "base-5.2"},
+                "messages": [{"role": "system", "content": "x"}],
+            }
+        )
+    )
     with pytest.raises(ValueError, match="lineage"):
         load_base_catalog(base_id="base-5.3", mode="analytics", search_dirs=[tmp_path])
 

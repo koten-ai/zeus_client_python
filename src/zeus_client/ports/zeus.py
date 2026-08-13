@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from zeus_client.ports import AuthContext, VerbHopResult, VerbRequest
 from zeus_client.config.models import DataTarget
+from zeus_client.ports import AuthContext, VerbHopResult, VerbRequest
 
 __all__ = ["ZeusPort"]
 

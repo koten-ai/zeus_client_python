@@ -1,7 +1,9 @@
 """Mini-schema introspection and injection tests."""
+
 import json
 
 import pytest
+from tests.fixtures.catalog_brief import base_chat_req
 from zeus_client.contract_hash import compute_contract_hash
 from zeus_client.zeus.catalog import (
     _system_prompt_text,
@@ -11,7 +13,6 @@ from zeus_client.zeus.catalog import (
     inject_business_logic,
     render_injected_business_logic,
 )
-from tests.fixtures.catalog_brief import base_chat_req
 
 
 def test_get_mini_schema_structure():
@@ -44,10 +45,14 @@ def test_get_mini_schema_no_brief_is_empty():
 
 def test_inject_validates_against_schema():
     cr = base_chat_req()
-    cr2 = inject_business_logic(cr, {
-        "entity_type": "Beer", "fields": ["abv"],
-        "rule": "Do not process beers from California with abv > 7%.",
-    })
+    cr2 = inject_business_logic(
+        cr,
+        {
+            "entity_type": "Beer",
+            "fields": ["abv"],
+            "rule": "Do not process beers from California with abv > 7%.",
+        },
+    )
     bl = cr2["guidance"]["injections"]["business_logic"]
     assert len(bl) == 1 and bl[0]["entity_type"] == "Beer"
     assert cr["guidance"]["injections"]["business_logic"] == []
@@ -60,10 +65,14 @@ def test_inject_validates_against_schema():
 
 
 def test_apply_is_hash_stable():
-    cr = inject_business_logic(base_chat_req(), {
-        "entity_type": "Beer", "fields": ["abv"],
-        "rule": "Do not process beers from California with abv > 7%.",
-    })
+    cr = inject_business_logic(
+        base_chat_req(),
+        {
+            "entity_type": "Beer",
+            "fields": ["abv"],
+            "rule": "Do not process beers from California with abv > 7%.",
+        },
+    )
     before = compute_contract_hash(cr)
     applied = apply_injected_business_logic(cr)
     after = compute_contract_hash(applied)
@@ -156,7 +165,9 @@ def test_render_dict_rule_with_entity_type():
 
 
 def test_apply_without_brief_marker_returns_unchanged():
-    cr = inject_business_logic({"messages": [{"role": "system", "content": "plain"}]}, "rule", validate=False)
+    cr = inject_business_logic(
+        {"messages": [{"role": "system", "content": "plain"}]}, "rule", validate=False
+    )
     out = apply_injected_business_logic(cr)
     assert out["messages"][0]["content"] == "plain"
     assert "Additional Business Rules" not in out["messages"][0]["content"]
@@ -165,7 +176,9 @@ def test_apply_without_brief_marker_returns_unchanged():
 def test_apply_skips_when_heading_already_present():
     cr = base_chat_req()
     cr = inject_business_logic(cr, "Already there.", validate=False)
-    cr["messages"][0]["content"] += "\n\n## Additional Business Rules (injected by middle-man)\n- old"
+    cr["messages"][0]["content"] += (
+        "\n\n## Additional Business Rules (injected by middle-man)\n- old"
+    )
     out = apply_injected_business_logic(cr)
     assert out["messages"][0]["content"].count("Additional Business Rules") == 1
 
@@ -289,8 +302,8 @@ inverse_fks:
 
 
 def test_merge_scope_brief_skips_instr_when_markers_present():
-    from zeus_client.zeus.catalog import merge_scope_brief
     from tests.fixtures.catalog_brief import BRIEF
+    from zeus_client.zeus.catalog import merge_scope_brief
 
     base = {
         "messages": [{"content": "BASE"}],

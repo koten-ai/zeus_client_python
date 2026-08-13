@@ -16,7 +16,6 @@ from zeus_client.application.catalog_sync import (
     sync_catalogs,
 )
 from zeus_client.domain.contract import compute_contract_hash, extract_stamped_hash
-from zeus_client.ports import CatalogKey
 
 
 def test_resolve_sync_scopes_from_samples() -> None:
@@ -223,9 +222,7 @@ async def test_catalog_api_load_from_store(tmp_path: Path) -> None:
         "messages": [{"role": "system", "content": "hi"}],
         "verbs": [{"type": "function", "function": {"name": "find"}}],
     }
-    (scope / "chat_request_analytics_v2.json").write_text(
-        json.dumps(body), encoding="utf-8"
-    )
+    (scope / "chat_request_analytics_v2.json").write_text(json.dumps(body), encoding="utf-8")
     store = FsCatalogStore(root=user)
     cfg = RuntimeConfig(
         target=DataTarget(bucket="yelp-data", scope="_default", collection="_default"),

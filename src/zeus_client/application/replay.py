@@ -7,13 +7,13 @@ for a scripted dialogue. Full agent re-execution is agent-turn + fakes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from zeus_client.application.debug_export import (
     event_type_sequence,
-    export_journal_redacted,
     filter_export_by_turn,
 )
 from zeus_client.domain.journal.export import JournalExport, export_journal
@@ -119,9 +119,7 @@ def transport_replay(
 
     expected_t = tuple(expected_types) if expected_types is not None else None
     if expected_t is not None:
-        errors.extend(
-            assert_event_type_sequence(actual, expected_t, allow_extra=allow_extra)
-        )
+        errors.extend(assert_event_type_sequence(actual, expected_t, allow_extra=allow_extra))
     else:
         notes.append("no expected_types — sequence captured only")
 

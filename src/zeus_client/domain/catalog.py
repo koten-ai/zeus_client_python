@@ -11,13 +11,13 @@ Never invent production stamps.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from zeus_client.domain.contract import (
-    extract_stamped_hash,
     heal_trailing_ws_stamp_drift,
 )
 

@@ -1,8 +1,9 @@
 """Post-terminate policy table + hooks dual score."""
+
 from zeus_client.agent.hooks import AgentHooks
 from zeus_client.agent.layer_a import parse_layer_a
 from zeus_client.agent.policy import decide_policy, sticky_or_flags
-from zeus_client.agent.settings import ClientSettings, prepare_settings
+from zeus_client.agent.settings import prepare_settings
 
 
 def _layer(**extra):
@@ -66,22 +67,26 @@ def test_extract_structured_with_policy():
     from zeus_client.agent.response import extract_structured_response
 
     trace = {
-        "steps": [{
-            "type": "return",
-            "args": {
-                "summary": "ok",
-                "query_decomposition": {"intent": "List"},
-                "decomposition": {"targets": []},
-                "confidence": "high",
-                "policy_action": "answer",
-                "business_rules_triggers": {"loyalty": True},
-            },
-        }],
+        "steps": [
+            {
+                "type": "return",
+                "args": {
+                    "summary": "ok",
+                    "query_decomposition": {"intent": "List"},
+                    "decomposition": {"targets": []},
+                    "confidence": "high",
+                    "policy_action": "answer",
+                    "business_rules_triggers": {"loyalty": True},
+                },
+            }
+        ],
         "tool_calls": [],
     }
     settings = prepare_settings({"rules": {"loyalty": "Honor loyalty."}})
     resp = extract_structured_response(
-        "ok", trace, {"messages": [{"role": "system", "content": "x"}]},
+        "ok",
+        trace,
+        {"messages": [{"role": "system", "content": "x"}]},
         settings=settings,
         hooks_jailbreak_score=0.0,
         apply_policy=True,

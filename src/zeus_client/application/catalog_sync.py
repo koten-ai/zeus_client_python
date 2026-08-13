@@ -115,7 +115,7 @@ def _auto_modes(cfg: Mapping[str, Any], bucket: str, scope: str) -> list[str]:
     if isinstance(cfg.get("scope_contracts"), Mapping):
         contracts = cfg["scope_contracts"]  # type: ignore[assignment]
     elif isinstance(cfg.get("zeus"), Mapping):
-        contracts = (cfg["zeus"].get("scope_contracts") or {})  # type: ignore[index]
+        contracts = cfg["zeus"].get("scope_contracts") or {}  # type: ignore[index]
     entry = contracts.get(scope_key) or {}
     if isinstance(entry, Mapping):
         for key in entry:
@@ -235,15 +235,16 @@ async def sync_catalogs(
                     preserve_reason = should_preserve_local_catalog(local_doc, doc)
                     if preserve_reason:
                         rel_existing = (
-                            str(out.relative_to(store.root)) if out.is_file() else chat_request_filename(mode)
+                            str(out.relative_to(store.root))
+                            if out.is_file()
+                            else chat_request_filename(mode)
                         )
                         result.skipped.append(
                             {
                                 "scope": f"{bucket}/{scope}",
                                 "mode": mode,
                                 "path": rel_existing,
-                                "hash": prev.get("hash")
-                                or doc_fingerprint(local_doc),
+                                "hash": prev.get("hash") or doc_fingerprint(local_doc),
                                 "reason": preserve_reason,
                             }
                         )

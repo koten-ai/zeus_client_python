@@ -1,4 +1,5 @@
 """Trace pipeline spans and tool-order helpers."""
+
 import json
 
 from zeus_client.trace.pipeline import _pipeline_step_costs as pipeline_step_costs
@@ -64,10 +65,12 @@ def test_pipeline_py_step_costs_branches():
     assert pipeline_step_costs({"result_full": body})[0]["as"] == "b"
 
     assert pipeline_step_costs({"result": "not-json"}) == []
-    assert pipeline_step_costs({
-        "name": "pipeline",
-        "result": json.dumps({"status": "error"}),
-    }) == [{"status": "error"}]
+    assert pipeline_step_costs(
+        {
+            "name": "pipeline",
+            "result": json.dumps({"status": "error"}),
+        }
+    ) == [{"status": "error"}]
 
     plan = {"args": {"steps": [{"name": "x"}, "bad", {"name": "y"}]}}
     costs = pipeline_step_costs(plan)
@@ -114,15 +117,24 @@ def test_build_v1_tool_order_from_chats():
     chats = {
         "c1": {
             "created": 1,
-            "traces": [{
-                "api_version": "v1",
-                "trace": {"steps": [
-                    {"type": "tool", "name": "find_nodes"},
-                    {"type": "tool", "name": "pipeline", "args": {
-                        "steps": [{"name": "inner", "verb": "traverse"}],
-                    }, "pipeline_step_costs": [{"as": "inner"}]},
-                ]},
-            }],
+            "traces": [
+                {
+                    "api_version": "v1",
+                    "trace": {
+                        "steps": [
+                            {"type": "tool", "name": "find_nodes"},
+                            {
+                                "type": "tool",
+                                "name": "pipeline",
+                                "args": {
+                                    "steps": [{"name": "inner", "verb": "traverse"}],
+                                },
+                                "pipeline_step_costs": [{"as": "inner"}],
+                            },
+                        ]
+                    },
+                }
+            ],
             "turns": [
                 {"role": "user", "content": "hi"},
                 {"role": "assistant", "tool_calls": [{"function": {"name": "get_stats"}}]},

@@ -1,4 +1,5 @@
 """Import archived V1 tree as ``zeus_client`` for historical oracles only."""
+
 from __future__ import annotations
 
 import sys

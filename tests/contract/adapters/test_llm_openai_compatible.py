@@ -21,7 +21,6 @@ from zeus_client.domain.journal.events import EVENT_LLM_ROUND
 from zeus_client.domain.llm_classify import RetryBudget
 from zeus_client.ports import LlmRequest
 
-
 BASE = "https://api.x.ai/v1"
 KEY = "sk-test-secret-key"
 
@@ -162,9 +161,7 @@ async def test_complete_429_rate_retries_then_ok() -> None:
         sleep=_sleep,
     )
     try:
-        resp = await client.complete(
-            LlmRequest(messages=({"role": "user", "content": "x"},))
-        )
+        resp = await client.complete(LlmRequest(messages=({"role": "user", "content": "x"},)))
     finally:
         await client.aclose()
 

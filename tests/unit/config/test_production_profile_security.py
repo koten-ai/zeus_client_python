@@ -18,9 +18,7 @@ def test_production_rejects_auth_mode_none() -> None:
 
 
 def test_production_rejects_tls_verify_off() -> None:
-    base = RuntimeConfig(
-        zeus=ZeusEndpointConfig(auth_mode="basic", username="u", tls_verify=False)
-    )
+    base = RuntimeConfig(zeus=ZeusEndpointConfig(auth_mode="basic", username="u", tls_verify=False))
     with pytest.raises(ConfigError) as ei:
         apply_profile(base, "production")
     assert ei.value.code is ErrorCode.CONFIG_INVALID

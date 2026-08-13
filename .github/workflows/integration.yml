@@ -1,0 +1,32 @@
+# Lab-only integration suite (BEST_PRACTICES §11.2).
+# Non-blocking; disabled until tests/integration has real cases + secrets.
+name: Integration (opt-in)
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 9 * * 1"  # enable when secrets + tests exist
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    if: ${{ false }}  # flip when tests/integration has real cases + secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install and run integration markers
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+          pytest -q -m integration
+        env:
+          # ZEUS_URL: ${{ secrets.ZEUS_URL }}
+          # Never invent stamps/credentials in logs.
+          PLACEHOLDER: "1"

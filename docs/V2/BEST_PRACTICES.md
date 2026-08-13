@@ -359,14 +359,17 @@ Keep V2 design docs updated when architecture decisions change — **do not** le
 
 ## 11. CI/CD recommendations
 
+Implemented by **`make ci`** and **`.github/workflows/ci.yml`** (PR/push). Release: `.github/workflows/release.yml` on tag `v*`. Integration: `.github/workflows/integration.yml` (opt-in stub).
+
 ### 11.1 PR pipeline
 
 ```text
 ruff check/format
-typecheck (public + domain + application)
+typecheck (public + domain + config; application/compat incremental)
 pytest -q -m "not integration"
-pip audit / safety (non-blocking warn → blocking on GA)
-coverage report (fail under threshold)
+pip audit / safety (non-blocking warn → blocking on ZCP-44)
+coverage report (fail under threshold; COV_FAIL_UNDER=75)
+build sdist/wheel + twine check
 ```
 
 ### 11.2 Nightly / manual

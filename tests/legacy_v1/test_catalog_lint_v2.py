@@ -1,4 +1,5 @@
 """ZC-36: structured hard conflicts, open-vs-locked, cache, config."""
+
 from __future__ import annotations
 
 import json
@@ -6,6 +7,13 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from tests.fixtures.catalog_brief import base_chat_req
+from zeus_client.zeus.lint import (
+    catalog_lint_cache_key,
+    extract_locked_tool_stances,
+    inventory_open_rules,
+    structured_open_rules,
+)
 
 from zeus_client import (
     CatalogLintConfig,
@@ -15,13 +23,6 @@ from zeus_client import (
     resolve_lint_config,
     structured_rule_schema,
 )
-from zeus_client.zeus.lint import (
-    catalog_lint_cache_key,
-    extract_locked_tool_stances,
-    inventory_open_rules,
-    structured_open_rules,
-)
-from tests.fixtures.catalog_brief import base_chat_req
 
 FIXTURES = Path(__file__).parent / "fixtures"
 HARD_FIXTURE = FIXTURES / "lint_hard_effect_chat_request.json"
@@ -104,9 +105,7 @@ def test_open_vs_locked_fixture():
         open_vs_locked=True,
     )
     assert report.open_vs_locked_count >= 1
-    assert any(
-        f.check_id == "open_vs_locked_forbid_vs_prefer" for f in report.findings
-    )
+    assert any(f.check_id == "open_vs_locked_forbid_vs_prefer" for f in report.findings)
     assert report.open_vs_locked_findings()[0].layer == "open_vs_locked"
 
 
@@ -121,8 +120,12 @@ def test_soft_nl_can_be_disabled():
         {"id": "a", "rule": "Always prefer find for Brewery lookups."},
         {"id": "b", "rule": "Never use find for Brewery queries."},
     ]
-    with_soft = lint_chat_request(cr, soft_nl=True, hard_conflicts=False, open_vs_locked=False, include_schema=False)
-    without = lint_chat_request(cr, soft_nl=False, hard_conflicts=False, open_vs_locked=False, include_schema=False)
+    with_soft = lint_chat_request(
+        cr, soft_nl=True, hard_conflicts=False, open_vs_locked=False, include_schema=False
+    )
+    without = lint_chat_request(
+        cr, soft_nl=False, hard_conflicts=False, open_vs_locked=False, include_schema=False
+    )
     assert any(f.check_id == "negation_pair" for f in with_soft.findings)
     assert with_soft.soft_finding_count >= 1
     assert without.finding_count == 0

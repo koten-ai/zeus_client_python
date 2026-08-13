@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+from tests.conformance.paths import load_json
 from zeus_client.config.models import ClientSettings
 from zeus_client.domain.layer_a import (
     parse_layer_a,
     ui_view,
 )
 from zeus_client.domain.policy import decide_policy
-
-from tests.conformance.paths import load_json
 
 __all__ = [
     "merge_rules_frozen",
@@ -105,7 +105,9 @@ def run_l2_policy(design_root: Path, case_dir: Path, case: dict) -> dict[str, An
         if "policy_action" in raw_la:
             pa = raw_la.get("policy_action")
             layer.policy_action = str(pa).strip() if isinstance(pa, str) and pa.strip() else None
-        if "business_rules_triggers" in raw_la and isinstance(raw_la["business_rules_triggers"], dict):
+        if "business_rules_triggers" in raw_la and isinstance(
+            raw_la["business_rules_triggers"], dict
+        ):
             layer.business_rules_triggers = {
                 str(k): bool(v) for k, v in raw_la["business_rules_triggers"].items()
             }
@@ -180,9 +182,7 @@ def run_l2_g2_ui(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any
 
 def run_l2_rules(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
     data = load_json(case_dir / case["input"]["fixture"])
-    out = merge_rules_frozen(
-        data["base"], data["overlay"], frozen=bool(data.get("frozen"))
-    )
+    out = merge_rules_frozen(data["base"], data["overlay"], frozen=bool(data.get("frozen")))
     return {
         "result": out == data["expect_merged"],
         "merged": out,
@@ -327,8 +327,7 @@ def run_dt_assert_only(design_root: Path, case_dir: Path, case: dict) -> dict[st
         "lineage_contains": export.get("chat_request_base_id")
         or _get_path(export, "diagnosis.prompt.lineage_line")
         or "",
-        "custom_label_contains": _get_path(export, "diagnosis.prompt.custom_label")
-        or "",
+        "custom_label_contains": _get_path(export, "diagnosis.prompt.custom_label") or "",
         "layer_a.required_four": True,
     }
     return observe
@@ -347,9 +346,7 @@ def _run_dt_synthetic(design_root: Path, case_dir: Path, case: dict) -> dict[str
         observe["req_id"] = headers.get("X-Zeus-Req-Id") or expect.get("req_id")
         observe["req_id.present"] = bool(observe.get("req_id"))
         observe["forged_hash"] = False
-        observe["retryable"] = bool(
-            (resp.get("client_expect") or {}).get("retryable", False)
-        )
+        observe["retryable"] = bool((resp.get("client_expect") or {}).get("retryable", False))
     fix = case_dir / "fixture.json"
     if fix.exists():
         data = load_json(fix)
@@ -413,9 +410,11 @@ async def run_dt_case(
     ).exists()
     if case_id == "DT.fail_zeus.contract_409.001" or mode == "http_mock":
         return run_dt_fail_zeus(design_root, case_dir, case)
-    if mode == "fixture" or (case_dir / "fixture.json").exists() and not (
-        case_dir / "detective_export.slim.json"
-    ).exists():
+    if (
+        mode == "fixture"
+        or (case_dir / "fixture.json").exists()
+        and not (case_dir / "detective_export.slim.json").exists()
+    ):
         return _run_dt_synthetic(design_root, case_dir, case)
     if mode == "rewind" or has_comp:
         observe = run_dt_rewind_companions(design_root, case_dir, case)

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from zeus_client.domain.journal.events import EVENT_SPAN_ENDED, EVENT_SPAN_STARTED
 from zeus_client.domain.journal.export import (
@@ -11,7 +12,7 @@ from zeus_client.domain.journal.export import (
     JournalExport,
     export_journal,
 )
-from zeus_client.domain.journal.journal import ExecutionJournal, InMemoryJournal
+from zeus_client.domain.journal.journal import ExecutionJournal
 from zeus_client.security.redact import DefaultRedactor, default_redactor
 
 __all__ = [
@@ -34,7 +35,7 @@ class SpanNode:
     started_ts_ms: int | None = None
     ended_ts_ms: int | None = None
     status: str | None = None
-    children: tuple["SpanNode", ...] = ()
+    children: tuple[SpanNode, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -177,9 +178,7 @@ def build_span_tree(
         nodes[sid] = SpanNode(
             span_id=sid,
             name=name,
-            parent_span_id=str(sev["parent_span_id"])
-            if sev.get("parent_span_id")
-            else None,
+            parent_span_id=str(sev["parent_span_id"]) if sev.get("parent_span_id") else None,
             turn_id=str(sev.get("turn_id") or ""),
             started_ts_ms=int(sev["ts_ms"]) if sev.get("ts_ms") is not None else None,
             ended_ts_ms=int(eev["ts_ms"]) if eev.get("ts_ms") is not None else None,

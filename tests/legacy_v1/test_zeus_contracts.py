@@ -1,5 +1,4 @@
 """Tests for python3/zeus/contracts.py — contract binding resolution."""
-import pytest
 
 from zeus_client.zeus.contracts import resolve_contract_for_scope
 

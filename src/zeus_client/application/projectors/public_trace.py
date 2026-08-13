@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 __all__ = ["build_public_trace"]
 
@@ -39,9 +40,7 @@ def build_public_trace(
         "flags": dict(flags or {}),
         # G2 quarantine: scores stay under artifacts key only when present on layer_a
         "artifacts_keys": (
-            ["jail_break_attempt", "wish_i_knew", "hooks_jailbreak_score"]
-            if layer_a
-            else []
+            ["jail_break_attempt", "wish_i_knew", "hooks_jailbreak_score"] if layer_a else []
         ),
     }
     if tokens is not None:

@@ -1,17 +1,20 @@
 """Additional branch coverage for python3/agent/tool_round.py."""
+
 import json
 
-import httpx
 import pytest
-
 import zeus_client.agent.tool_round as tr
 from zeus_client.agent.hooks import AgentDecision, AgentHooks
 
 
 def _trace():
     return {
-        "steps": [], "spans": [], "ai_requests": [], "ai_responses": [],
-        "tool_calls": [], "notes": [],
+        "steps": [],
+        "spans": [],
+        "ai_requests": [],
+        "ai_responses": [],
+        "tool_calls": [],
+        "notes": [],
     }
 
 
@@ -27,7 +30,18 @@ async def test_round_start_stop_with_force_return(monkeypatch):
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     trace = _trace()
     answer, should_break, msg = await tr.run_llm_round(
-        1, "m", [], [], None, None, "http://llm", "k", StopHooks(), {}, trace, lambda: 0,
+        1,
+        "m",
+        [],
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        StopHooks(),
+        {},
+        trace,
+        lambda: 0,
     )
     assert should_break is True
     assert answer == "done early"
@@ -43,14 +57,27 @@ async def test_round_start_inject_only(monkeypatch):
 
     async def fake_llm(*_a, **_k):
         return 200, {
-            "choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "hi"}}],
+            "choices": [
+                {"finish_reason": "stop", "message": {"role": "assistant", "content": "hi"}}
+            ],
         }
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     messages = []
     trace = _trace()
     answer, should_break, msg = await tr.run_llm_round(
-        1, "m", messages, [], None, None, "http://llm", "k", InjectHooks(), {}, trace, lambda: 0,
+        1,
+        "m",
+        messages,
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        InjectHooks(),
+        {},
+        trace,
+        lambda: 0,
     )
     assert any(m.get("content") == "injected" for m in messages)
     assert "hook injected" in trace["notes"][-1]
@@ -69,7 +96,18 @@ async def test_on_ai_response_stop(monkeypatch):
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     answer, should_break, msg = await tr.run_llm_round(
-        1, "m", [], [], None, None, "http://llm", "k", AiStopHooks(), {}, _trace(), lambda: 0,
+        1,
+        "m",
+        [],
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        AiStopHooks(),
+        {},
+        _trace(),
+        lambda: 0,
     )
     assert answer == "blocked"
     assert should_break is True
@@ -82,7 +120,18 @@ async def test_llm_http_error(monkeypatch):
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     answer, should_break, msg = await tr.run_llm_round(
-        1, "m", [], [], None, None, "http://llm", "k", AgentHooks(), {}, _trace(), lambda: 0,
+        1,
+        "m",
+        [],
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
     )
     assert should_break is True
     assert "HTTP 502" in answer
@@ -95,7 +144,18 @@ async def test_llm_non_dict_response(monkeypatch):
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     answer, should_break, _ = await tr.run_llm_round(
-        1, "m", [], [], None, None, "http://llm", "k", AgentHooks(), {}, _trace(), lambda: 0,
+        1,
+        "m",
+        [],
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
     )
     assert should_break is True
     assert "HTTP 200" in answer
@@ -105,17 +165,30 @@ async def test_llm_non_dict_response(monkeypatch):
 async def test_no_tool_calls_returns_content(monkeypatch):
     async def fake_llm(*_a, **_k):
         return 200, {
-            "choices": [{
-                "finish_reason": "stop",
-                "message": {"role": "assistant", "content": "final answer"},
-            }],
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"role": "assistant", "content": "final answer"},
+                }
+            ],
             "usage": {"total_tokens": 10},
         }
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     messages = []
     answer, should_break, msg = await tr.run_llm_round(
-        1, "m", messages, [], None, None, "http://llm", "k", AgentHooks(), {}, _trace(), lambda: 0,
+        1,
+        "m",
+        messages,
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
     )
     assert answer == "final answer"
     assert should_break is True
@@ -129,28 +202,59 @@ async def test_no_content_fallback(monkeypatch):
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     answer, should_break, _ = await tr.run_llm_round(
-        1, "m", [], [], None, None, "http://llm", "k", AgentHooks(), {}, _trace(), lambda: 0,
+        1,
+        "m",
+        [],
+        [],
+        None,
+        None,
+        "http://llm",
+        "k",
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
     )
     assert answer == "(model returned no content)"
 
 
 @pytest.mark.asyncio
-
 @pytest.mark.asyncio
 async def test_return_result_tool_ends_turn(monkeypatch):
     async def fake_dispatch(*_a, **_k):
         pytest.fail("dispatch should not run for return_result")
 
     monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
-    tool_calls = [{
-        "id": "c1",
-        "function": {"name": "return_result", "arguments": json.dumps({"summary": "The answer"})},
-    }]
+    tool_calls = [
+        {
+            "id": "c1",
+            "function": {
+                "name": "return_result",
+                "arguments": json.dumps({"summary": "The answer"}),
+            },
+        }
+    ]
     messages = []
     trace = _trace()
     answer, should_break, _, outcome = await tr.execute_tool_calls(
-        1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        messages,
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert answer == "The answer"
     assert should_break is True
@@ -163,27 +267,47 @@ async def test_return_result_tool_ends_turn(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pipeline_turn_complete_is_return_seen(monkeypatch):
-    body = json.dumps({
-        "turn_complete": True,
-        "summary": "pipeline done",
-        "data": {"rows": [{"name": "A"}]},
-    })
+    body = json.dumps(
+        {
+            "turn_complete": True,
+            "summary": "pipeline done",
+            "data": {"rows": [{"name": "A"}]},
+        }
+    )
 
     async def fake_dispatch(*_a, **_k):
         return 200, body, "http://z/pipeline", "req-p"
 
     monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
-    tool_calls = [{
-        "id": "c1",
-        "function": {
-            "name": "pipeline",
-            "arguments": json.dumps({"steps": [{"as": "x", "verb": "find"}]}),
-        },
-    }]
+    tool_calls = [
+        {
+            "id": "c1",
+            "function": {
+                "name": "pipeline",
+                "arguments": json.dumps({"steps": [{"as": "x", "verb": "find"}]}),
+            },
+        }
+    ]
     messages = []
     answer, should_break, _, outcome = await tr.execute_tool_calls(
-        1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, _trace(), lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        messages,
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert should_break is True
     assert outcome.return_seen is True
@@ -194,30 +318,52 @@ async def test_pipeline_turn_complete_is_return_seen(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pipeline_args_summary_captured_without_turn_complete(monkeypatch):
-    body = json.dumps({
-        "status": "failed",
-        "error": "project failed",
-        "results_so_far": {"reno_biz": {"rows": [{"name": "A"}]}},
-    })
+    body = json.dumps(
+        {
+            "status": "failed",
+            "error": "project failed",
+            "results_so_far": {"reno_biz": {"rows": [{"name": "A"}]}},
+        }
+    )
 
     async def fake_dispatch(*_a, **_k):
         return 200, body, "http://z/pipeline", "req-p"
 
     monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
-    tool_calls = [{
-        "id": "c1",
-        "function": {
-            "name": "pipeline",
-            "arguments": json.dumps({
-                "summary": "Businesses in Reno ranked by review count",
-                "steps": [{"as": "x", "verb": "find"}],
-            }),
-        },
-    }]
+    tool_calls = [
+        {
+            "id": "c1",
+            "function": {
+                "name": "pipeline",
+                "arguments": json.dumps(
+                    {
+                        "summary": "Businesses in Reno ranked by review count",
+                        "steps": [{"as": "x", "verb": "find"}],
+                    }
+                ),
+            },
+        }
+    ]
     messages = []
     answer, should_break, _, outcome = await tr.execute_tool_calls(
-        1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, _trace(), lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        messages,
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert should_break is False
     assert outcome.return_seen is False
@@ -251,8 +397,17 @@ async def test_force_final_llm_answer_no_tools(monkeypatch):
     messages = [{"role": "user", "content": "q"}]
     trace = _trace()
     out = await tr.force_final_llm_answer(
-        1, "m", messages, None, None, "http://llm", "k",
-        AgentHooks(), {}, trace, lambda: 0,
+        1,
+        "m",
+        messages,
+        None,
+        None,
+        "http://llm",
+        "k",
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
         instruction=tr.INSIGHT_AFTER_ZEUS_INSTRUCTION,
         cause="test",
     )
@@ -277,8 +432,24 @@ async def test_invalid_tool_args_json(monkeypatch):
     messages = []
     trace = _trace()
     _, should_break, _, outcome = await tr.execute_tool_calls(
-        1, tool_calls, messages, "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        messages,
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert should_break is False
     assert trace["tool_calls"][0]["args"] == {}
@@ -289,8 +460,17 @@ async def test_invalid_tool_args_json(monkeypatch):
 async def test_basic_auth_401_retry_success(monkeypatch, reset_auth_cache, http_client):
     calls = []
 
-    async def flaky_dispatch(api_version, zeus_url, bucket, scope, collection, name, args,
-                             zeus_headers, corr_headers=None):
+    async def flaky_dispatch(
+        api_version,
+        zeus_url,
+        bucket,
+        scope,
+        collection,
+        name,
+        args,
+        zeus_headers,
+        corr_headers=None,
+    ):
         calls.append(zeus_headers.get("X-Zeus-Session", ""))
         if len(calls) == 1:
             return 401, "unauthorized", "http://z/find", ""
@@ -306,9 +486,24 @@ async def test_basic_auth_401_retry_success(monkeypatch, reset_auth_cache, http_
     trace = _trace()
     zcfg = {"auth_mode": "basic"}
     _, should_break, headers, _ = await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        zcfg, {"X-Zeus-Session": "sid-old"}, AgentHooks(), {}, trace, lambda: 0,
-        "t1", "conv", False, [],
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        zcfg,
+        {"X-Zeus-Session": "sid-old"},
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert should_break is False
     assert headers["X-Zeus-Session"] == "sid-new"
@@ -330,34 +525,69 @@ async def test_basic_auth_401_remint_failure(monkeypatch):
     tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "{}"}}]
     trace = _trace()
     _, _, _, _ = await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {"auth_mode": "basic"}, {}, AgentHooks(), {}, trace, lambda: 0,
-        "t1", "conv", False, [],
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {"auth_mode": "basic"},
+        {},
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert any("re-mint after 401 failed" in n for n in trace["notes"])
 
 
 @pytest.mark.asyncio
 async def test_pipeline_step_spans(monkeypatch):
-    pipeline_result = json.dumps({
-        "meta": {"step_costs": [{"as": "s1", "ms": 10, "verb": "find"}]},
-    })
+    pipeline_result = json.dumps(
+        {
+            "meta": {"step_costs": [{"as": "s1", "ms": 10, "verb": "find"}]},
+        }
+    )
 
     async def fake_dispatch(*_a, **_k):
         return 200, pipeline_result, "http://z/pipeline", "req-p"
 
     monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
-    tool_calls = [{
-        "id": "c1",
-        "function": {
-            "name": "pipeline",
-            "arguments": json.dumps({"steps": [{"name": "s1", "verb": "find"}]}),
-        },
-    }]
+    tool_calls = [
+        {
+            "id": "c1",
+            "function": {
+                "name": "pipeline",
+                "arguments": json.dumps({"steps": [{"name": "s1", "verb": "find"}]}),
+            },
+        }
+    ]
     trace = _trace()
     await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert any(s.get("name", "").startswith("pipeline.") for s in trace["spans"])
 
@@ -372,8 +602,24 @@ async def test_toon_and_req_id_tracking(monkeypatch):
     trace = _trace()
     this_turn_reqs = []
     await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {"mode": "analytics"}, trace, lambda: 0, "t1", "conv-9", True, this_turn_reqs,
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {"mode": "analytics"},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv-9",
+        True,
+        this_turn_reqs,
     )
     assert trace["tool_calls"][0]["ai_content_format"] == "toon"
     assert len(this_turn_reqs) == 1
@@ -392,8 +638,15 @@ async def test_force_trace_header_from_zcfg(monkeypatch):
     captured = {}
 
     async def capture_dispatch(
-        api_version, zeus_url, bucket, scope, collection, name, args,
-        zeus_headers, corr_headers=None,
+        api_version,
+        zeus_url,
+        bucket,
+        scope,
+        collection,
+        name,
+        args,
+        zeus_headers,
+        corr_headers=None,
     ):
         captured["corr"] = corr_headers
         return 200, "{}", "http://z/find", "r1"
@@ -401,9 +654,24 @@ async def test_force_trace_header_from_zcfg(monkeypatch):
     monkeypatch.setattr(tr, "dispatch_zeus_call", capture_dispatch)
     tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "{}"}}]
     await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {"force_trace": True}, {}, AgentHooks(), {"mode": "analytics"}, _trace(),
-        lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {"force_trace": True},
+        {},
+        AgentHooks(),
+        {"mode": "analytics"},
+        _trace(),
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert captured["corr"]["X-Zeus-Trace"] == "1"
     assert captured["corr"]["X-Zeus-Mode"] == "analytics"
@@ -411,25 +679,43 @@ async def test_force_trace_header_from_zcfg(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pipeline_hop_includes_step_costs(monkeypatch):
-    body = json.dumps({
-        "status": "ok",
-        "meta": {
-            "step_costs": [
-                {"as": "tampa", "status": "ok", "result_size": 0, "ms": 22},
-            ],
-            "steps_executed": 1,
-        },
-    })
+    body = json.dumps(
+        {
+            "status": "ok",
+            "meta": {
+                "step_costs": [
+                    {"as": "tampa", "status": "ok", "result_size": 0, "ms": 22},
+                ],
+                "steps_executed": 1,
+            },
+        }
+    )
 
     async def fake_dispatch(*_a, **_k):
         return 200, body, "http://z/pipeline", "req-pipe"
 
     monkeypatch.setattr(tr, "dispatch_zeus_call", fake_dispatch)
-    tool_calls = [{"id": "c1", "function": {"name": "pipeline", "arguments": "{\"steps\":[]}"}}]
+    tool_calls = [{"id": "c1", "function": {"name": "pipeline", "arguments": '{"steps":[]}'}}]
     this_turn_reqs = []
     await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, _trace(), lambda: 0, "t1", "conv", False, this_turn_reqs,
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        _trace(),
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        this_turn_reqs,
     )
     assert this_turn_reqs[0]["name"] == "pipeline"
     assert this_turn_reqs[0]["step_costs"][0]["as"] == "tampa"
@@ -445,7 +731,23 @@ async def test_non_json_tool_result(monkeypatch):
     tool_calls = [{"id": "c1", "function": {"name": "find", "arguments": "{}"}}]
     trace = _trace()
     await tr.execute_tool_calls(
-        1, tool_calls, [], "v2", "http://z", "b", "s", "c",
-        {}, {}, AgentHooks(), {}, trace, lambda: 0, "t1", "conv", False, [],
+        1,
+        tool_calls,
+        [],
+        "v2",
+        "http://z",
+        "b",
+        "s",
+        "c",
+        {},
+        {},
+        AgentHooks(),
+        {},
+        trace,
+        lambda: 0,
+        "t1",
+        "conv",
+        False,
+        [],
     )
     assert trace["tool_calls"][0]["result_json"] is None

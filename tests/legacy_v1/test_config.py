@@ -1,4 +1,5 @@
 """Config load/save and Zeus connection resolution tests."""
+
 import json
 
 import pytest
@@ -27,13 +28,15 @@ def test_resolve_zeus_config_returns_zeus_section():
 
 
 def test_zeus_connections_migrates_to_single_zeus():
-    cfg = normalize_config({
-        "default_zeus_connection": "staging",
-        "zeus_connections": [
-            {"name": "default", "url": "http://default:8080", "auth_mode": "none"},
-            {"name": "staging", "url": "http://staging:8080", "auth_mode": "basic"},
-        ],
-    })
+    cfg = normalize_config(
+        {
+            "default_zeus_connection": "staging",
+            "zeus_connections": [
+                {"name": "default", "url": "http://default:8080", "auth_mode": "none"},
+                {"name": "staging", "url": "http://staging:8080", "auth_mode": "basic"},
+            ],
+        }
+    )
     assert "zeus_connections" not in cfg
     assert "default_zeus_connection" not in cfg
     assert cfg["zeus"]["url"] == "http://staging:8080"
@@ -41,20 +44,24 @@ def test_zeus_connections_migrates_to_single_zeus():
 
 
 def test_zeus_connections_falls_back_to_first_when_default_missing():
-    cfg = normalize_config({
-        "default_zeus_connection": "nonexistent",
-        "zeus_connections": [
-            {"name": "default", "url": "http://default:8080", "auth_mode": "none"},
-            {"name": "staging", "url": "http://staging:8080", "auth_mode": "basic"},
-        ],
-    })
+    cfg = normalize_config(
+        {
+            "default_zeus_connection": "nonexistent",
+            "zeus_connections": [
+                {"name": "default", "url": "http://default:8080", "auth_mode": "none"},
+                {"name": "staging", "url": "http://staging:8080", "auth_mode": "basic"},
+            ],
+        }
+    )
     assert cfg["zeus"]["url"] == "http://default:8080"
 
 
 def test_zeus_url_env_overrides_at_resolve_only(monkeypatch):
-    cfg = normalize_config({
-        "zeus": {"url": "http://default:8080", "auth_mode": "none"},
-    })
+    cfg = normalize_config(
+        {
+            "zeus": {"url": "http://default:8080", "auth_mode": "none"},
+        }
+    )
     monkeypatch.setenv("ZEUS_URL", "http://docker-zeus:8080")
     assert cfg["zeus"]["url"] == "http://default:8080"
     z = resolve_zeus_config(cfg)
@@ -66,15 +73,17 @@ def test_resolve_empty_when_no_zeus():
 
 
 def test_strips_legacy_connection_fields():
-    cfg = normalize_config({
-        "zeus": {
-            "id": "zeus_default",
-            "name": "default",
-            "workbench_url": "http://workbench:3000",
-            "url": "http://zeus:8080",
-            "auth_mode": "none",
-        },
-    })
+    cfg = normalize_config(
+        {
+            "zeus": {
+                "id": "zeus_default",
+                "name": "default",
+                "workbench_url": "http://workbench:3000",
+                "url": "http://zeus:8080",
+                "auth_mode": "none",
+            },
+        }
+    )
     assert "id" not in cfg["zeus"]
     assert "name" not in cfg["zeus"]
     assert "workbench_url" not in cfg["zeus"]
@@ -96,24 +105,26 @@ def test_resolve_llm_provider_config_returns_section():
 
 
 def test_providers_migrates_to_single_llm_provider():
-    cfg = normalize_config({
-        "default_provider": "openai",
-        "provider_pool": ["grok", "openai"],
-        "providers": {
-            "grok": {
-                "label": "xAI Grok",
-                "base_url": "https://api.x.ai/v1",
-                "api_key": "",
-                "models": ["grok-4"],
+    cfg = normalize_config(
+        {
+            "default_provider": "openai",
+            "provider_pool": ["grok", "openai"],
+            "providers": {
+                "grok": {
+                    "label": "xAI Grok",
+                    "base_url": "https://api.x.ai/v1",
+                    "api_key": "",
+                    "models": ["grok-4"],
+                },
+                "openai": {
+                    "label": "OpenAI",
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-test",
+                    "models": ["gpt-4o"],
+                },
             },
-            "openai": {
-                "label": "OpenAI",
-                "base_url": "https://api.openai.com/v1",
-                "api_key": "sk-test",
-                "models": ["gpt-4o"],
-            },
-        },
-    })
+        }
+    )
     assert "providers" not in cfg
     assert "default_provider" not in cfg
     assert "provider_pool" not in cfg
@@ -122,36 +133,40 @@ def test_providers_migrates_to_single_llm_provider():
 
 
 def test_providers_falls_back_to_first_when_default_missing():
-    cfg = normalize_config({
-        "default_provider": "missing",
-        "providers": {
-            "grok": {
-                "label": "xAI Grok",
-                "base_url": "https://api.x.ai/v1",
-                "api_key": "",
-                "models": ["grok-4"],
+    cfg = normalize_config(
+        {
+            "default_provider": "missing",
+            "providers": {
+                "grok": {
+                    "label": "xAI Grok",
+                    "base_url": "https://api.x.ai/v1",
+                    "api_key": "",
+                    "models": ["grok-4"],
+                },
+                "openai": {
+                    "label": "OpenAI",
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-test",
+                    "models": ["gpt-4o"],
+                },
             },
-            "openai": {
-                "label": "OpenAI",
-                "base_url": "https://api.openai.com/v1",
-                "api_key": "sk-test",
-                "models": ["gpt-4o"],
-            },
-        },
-    })
+        }
+    )
     assert cfg["llm_provider"]["base_url"] == "https://api.x.ai/v1"
 
 
 def test_strips_extra_llm_provider_fields():
-    cfg = normalize_config({
-        "llm_provider": {
-            "label": "OpenAI",
-            "base_url": "https://api.openai.com/v1",
-            "api_key": "sk-test",
-            "models": ["gpt-4o"],
-            "extra": "ignored",
-        },
-    })
+    cfg = normalize_config(
+        {
+            "llm_provider": {
+                "label": "OpenAI",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": "sk-test",
+                "models": ["gpt-4o"],
+                "extra": "ignored",
+            },
+        }
+    )
     assert "extra" not in cfg["llm_provider"]
 
 

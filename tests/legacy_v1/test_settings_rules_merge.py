@@ -1,7 +1,7 @@
 """Settings bag, rules merge/freeze, output_request validation."""
-import pytest
 
-from zeus_client.agent.jailbreak_defaults import JAILBREAK_RULE_IDS, default_jailbreak_rules
+import pytest
+from zeus_client.agent.jailbreak_defaults import JAILBREAK_RULE_IDS
 from zeus_client.agent.settings import (
     ClientSettings,
     append_session_rules,
@@ -47,15 +47,19 @@ def test_append_only_mid_session():
 
 def test_output_request_requires_description():
     with pytest.raises(ValueError, match="description"):
-        validate_output_request({
-            "app": {"fields": {"x": {"type": "string"}}},
-        })
+        validate_output_request(
+            {
+                "app": {"fields": {"x": {"type": "string"}}},
+            }
+        )
 
 
 def test_output_request_ok():
-    doc = validate_output_request({
-        "app": {"fields": {"x": {"type": "string", "description": "X field"}}},
-    })
+    doc = validate_output_request(
+        {
+            "app": {"fields": {"x": {"type": "string", "description": "X field"}}},
+        }
+    )
     assert doc["app"]["fields"]["x"]["description"] == "X field"
 
 
@@ -67,14 +71,16 @@ def test_company_context_hard_truncate():
 
 
 def test_prepare_settings_merges():
-    s = prepare_settings({
-        "company_context": "We sell beer.",
-        "rules": {"loyalty": "Apply loyalty discounts from tools."},
-        "output_request": {
-            "app": {"fields": {"code": {"type": "string", "description": "code"}}},
-        },
-        "locale": "en-US",
-    })
+    s = prepare_settings(
+        {
+            "company_context": "We sell beer.",
+            "rules": {"loyalty": "Apply loyalty discounts from tools."},
+            "output_request": {
+                "app": {"fields": {"code": {"type": "string", "description": "code"}}},
+            },
+            "locale": "en-US",
+        }
+    )
     assert s.ruleset_id
     assert "loyalty" in (s.rules or {})
     assert "no_prompt_dump" in (s.rules or {})
@@ -96,4 +102,3 @@ def test_ai_process_result_configurable():
     assert effective_ai_process_result(s) is False
     assert effective_ai_process_result({"ai_process_result": False}) is False
     assert effective_ai_process_result({"locale": "en"}) is True
-

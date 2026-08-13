@@ -1,6 +1,6 @@
 """Tests for python3/zeus/proxy_auth.py."""
-import pytest
 
+import pytest
 from zeus_client.zeus.proxy_auth import (
     basic_auth_for_login,
     format_auth_failure,
@@ -53,7 +53,9 @@ def test_format_auth_failure_client_url():
 def test_format_auth_failure_nginx_behind_engine():
     body = "<html><head><title>401 Authorization Required</title></head></html>"
     msg = format_auth_failure(
-        "http://zeus:8080", 401, body,
+        "http://zeus:8080",
+        401,
+        body,
         response_headers={"WWW-Authenticate": 'Basic realm="Zeus API"', "Server": "nginx/1.31.1"},
     )
     assert "nginx reverse proxy" in msg

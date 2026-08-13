@@ -1,10 +1,10 @@
 """Tests for python3/zeus/session.py — durable session + trace APIs."""
+
 import json
 
 import httpx
 import pytest
 import respx
-
 from zeus_client.zeus.session import (
     continue_session_turn,
     create_zeus_session,
@@ -24,13 +24,21 @@ def _respx(respx_mock):
 
 @pytest.mark.asyncio
 async def test_create_zeus_session_success_200(http_client):
-    route = respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(
-        200,
-        json={"session_id": SID, "round": 1, "contract_status": "match"},
-        headers={"X-Zeus-Req-Id": "creq-1"},
-    ))
+    route = respx.post(f"{ZEUS_URL}/v2/session").mock(
+        return_value=httpx.Response(
+            200,
+            json={"session_id": SID, "round": 1, "contract_status": "match"},
+            headers={"X-Zeus-Req-Id": "creq-1"},
+        )
+    )
     status, body, url, req_id = await create_zeus_session(
-        ZEUS_URL, "b", "s", "cid", "chash", {"tools": []}, [{"role": "user", "content": "hi"}],
+        ZEUS_URL,
+        "b",
+        "s",
+        "cid",
+        "chash",
+        {"tools": []},
+        [{"role": "user", "content": "hi"}],
         HEADERS,
     )
     assert status == 200
@@ -45,9 +53,18 @@ async def test_create_zeus_session_success_200(http_client):
 
 @pytest.mark.asyncio
 async def test_create_zeus_session_success_201(http_client):
-    respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(201, json={"session_id": SID}))
+    respx.post(f"{ZEUS_URL}/v2/session").mock(
+        return_value=httpx.Response(201, json={"session_id": SID})
+    )
     status, body, _, _ = await create_zeus_session(
-        ZEUS_URL, "b", "s", None, None, None, None, HEADERS,
+        ZEUS_URL,
+        "b",
+        "s",
+        None,
+        None,
+        None,
+        None,
+        HEADERS,
     )
     assert status == 201
     assert body["session_id"] == SID
@@ -57,7 +74,14 @@ async def test_create_zeus_session_success_201(http_client):
 async def test_create_zeus_session_non_dict_json_body(http_client):
     respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(200, json=[1, 2]))
     status, body, _, _ = await create_zeus_session(
-        ZEUS_URL, "b", "s", "", "", {}, [], HEADERS,
+        ZEUS_URL,
+        "b",
+        "s",
+        "",
+        "",
+        {},
+        [],
+        HEADERS,
     )
     assert status == 200
     assert body["raw"] == [1, 2]
@@ -68,7 +92,14 @@ async def test_create_zeus_session_non_dict_json_body(http_client):
 async def test_create_zeus_session_invalid_json_on_success(http_client):
     respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(200, text="not-json"))
     status, body, _, _ = await create_zeus_session(
-        ZEUS_URL, "b", "s", "", "", {}, [], HEADERS,
+        ZEUS_URL,
+        "b",
+        "s",
+        "",
+        "",
+        {},
+        [],
+        HEADERS,
     )
     assert status == 200
     assert body["raw"] == "not-json"
@@ -78,7 +109,14 @@ async def test_create_zeus_session_invalid_json_on_success(http_client):
 async def test_create_zeus_session_non_2xx(http_client):
     respx.post(f"{ZEUS_URL}/v2/session").mock(return_value=httpx.Response(409, text="conflict"))
     status, body, _, req_id = await create_zeus_session(
-        ZEUS_URL, "b", "s", "c", "h", {}, [], HEADERS,
+        ZEUS_URL,
+        "b",
+        "s",
+        "c",
+        "h",
+        {},
+        [],
+        HEADERS,
     )
     assert status == 409
     assert body == "conflict"
@@ -89,7 +127,14 @@ async def test_create_zeus_session_non_2xx(http_client):
 async def test_create_zeus_session_http_error(http_client):
     respx.post(f"{ZEUS_URL}/v2/session").mock(side_effect=httpx.ConnectError("down"))
     status, body, url, req_id = await create_zeus_session(
-        ZEUS_URL, "b", "s", "", "", {}, [], HEADERS,
+        ZEUS_URL,
+        "b",
+        "s",
+        "",
+        "",
+        {},
+        [],
+        HEADERS,
     )
     assert status == 0
     assert json.loads(body)["error"] == "session_create_failed"
@@ -100,7 +145,12 @@ async def test_create_zeus_session_http_error(http_client):
 @pytest.mark.asyncio
 async def test_continue_session_turn_empty_sid():
     status, body, url, req_id = await continue_session_turn(
-        ZEUS_URL, "", 2, {}, [], HEADERS,
+        ZEUS_URL,
+        "",
+        2,
+        {},
+        [],
+        HEADERS,
     )
     assert status == 0
     assert body == "no session_id"
@@ -110,11 +160,19 @@ async def test_continue_session_turn_empty_sid():
 
 @pytest.mark.asyncio
 async def test_continue_session_turn_success(http_client):
-    route = respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(return_value=httpx.Response(
-        200, json={"round": 2}, headers={"X-Zeus-Req-Id": "treq-1"},
-    ))
+    route = respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(
+        return_value=httpx.Response(
+            200,
+            json={"round": 2},
+            headers={"X-Zeus-Req-Id": "treq-1"},
+        )
+    )
     status, body, url, req_id = await continue_session_turn(
-        ZEUS_URL, SID, 2, {"mode": "auto"}, [{"role": "assistant", "content": "ok"}],
+        ZEUS_URL,
+        SID,
+        2,
+        {"mode": "auto"},
+        [{"role": "assistant", "content": "ok"}],
         HEADERS,
     )
     assert status == 200
@@ -129,7 +187,9 @@ async def test_continue_session_turn_success(http_client):
 
 @pytest.mark.asyncio
 async def test_continue_session_turn_non_200(http_client):
-    respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(return_value=httpx.Response(400, text="bad"))
+    respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(
+        return_value=httpx.Response(400, text="bad")
+    )
     status, body, _, _ = await continue_session_turn(ZEUS_URL, SID, 2, {}, [], HEADERS)
     assert status == 400
     assert body == "bad"
@@ -137,7 +197,9 @@ async def test_continue_session_turn_non_200(http_client):
 
 @pytest.mark.asyncio
 async def test_continue_session_turn_invalid_json(http_client):
-    respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(return_value=httpx.Response(200, text="nope"))
+    respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(
+        return_value=httpx.Response(200, text="nope")
+    )
     status, body, _, _ = await continue_session_turn(ZEUS_URL, SID, 2, {}, [], HEADERS)
     assert status == 200
     assert body["raw"] == "nope"
@@ -156,7 +218,17 @@ async def test_continue_session_turn_http_error(http_client):
 @pytest.mark.asyncio
 async def test_post_session_trace_bad_params():
     status, body, url, req_id = await post_session_trace(
-        ZEUS_URL, "", 0, "r", "", "", {}, [], {}, "ok", HEADERS,
+        ZEUS_URL,
+        "",
+        0,
+        "r",
+        "",
+        "",
+        {},
+        [],
+        {},
+        "ok",
+        HEADERS,
     )
     assert status == 0
     assert body == "bad trace params"
@@ -164,7 +236,17 @@ async def test_post_session_trace_bad_params():
     assert req_id == ""
 
     status, body, _, _ = await post_session_trace(
-        ZEUS_URL, SID, 0, "r", "", "", {}, [], {}, "ok", HEADERS,
+        ZEUS_URL,
+        SID,
+        0,
+        "r",
+        "",
+        "",
+        {},
+        [],
+        {},
+        "ok",
+        HEADERS,
     )
     assert status == 0
     assert body == "bad trace params"
@@ -172,13 +254,25 @@ async def test_post_session_trace_bad_params():
 
 @pytest.mark.asyncio
 async def test_post_session_trace_success(http_client):
-    route = respx.post(f"{ZEUS_URL}/v2/session/trace").mock(return_value=httpx.Response(
-        201, json={"ok": True}, headers={"X-Zeus-Req-Id": "trace-1"},
-    ))
+    route = respx.post(f"{ZEUS_URL}/v2/session/trace").mock(
+        return_value=httpx.Response(
+            201,
+            json={"ok": True},
+            headers={"X-Zeus-Req-Id": "trace-1"},
+        )
+    )
     status, body, url, req_id = await post_session_trace(
-        ZEUS_URL, SID, 2, "req-join", "cid", "chash", {"x": 1},
+        ZEUS_URL,
+        SID,
+        2,
+        "req-join",
+        "cid",
+        "chash",
+        {"x": 1},
         [{"role": "tool", "content": "find → 200"}],
-        {"status": 200}, "ok", HEADERS,
+        {"status": 200},
+        "ok",
+        HEADERS,
     )
     assert status == 201
     assert body["ok"] is True
@@ -195,7 +289,17 @@ async def test_post_session_trace_success(http_client):
 async def test_post_session_trace_non_success(http_client):
     respx.post(f"{ZEUS_URL}/v2/session/trace").mock(return_value=httpx.Response(500, text="fail"))
     status, body, _, _ = await post_session_trace(
-        ZEUS_URL, SID, 1, "", "", "", None, None, None, None, HEADERS,
+        ZEUS_URL,
+        SID,
+        1,
+        "",
+        "",
+        "",
+        None,
+        None,
+        None,
+        None,
+        HEADERS,
     )
     assert status == 500
     assert body == "fail"
@@ -205,7 +309,17 @@ async def test_post_session_trace_non_success(http_client):
 async def test_post_session_trace_invalid_json(http_client):
     respx.post(f"{ZEUS_URL}/v2/session/trace").mock(return_value=httpx.Response(200, text="raw"))
     status, body, _, _ = await post_session_trace(
-        ZEUS_URL, SID, 1, "", "", "", {}, [], {}, "ok", HEADERS,
+        ZEUS_URL,
+        SID,
+        1,
+        "",
+        "",
+        "",
+        {},
+        [],
+        {},
+        "ok",
+        HEADERS,
     )
     assert status == 200
     assert body["raw"] == "raw"
@@ -215,7 +329,17 @@ async def test_post_session_trace_invalid_json(http_client):
 async def test_post_session_trace_http_error(http_client):
     respx.post(f"{ZEUS_URL}/v2/session/trace").mock(side_effect=httpx.ConnectError("x"))
     status, body, url, req_id = await post_session_trace(
-        ZEUS_URL, SID, 1, "", "", "", {}, [], {}, "ok", HEADERS,
+        ZEUS_URL,
+        SID,
+        1,
+        "",
+        "",
+        "",
+        {},
+        [],
+        {},
+        "ok",
+        HEADERS,
     )
     assert status == 0
     assert json.loads(body)["error"] == "session_trace_failed"

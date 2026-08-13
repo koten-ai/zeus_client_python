@@ -1,7 +1,6 @@
 """Tests for python3/agent/enrichment.py — tool result amplification."""
-import json
 
-import pytest
+import json
 
 from zeus_client.agent.enrichment import amplify_tool_content
 
@@ -27,12 +26,14 @@ def test_search_zero_results_adds_problem_note():
 
 
 def test_search_hints_prepended():
-    body = json.dumps({
-        "result": {"returned_count": 1},
-        "input_hints": [
-            {"suggested": "fts:beer", "message": "try broader", "code": "LOW_RECALL"},
-        ],
-    })
+    body = json.dumps(
+        {
+            "result": {"returned_count": 1},
+            "input_hints": [
+                {"suggested": "fts:beer", "message": "try broader", "code": "LOW_RECALL"},
+            ],
+        }
+    )
     out = amplify_tool_content("search", 200, body, body)
     assert "fts:beer" in out
     assert "try broader" in out
@@ -107,10 +108,12 @@ def test_other_tool_name_unchanged():
 
 
 def test_search_hints_skips_non_dict_and_empty_keys():
-    body = json.dumps({
-        "result": {"returned_count": 1},
-        "input_hints": ["bad", {"message": "", "suggested": "fts:beer"}],
-    })
+    body = json.dumps(
+        {
+            "result": {"returned_count": 1},
+            "input_hints": ["bad", {"message": "", "suggested": "fts:beer"}],
+        }
+    )
     out = amplify_tool_content("search", 200, body, body)
     assert "fts:beer" in out
 
