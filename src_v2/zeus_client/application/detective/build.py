@@ -13,6 +13,7 @@ from zeus_client_v2.application.detective.diagnosis import build_diagnosis
 from zeus_client_v2.application.detective.hub_hydrate import merge_hub_hydrate
 from zeus_client_v2.application.detective.overview import build_overview
 from zeus_client_v2.application.detective.prompt_checklist import build_prompt_checklist
+from zeus_client_v2.application.tokens import sum_provider_tokens
 
 __all__ = [
     "detective_enabled",
@@ -86,6 +87,12 @@ def build_detective_briefing(
         catalog=catalog,
         tools=tools,
     )
+    # Prefer explicit tokens, else public_trace.tokens, else sum steps on public_trace.
+    tokens_arg = None
+    if isinstance(pt.get("tokens"), Mapping):
+        tokens_arg = pt.get("tokens")
+    elif pt.get("steps"):
+        tokens_arg = sum_provider_tokens(steps=list(pt.get("steps") or ()))
     overview = build_overview(
         turn_id=turn_id,
         answer=answer,
@@ -105,6 +112,7 @@ def build_detective_briefing(
         ai_process_result_exit=str(ai_process_result_exit)
         if ai_process_result_exit is not None
         else None,
+        tokens=tokens_arg if isinstance(tokens_arg, Mapping) else None,
     )
     diagnosis = build_diagnosis(
         answer=answer,

@@ -258,9 +258,12 @@ async def force_final_llm_answer(
     content = (msg.get("content") or "").strip()
     if content:
         messages.append({"role": "assistant", "content": content})
+        usage = resp.get("usage", {}) if isinstance(resp.get("usage"), dict) else {}
         trace["steps"].append({
             "round": rnd, "type": "force_final", "ms": llm_ms,
             "cause": cause, "content_len": len(content),
+            "finish_reason": choice.get("finish_reason"),
+            "usage": usage,
         })
         return content
     trace["notes"].append(f"force_final_empty: {cause}")

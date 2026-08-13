@@ -233,20 +233,38 @@ async def test_force_final_llm_answer_no_tools(monkeypatch):
     async def fake_llm(_url, _key, payload, extra_headers=None):
         captured["payload"] = payload
         return 200, {
-            "choices": [{"message": {"role": "assistant", "content": "narrated"}}],
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"role": "assistant", "content": "narrated"},
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 40,
+                "completion_tokens": 12,
+                "total_tokens": 52,
+                "prompt_tokens_details": {"cached_tokens": 5},
+            },
         }
 
     monkeypatch.setattr(tr, "llm_chat_payload", fake_llm)
     messages = [{"role": "user", "content": "q"}]
+    trace = _trace()
     out = await tr.force_final_llm_answer(
         1, "m", messages, None, None, "http://llm", "k",
-        AgentHooks(), {}, _trace(), lambda: 0,
+        AgentHooks(), {}, trace, lambda: 0,
         instruction=tr.INSIGHT_AFTER_ZEUS_INSTRUCTION,
         cause="test",
     )
     assert out == "narrated"
     assert "tools" not in captured["payload"]
     assert messages[-1]["role"] == "assistant"
+    steps = [s for s in trace["steps"] if s.get("type") == "force_final"]
+    assert len(steps) == 1
+    assert steps[0]["usage"]["prompt_tokens"] == 40
+    assert steps[0]["usage"]["completion_tokens"] == 12
+    assert steps[0]["usage"]["total_tokens"] == 52
+    assert steps[0]["finish_reason"] == "stop"
 
 
 @pytest.mark.asyncio

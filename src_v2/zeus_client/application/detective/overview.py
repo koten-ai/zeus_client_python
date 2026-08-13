@@ -14,6 +14,19 @@ from zeus_client_v2.application.detective.extract import (
 __all__ = ["build_overview"]
 
 
+def _tokens_block(tokens: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(tokens, Mapping) or not tokens:
+        return None
+    return {
+        "prompt": int(tokens.get("prompt") or 0),
+        "completion": int(tokens.get("completion") or 0),
+        "total": int(tokens.get("total") or 0),
+        "cached": int(tokens.get("cached") or 0),
+        "extra": int(tokens.get("extra") or 0),
+        "ok": bool(tokens.get("ok")),
+    }
+
+
 def build_overview(
     *,
     turn_id: str = "",
@@ -32,6 +45,7 @@ def build_overview(
     target: Mapping[str, Any] | None = None,
     ai_process_result: bool | None = None,
     ai_process_result_exit: str | None = None,
+    tokens: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     hops = list(hops or ())
     req_ids = collect_req_ids(hops)
@@ -47,6 +61,7 @@ def build_overview(
     if hub and session_id:
         links["session"] = f"{hub}/hub/debug/session/{session_id}"
     tgt = dict(target or {})
+    tok = _tokens_block(tokens)
     return {
         "turn_id": turn_id,
         "status": status,
@@ -72,4 +87,5 @@ def build_overview(
             "mode": tgt.get("mode"),
         },
         "notes_count": len(list(notes or ())),
+        "tokens": tok,
     }

@@ -29,6 +29,7 @@ from zeus_client.constants import MAX_ROUNDS, normalize_api_version
 from zeus_client.llm.client import cache_hints
 from zeus_client.logging_setup import logger
 from zeus_client.toon import _toon_encode
+from zeus_client.trace.tokens import attach_trace_tokens
 from zeus_client.zeus.auth import resolve_zeus_auth
 from zeus_client.zeus.base_catalog import load_base_catalog
 from zeus_client.zeus.catalog import (
@@ -518,6 +519,8 @@ async def run_agent(
     t_turn = tc.ctx["_t_turn"]
     tc.trace["total_ms"] = int((time.time() - t_turn) * 1000)
     tc.trace["final_messages"] = deepcopy(tc.messages[1:])
+    # Hub-identical provider Token IN/OUT rollup (never invents size estimates).
+    attach_trace_tokens(tc.trace)
     logger.info(
         f"run_agent: DONE answer_len={len(answer or '')} total_ms={tc.trace['total_ms']}"
     )
