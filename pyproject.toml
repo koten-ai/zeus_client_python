@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kotenai-zeus-client"
-version = "0.3.1"
+# GA cutover (ZCP-39): default import is V2 Runtime tree as zeus_client 2.0.0
+version = "2.0.0"
 description = "Python client library for Zeus AI data servers"
 readme = "README.md"
 license = "MIT"
@@ -31,17 +32,34 @@ Homepage = "https://github.com/koten-ai/zeus_client_python"
 Repository = "https://github.com/koten-ai/zeus_client_python"
 
 [tool.setuptools]
-package-dir = {"zeus_client" = "src"}
+package-dir = { "zeus_client" = "src/zeus_client", "zeus_client_v2" = "src/zeus_client_v2_alias" }
 packages = [
     "zeus_client",
-    "zeus_client.agent",
-    "zeus_client.llm",
-    "zeus_client.trace",
-    "zeus_client.zeus",
+    "zeus_client.api",
+    "zeus_client.domain",
+    "zeus_client.domain.journal",
+    "zeus_client.application",
+    "zeus_client.application.detective",
+    "zeus_client.application.projectors",
+    "zeus_client.ports",
+    "zeus_client.adapters",
+    "zeus_client.adapters.zeus_http",
+    "zeus_client.adapters.llm_openai_compatible",
+    "zeus_client.adapters.hub_debug_http",
+    "zeus_client.adapters.catalog_fs",
+    "zeus_client.adapters.secrets_env",
+    "zeus_client.adapters.otlp",
+    "zeus_client.config",
+    "zeus_client.security",
+    "zeus_client.compat",
+    "zeus_client.compat.v1",
+    "zeus_client.observability",
+    # Temporary deprecation alias (≤1 minor / 2.1.0)
+    "zeus_client_v2",
 ]
 
 [tool.setuptools.package-data]
-zeus_client = ["data/**/*"]
+zeus_client = ["py.typed"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -49,6 +67,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+norecursedirs = [".*", "build", "dist", "*.egg", "src_v1_legacy", "legacy_v1"]
 
 [tool.coverage.run]
 source = ["zeus_client"]

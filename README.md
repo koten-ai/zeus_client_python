@@ -2,6 +2,30 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
+> **2.0.0 GA cutover** on `feat/ZCP-ga-cutover-2.0.0` — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md).
+
+## Claim (family honesty)
+
+| Field | Value |
+| --- | --- |
+| **claim_level** | **candidate** (not `supported`) |
+| **client_floor** | `client-floor-5` |
+| **modes** | `agent`, `direct` only |
+| **multi_agent** | no |
+| **plugins** | no |
+| **suite** | `conformance-0.2-dev` (offline) |
+
+Pins file: [`sdk_bootstrap.pins.json`](sdk_bootstrap.pins.json) (HOW_TO G0). Never invent production `contract_hash` / Hub stamps.
+
+Family law and ship bar (sibling design repo):
+
+- [HOW_TO_MAKE_A_CLIENT.md](../zeus_client_design/HOW_TO_MAKE_A_CLIENT.md)
+- [CHECKLIST.md](../zeus_client_design/CHECKLIST.md)
+- [MATRIX.md](../zeus_client_design/MATRIX.md)
+- [COMPAT](../Zeus/ai/zeus_chat_request/COMPAT.md) (engine pack triples — not invented here)
+
+**Note on `ai_process_result`:** pins document product-cheap guidance default `false`; package `ClientSettings.ai_process_result` default remains **`true`** (Hub parity). Cheap products must set it explicitly.
+
 ## Install
 
 ```bash
@@ -19,7 +43,7 @@ pip install -e ".[dev]"
 ## Version 0.3.0 — direct V2 verbs + `run_<verb>` naming
 
 - **`run_verb` / `run_<verb>`** — direct V2 verb POSTs (no LLM) for every Zeus verb **except `pipeline`** (see [docs/VERBS.md](docs/VERBS.md)). Helpers: `run_find`, `run_get`, `run_project`, …; raw search body via `run_search_verb` / `run_verb("search", …)`.
-- **`run_search` / `run_search_from_config`** — no-LLM typeahead over V2 `search` (FTS) + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)). Named after the primary Zeus verb (`run_<verb>`); deprecated aliases: `run_fast_suggest` / `run_fast_suggest_from_config`.
+- **`run_search` / `run_search_from_config`** — no-LLM typeahead over V2 `search` (FTS) + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)). Named after the primary Zeus verb (`run_<verb>`). Deprecated nicknames `run_fast_suggest*` were removed for GA (use `run_search*`).
 - **`ai_process_result=false`** after Zeus tool data: **no second LLM hop** — prefer tool-arg `summary`, else a static thin line (UI shows Zeus rows).
 
 ## Version 0.2.2 — fast suggest + thinner cheap path

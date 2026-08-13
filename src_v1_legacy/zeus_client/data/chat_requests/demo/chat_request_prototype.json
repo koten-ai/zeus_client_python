@@ -1,0 +1,225 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_version": 1,
+  "_comment": "Prototype of the standardized chat_request contract document shape for V2. This illustrates the structure that /verify and /contract endpoints will accept and stamp. Top-level _* fields are for operators and tooling (stripped before sending to the model). The content under instructions, messages, and verbs is what the LLM actually receives.",
+  "_purpose": "Demonstrates clean separation: Rules (instructions + masq + verbs + verb_order) are part of the hashed contract. guidance (including optimal_paths) is advisory, excluded from the hash, and can be updated independently.",
+
+  "contract": {
+    "id": "standard_prototype_1",
+    "hash": "md5:TO_BE_FILLED_BY_/verify_OR_/contract",
+    "computed_at": "2026-06-11T12:00:00Z",
+    "builder": "BuildChatRequestV2@prototype-illustrative",
+    "mode": "demo",
+    "scope": "demo/_default"
+  },
+
+  "instructions": {
+    "system_prompt": "You query a Zeus knowledge graph through the V2 verb-shaped API. Current mode: `demo`.\n\n## Execution style (latency matters)\n\n- Act, don't narrate. Emit the tool call (or ONE `pipeline`) directly instead of writing out a plan first. Keep any chain-of-thought brief and internal — just enough to pick the cheapest correct verb, then call it.\n- One decisive call per round. When steps are independent, emit them as parallel tool calls in the SAME round rather than one-at-a-time across rounds.\n- Save prose for the final `return`. Do not produce step-by-step write-ups, restated plans, or long explanations unless the user explicitly asks. Fewer rounds + shorter output = faster answers.\n\n## Verb Priority & Cost Model\n\nAlways choose the **cheapest viable verb** that can solve the sub-problem. Only move to a more expensive verb when no cheaper option can produce the required result.\n\n**Canonical priority (cheapest first):**\n\n1. `find` [cheap] — exact predicate lookup, counts, ordered top-K\n2. `get` [cheap] — batch fetch by ids (use for hydration after find/search)\n3. `set`, `order`, `enrich`, `project`, `describe` [cheap] — cheap id-list shaping and decoration\n4. `traverse` [moderate] — graph walks (hops, paths, subgraphs, walk_path)\n5. `pipeline` [moderate] — server-side multi-step composition (strongly preferred for 2+ retrieval/transform steps)\n6. `search` [expensive] — recall (fts, vector, semantic, hybrid, spatial)\n7. `analyze` [expensive] — heavy analytics jobs (communities, duplicates, importance, etc.)\n\n**Core rule:**\nPrefer verbs higher in the list above. Use `pipeline` aggressively to collapse work on the server instead of making many round trips. Only use `search` or `analyze` when you genuinely need their power.\n\n## Capabilities & cost model\n\nZeus is a knowledge PLATFORM, not only a graph database. Match the capability to the sub-problem instead of defaulting to graph features:\n- exact KV-style fetch by node id → `get`\n- equality / predicate lookup, counts, ordered top-K → `find`\n- full-text, vector, semantic, hybrid, or spatial recall → `search`\n- graph expansion / FK walks → `traverse`\n- analytics & ML-style jobs (communities, duplicates, outliers, importance, bridges, topics, ...) → `analyze`\n- in-memory glue over id-lists → `set` / `order` / `enrich` / `project`\n- server-side multi-step composition → `pipeline`\n\nRelative cost (the `[cheap]` / `[moderate]` / `[expensive]` tag on each verb is authoritative — see the masq section of this contract for the source of truth).",
+    "verb_usage_guide": "## Pipeline authoring\nEvery pipeline step requires a unique \"as\" binding. Use @step.ids or @step.results[*].id to pass id lists forward. return[] must list \"as\" names, not verb names. Max 8 steps.\n\n## Decision heuristics\n- When you already have ids from a prior step, prefer get/find/project over search.\n- For recall over text or embeddings use search (but only when find/get cannot suffice).\n- Prefer one pipeline call over many sequential rounds when the steps are known.\n\n## Guidance note\nCurrent guidance.optimal_paths for this mode is empty. When optimal paths are added for common intents they will appear here (or in a rendered \"Known Optimal Pipeline Patterns\" section) as strong suggestions. They are advisory only and can evolve without changing the contract hash.",
+    "verb_order": [
+      "find",
+      "get",
+      "describe",
+      "set",
+      "order",
+      "enrich",
+      "project",
+      "traverse",
+      "pipeline",
+      "search",
+      "analyze",
+      "return"
+    ]
+  },
+
+  "masq": {
+    "costs": {
+      "find": "cheap",
+      "get": "cheap",
+      "set": "cheap",
+      "order": "cheap",
+      "enrich": "cheap",
+      "project": "cheap",
+      "describe": "cheap",
+      "traverse": "moderate",
+      "pipeline": "moderate",
+      "search": "expensive",
+      "analyze": "expensive"
+    },
+    "tier_order": ["cheap", "moderate", "expensive"]
+  },
+
+  "guidance": {
+    "optimal_paths": []
+  },
+
+  "verbs": [
+    {
+      "function": {
+        "name": "describe",
+        "description": "[cheap] V2 scope-level orientation. POST /v2/{bucket}/{scope}/describe. Hidden composite over get_stats, list_entity_types, list_edge_types, list_modes, and list_tools.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["stats", "entity_types", "edge_types", "modes", "tools", "indexes"]
+              }
+            }
+          }
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "get",
+        "description": "[cheap] V2 collection-level direct read. POST /v2/{bucket}/{scope}/{collection}/get. Fetch 1..50 node ids via batch_get_nodes; use include to hydrate body/edges.",
+        "parameters": {
+          "type": "object",
+          "required": ["ids"],
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Node ids to fetch; 1..50."
+            },
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["body", "edges", "edges_in", "edges_out"]
+              }
+            }
+          }
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "find",
+        "description": "[cheap] V2 collection-level predicate lookup. POST /v2/{bucket}/{scope}/{collection}/find. Supports where predicates, return=rows|ids|count|selectivity, narrow_to for pipeline chaining, order_by.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "entity_type": { "type": "string" },
+            "where": { "type": "object", "additionalProperties": true },
+            "return": {
+              "type": "string",
+              "enum": ["rows", "ids", "count", "selectivity"]
+            },
+            "limit": { "type": "integer" },
+            "narrow_to": {
+              "description": "Pipeline-only id-list allow-list; direct id list or @step binding."
+            },
+            "order_by": { "type": "string" }
+          }
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "search",
+        "description": "[expensive] V2 recall (FTS, vector, semantic, hybrid, spatial). Use only when cheaper verbs cannot deliver the required recall.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": ["fts", "vector", "semantic", "hybrid", "spatial"]
+            },
+            "query_text": { "type": "string" },
+            "target": { "type": "string" },
+            "narrow_to": { "description": "id-list from prior step" },
+            "limit": { "type": "integer" }
+          }
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "traverse",
+        "description": "[moderate] Graph expansion (hops, paths, subgraphs, walk_path with aggregates).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "shape": { "type": "string", "enum": ["hop", "walk_path"] },
+            "from": { "description": "ids or @binding" },
+            "via": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "pipeline",
+        "description": "[moderate] Server-side multi-step composition. Strongly preferred for 2+ retrieval/transform steps. Each step needs unique 'as'. return[] lists 'as' names.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "steps": {
+              "type": "array",
+              "items": { "type": "object", "additionalProperties": true },
+              "maxItems": 8
+            },
+            "return": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["steps"]
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "project",
+        "description": "[cheap] Shape / decorate / hydrate an id list. Supports dotted FK paths (e.g. city.name) and why_match_from provenance.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": { "description": "ids or @step.ids" },
+            "fields": { "type": "array", "items": { "type": "string" } },
+            "why_match_from": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["ids"]
+        }
+      },
+      "type": "function"
+    },
+    {
+      "function": {
+        "name": "return",
+        "description": "[cheap] Final answer shaping. Use for the last step when you have collected evidence and want to present a clean result to the user.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "object" } }
+          }
+        }
+      },
+      "type": "function"
+    }
+  ],
+
+  "messages": [
+    {
+      "role": "system",
+      "content": "You query a Zeus knowledge graph through the V2 verb-shaped API. Current mode: `demo`.\n\n## Execution style (latency matters)\n\n- Act, don't narrate. Emit the tool call (or ONE `pipeline`) directly instead of writing out a plan first. Keep any chain-of-thought brief and internal — just enough to pick the cheapest correct verb, then call it.\n- One decisive call per round. When steps are independent, emit them as parallel tool calls in the SAME round rather than one-at-a-time across rounds.\n- Save prose for the final `return`. Do not produce step-by-step write-ups, restated plans, or long explanations unless the user explicitly asks. Fewer rounds + shorter output = faster answers.\n\n## Verb Priority & Cost Model\n\nAlways choose the **cheapest viable verb** that can solve the sub-problem. Only move to a more expensive verb when no cheaper option can produce the required result.\n\n**Canonical priority (cheapest first):**\n\n1. `find` [cheap] — exact predicate lookup, counts, ordered top-K\n2. `get` [cheap] — batch fetch by ids (use for hydration after find/search)\n3. `set`, `order`, `enrich`, `project`, `describe` [cheap] — cheap id-list shaping and decoration\n4. `traverse` [moderate] — graph walks (hops, paths, subgraphs, walk_path)\n5. `pipeline` [moderate] — server-side multi-step composition (strongly preferred for 2+ retrieval/transform steps)\n6. `search` [expensive] — recall (fts, vector, semantic, hybrid, spatial)\n7. `analyze` [expensive] — heavy analytics jobs (communities, duplicates, importance, etc.)\n\n**Core rule:**\nPrefer verbs higher in the list above. Use `pipeline` aggressively to collapse work on the server instead of making many round trips. Only use `search` or `analyze` when you genuinely need their power.\n\n## Known Optimal Pipeline Patterns\n\nCurrent guidance has no pre-validated optimal paths defined for this mode yet. When patterns are added for common intents, they will appear in this section as recommended structures to prefer (unless the user's request clearly calls for something different). These suggestions can be updated independently without affecting the contract hash.\n\n## Capabilities & cost model\n\nZeus is a knowledge PLATFORM, not only a graph database. Match the capability to the sub-problem instead of defaulting to graph features (see the full instructions and the individual verb descriptions below for details)."
+    }
+  ],
+
+  "metadata": {
+    "description": "Illustrative prototype for the standardized V2 chat_request contract document shape. Uses a minimal 'demo' mode.",
+    "tags": ["prototype", "standard", "v2-contract", "demo"],
+    "notes": "This file shows the target shape for contract documents. guidance.optimal_paths is empty here (as requested for the prototype). The server will compute and return the authoritative hash when this (or a real catalog) is sent to /verify or /contract. Only the Rules portions affect the hash."
+  }
+}

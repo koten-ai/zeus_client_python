@@ -13,7 +13,7 @@ verb is **`search`** (FTS), so:
 | `run_search(...)` | Main entry — headers or `zcfg` auth |
 | `run_search_from_config(q, cfg)` | Uses `samples` / `zeus` / `couchbase` |
 
-Deprecated aliases (≤1 Client release): `run_fast_suggest`, `run_fast_suggest_from_config`.
+Deprecated aliases `run_fast_suggest` / `run_fast_suggest_from_config` were **removed in the 2.0.0 GA cutover train** (ZCM-032 / ZCP-37). Use `run_search` / `run_search_from_config` only.
 
 Supporting types stay product-shaped: `SuggestOptions`, `SuggestHit`, `SuggestResult`
 (typeahead cards), plus `CouchbaseQueryConfig`.
@@ -99,4 +99,4 @@ pytest tests/test_zeus_suggest.py tests/test_smoke_imports.py -q
 
 - Optional short client-side HTTP timeout override on dispatch (today FTS is capped by Zeus `timeout_ms`)
 - Fold `get_by_keys` into V2 when Zeus exposes it, drop N1QL dependency
-- Remove deprecated `run_fast_suggest*` aliases after one Client release
+- ~~Remove deprecated `run_fast_suggest*` aliases~~ **done** (ZCP-37 / GA cutover)
