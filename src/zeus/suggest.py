@@ -884,11 +884,6 @@ async def run_search_from_config(
     )
 
 
-# Deprecated aliases (≤1 Client release). Prefer run_search / run_search_from_config.
-run_fast_suggest = run_search
-run_fast_suggest_from_config = run_search_from_config
-
-
 def apply_suggest_config_defaults(cfg: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
     """Ensure optional ``couchbase`` + yelp sample keys exist (non-destructive)."""
     cfg.setdefault(

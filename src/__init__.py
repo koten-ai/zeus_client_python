@@ -56,8 +56,6 @@ from zeus_client.zeus.suggest import (
     SuggestHit,
     SuggestOptions,
     SuggestResult,
-    run_fast_suggest,  # deprecated alias of run_search
-    run_fast_suggest_from_config,  # deprecated alias of run_search_from_config
     run_search,
     run_search_from_config,
 )
@@ -192,8 +190,6 @@ __all__ = [
     "run_search_verb",
     "run_search",
     "run_search_from_config",
-    "run_fast_suggest",  # deprecated alias
-    "run_fast_suggest_from_config",  # deprecated alias
     "save_config",
     "SuggestHit",
     "SuggestOptions",
