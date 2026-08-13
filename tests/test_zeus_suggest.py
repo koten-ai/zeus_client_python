@@ -254,10 +254,10 @@ async def test_run_search_find_name_only(http_client):
     assert "zeus_find_name" in r.sources
 
 
-def test_run_search_aliases():
-    """Deprecated fast_suggest names remain bound for one release."""
-    assert sug.run_fast_suggest is sug.run_search
-    assert sug.run_fast_suggest_from_config is sug.run_search_from_config
+def test_run_fast_suggest_aliases_removed():
+    """ZCM-032 / ZCP-37: deprecated nicknames are gone; use run_search*."""
+    assert not hasattr(sug, "run_fast_suggest")
+    assert not hasattr(sug, "run_fast_suggest_from_config")
 
 
 @pytest.mark.asyncio

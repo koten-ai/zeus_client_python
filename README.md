@@ -43,7 +43,7 @@ pip install -e ".[dev]"
 ## Version 0.3.0 — direct V2 verbs + `run_<verb>` naming
 
 - **`run_verb` / `run_<verb>`** — direct V2 verb POSTs (no LLM) for every Zeus verb **except `pipeline`** (see [docs/VERBS.md](docs/VERBS.md)). Helpers: `run_find`, `run_get`, `run_project`, …; raw search body via `run_search_verb` / `run_verb("search", …)`.
-- **`run_search` / `run_search_from_config`** — no-LLM typeahead over V2 `search` (FTS) + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)). Named after the primary Zeus verb (`run_<verb>`); deprecated aliases: `run_fast_suggest` / `run_fast_suggest_from_config`.
+- **`run_search` / `run_search_from_config`** — no-LLM typeahead over V2 `search` (FTS) + optional N1QL hydrate + `find`→`project` (see [docs/FAST_SUGGEST.md](docs/FAST_SUGGEST.md)). Named after the primary Zeus verb (`run_<verb>`). Deprecated nicknames `run_fast_suggest*` were removed for GA (use `run_search*`).
 - **`ai_process_result=false`** after Zeus tool data: **no second LLM hop** — prefer tool-arg `summary`, else a static thin line (UI shows Zeus rows).
 
 ## Version 0.2.2 — fast suggest + thinner cheap path

@@ -19,7 +19,6 @@ SYMBOLS = [
     "peel_layer_a_summary",
     "effective_force_trace",
     "run_search", "run_search_from_config",
-    "run_fast_suggest", "run_fast_suggest_from_config",  # deprecated aliases
     "SuggestHit", "SuggestOptions", "SuggestResult", "CouchbaseQueryConfig",
     "run_verb", "run_verb_from_config", "VerbResult", "EXPOSED_V2_VERBS",
     "run_describe", "run_explain", "run_get", "run_find", "run_set",
