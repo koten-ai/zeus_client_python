@@ -34,6 +34,24 @@ Constant: `EXPOSED_V2_VERBS` (tuple, pipeline stripped from `V2_DOCS_VERB_ORDER`
 
 Same as the rest of the client: pass minted `zeus_headers` **or** `zcfg` → `resolve_zeus_auth`. Default `X-Zeus-Mode: analytics` when unset.
 
+## Hub Rewind (external hops)
+
+Rewind plays a retained TraceBundle for one `req_id` (`#/debug/rewind?req_id=`).
+This client stamps `X-Zeus-Chat-Id` / `X-Zeus-Turn-Id` / `X-Zeus-Trace-Class`
+on every `:8080` hop:
+
+| Surface | `X-Zeus-Trace-Class` |
+| --- | --- |
+| Agent verb hops | `agent` |
+| `/v2/session*` | `session` |
+| Typeahead `search` | `direct.interactive` |
+| Direct `rt.data.*` | `direct.read` |
+
+Open the **tool** hop (`find`/`search`/`project`), never `POST /v2/session/{id}/turn`.
+Pipeline hops are often edge-only in Rewind (Zeus does not `AppendToolCall`).
+`X-Zeus-Trace: 1` is opt-in via `ClientSettings.force_trace` / `ZEUS_CLIENT_FORCE_TRACE`.
+Never reuse `X-Zeus-Req-Id` across hops.
+
 ## URL routing (via dispatch)
 
 | Verb class | Path |
