@@ -110,3 +110,28 @@ async def test_short_query_skips_network() -> None:
     r = await run_typeahead_search(Boom(), "a", target=DataTarget())  # type: ignore[arg-type]
     assert r.count == 0
     assert r.source == "none"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_typeahead_stamps_direct_interactive_class() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(f"{base}/v2/yelp-data/_default/_default/search").mock(
+        return_value=httpx.Response(
+            200,
+            json={"result": {"items": []}},
+            headers={"X-Zeus-Req-Id": "fts-cls"},
+        )
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=base, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        await run_typeahead_search(port, "sushi", target=DataTarget())
+    finally:
+        await port.aclose()
+    h = route.calls.last.request.headers
+    assert h["X-Zeus-Trace-Class"] == "direct.interactive"
+    assert "X-Zeus-Trace" not in h
+    assert h.get("X-Zeus-Req-Id") in (None, "")
