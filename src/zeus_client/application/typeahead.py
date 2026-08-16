@@ -10,6 +10,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from zeus_client.adapters.zeus_http.headers import (
+    TRACE_CLASS_DIRECT_INTERACTIVE,
+    correlation_headers,
+)
 from zeus_client.config.models import DataTarget
 from zeus_client.ports import VerbRequest
 from zeus_client.ports.zeus import ZeusPort
@@ -230,6 +234,7 @@ async def run_typeahead_search(
             body=body,
             target=target,
             mode_header=opts.mode_header,
+            headers=correlation_headers(trace_class=TRACE_CLASS_DIRECT_INTERACTIVE),
         )
     )
     if not hop.ok:
