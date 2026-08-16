@@ -380,3 +380,37 @@ async def test_use_case_and_pipeline_allow_flag():
     assert zeus.calls[0].allow_pipeline is True
     assert result.debug.ai_process_result_exit == "cheap_terminal"
     assert "Pipe done" in result.answer
+
+
+@pytest.mark.asyncio
+async def test_tool_hop_stamps_rewind_correlation_headers() -> None:
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(_tc("find", {"entity_type": "Beer"}, "c1"),),
+            ),
+            LlmResponse(content="ok", tool_calls=()),
+        ]
+    )
+    zeus = ScriptedZeus()
+    result = await run_agent_turn(
+        TurnRequest(
+            message="find beers",
+            chat_id="chat-rew",
+            tools=(FIND_TOOL,),
+            settings=ClientSettings(force_trace=True, mode="analytics", ai_process_result=True),
+        ),
+        llm=llm,
+        zeus=zeus,
+    )
+    assert zeus.calls, "expected a find hop"
+    hop = zeus.calls[0]
+    h = dict(hop.headers)
+    assert h["X-Zeus-Chat-Id"] == "chat-rew"
+    assert h["X-Zeus-Turn-Id"] == result.debug.turn_id
+    assert result.debug.turn_id.startswith("turn_")
+    assert h["X-Zeus-Call-Id"] == "c1"
+    assert h["X-Zeus-Trace-Class"] == "agent"
+    assert h["X-Zeus-Trace"] == "1"
+    assert "X-Zeus-Req-Id" not in h
