@@ -383,3 +383,38 @@ async def test_lifecycle_prefers_payload_hash_on_drift() -> None:
     body = json.loads(route.calls.last.request.content)
     assert body["contract_hash"] == payload_h
     await http.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_lifecycle_create_stamps_session_rewind_headers() -> None:
+    route = respx.post(f"{ZEUS}/v2/session").mock(
+        return_value=httpx.Response(
+            201,
+            json={"session_id": "sid-rw", "round": 1, "contract_status": "match"},
+            headers={"X-Zeus-Req-Id": "req-create-rw"},
+        )
+    )
+    http = HttpxSessionClient(
+        endpoint=ZeusEndpointConfig(url=ZEUS),
+        secrets=EnvSecretStore({}),
+    )
+    life = SessionLifecycle(http)
+    await life.setup(
+        chat_request={"messages": [{"role": "system", "content": "x"}]},
+        user_message="hello",
+        prior=None,
+        contract_id="c1",
+        mode="analytics",
+        chat_id="chat-rew",
+        turn_id="turn_abc",
+        force_trace=True,
+    )
+    h = route.calls.last.request.headers
+    assert h["X-Zeus-Chat-Id"] == "chat-rew"
+    assert h["X-Zeus-Turn-Id"] == "turn_abc"
+    assert h["X-Zeus-Trace-Class"] == "session"
+    assert h["X-Zeus-Trace"] == "1"
+    assert "X-Zeus-Call-Id" not in h
+    assert route.calls.last.request.headers.get("X-Zeus-Req-Id") in (None, "")
+    await http.aclose()
