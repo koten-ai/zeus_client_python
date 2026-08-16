@@ -22,6 +22,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from zeus_client.adapters.zeus_http.headers import TRACE_CLASS_AGENT, correlation_headers
 from zeus_client.application.detective import safe_build_detective_briefing
 from zeus_client.application.middleware import MiddlewareChain, MiddlewareContext
 from zeus_client.application.projectors.public_trace import build_public_trace
@@ -388,6 +389,9 @@ async def run_agent_turn(
                 middleware=mw,
                 mw_ctx=mw_ctx,
                 round_n=rnd,
+                chat_id=req.chat_id or "",
+                turn_id=turn_id,
+                force_trace=bool(settings.force_trace),
             )
             hops.extend(outcome.hops)
             steps.extend(outcome.steps)
@@ -597,6 +601,9 @@ async def _execute_tool_calls(
     middleware: MiddlewareChain,
     mw_ctx: MiddlewareContext,
     round_n: int,
+    chat_id: str = "",
+    turn_id: str = "",
+    force_trace: bool = False,
 ) -> ToolRoundOutcome:
     outcome = ToolRoundOutcome()
     final_summary: str | None = None
@@ -639,6 +646,14 @@ async def _execute_tool_calls(
                 body=tc_args,
                 target=target,
                 mode_header=mode or "analytics",
+                headers=correlation_headers(
+                    chat_id=chat_id,
+                    turn_id=turn_id,
+                    call_id=call_id,
+                    mode=mode or "analytics",
+                    force_trace=force_trace,
+                    trace_class=TRACE_CLASS_AGENT,
+                ),
                 allow_pipeline=True,
             )
         )
