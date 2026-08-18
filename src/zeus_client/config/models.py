@@ -111,6 +111,7 @@ class DebugPolicy:
     detective_briefing: bool = True
     capture_bodies: bool = False  # prod default off; dev may enable
     transport_replay: bool = True
+    hub_base_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

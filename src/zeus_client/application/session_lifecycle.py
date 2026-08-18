@@ -11,6 +11,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from zeus_client.adapters.zeus_http.headers import (
+    TRACE_CLASS_SESSION,
+    correlation_headers,
+    merge_headers,
+)
 from zeus_client.adapters.zeus_http.session import HttpxSessionClient
 from zeus_client.config.models import DataTarget
 from zeus_client.domain.contract import (
@@ -60,6 +65,23 @@ class CommitResult:
     error: str | None = None
 
 
+def _session_hop_headers(
+    *,
+    chat_id: str = "",
+    turn_id: str = "",
+    force_trace: bool = False,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Correlation for /v2/session* hops. Caller keys win. No Call-Id / Req-Id."""
+    base = correlation_headers(
+        chat_id=chat_id,
+        turn_id=turn_id,
+        force_trace=force_trace,
+        trace_class=TRACE_CLASS_SESSION,
+    )
+    return merge_headers(base, extra)
+
+
 @dataclass
 class SessionLifecycle:
     """Setup + commit durable sessions over :class:`HttpxSessionClient`."""
@@ -79,6 +101,8 @@ class SessionLifecycle:
         chat_id: str = "",
         enable_sessions: bool = True,
         headers: Mapping[str, str] | None = None,
+        turn_id: str = "",
+        force_trace: bool = False,
     ) -> SessionHandle:
         """Create or rehydrate a session; dead sid → recreate same turn."""
         chat_req = dict(chat_request or {})
@@ -90,6 +114,12 @@ class SessionLifecycle:
             payload_h = ""
         choice = resolve_session_contract_hash(bound_contract_hash, stamped, payload_h)
         session_hash = choice.hash
+        hop_headers = _session_hop_headers(
+            chat_id=chat_id,
+            turn_id=turn_id,
+            force_trace=force_trace,
+            extra=headers,
+        )
 
         if not enable_sessions:
             return SessionHandle(
@@ -108,7 +138,7 @@ class SessionLifecycle:
             reh = await self.client.rehydrate(
                 prior_sid,
                 rounds=6,
-                headers=headers,
+                headers=hop_headers,
                 mode=mode,
                 target=self.target,
             )
@@ -135,7 +165,7 @@ class SessionLifecycle:
                 contract_hash=session_hash,
                 mode=mode,
                 chat_id=chat_id or (prior.chat_id if prior else ""),
-                headers=headers,
+                headers=hop_headers,
                 recovered_from=prior_sid,
             )
 
@@ -146,7 +176,7 @@ class SessionLifecycle:
             contract_hash=session_hash,
             mode=mode,
             chat_id=chat_id,
-            headers=headers,
+            headers=hop_headers,
         )
 
     async def _create(
@@ -216,6 +246,8 @@ class SessionLifecycle:
         produced_delta: Sequence[Mapping[str, Any]],
         mode: str = "analytics",
         headers: Mapping[str, str] | None = None,
+        turn_id: str = "",
+        force_trace: bool = False,
     ) -> CommitResult:
         """POST ``/v2/session/{id}/turn`` for this user question's delta.
 
@@ -244,7 +276,12 @@ class SessionLifecycle:
             client_round=turn_round,
             chat_request=chat_request,
             new_turns=turn_turns,
-            headers=headers,
+            headers=_session_hop_headers(
+                chat_id=handle.chat_id,
+                turn_id=turn_id,
+                force_trace=force_trace,
+                extra=headers,
+            ),
             mode=mode,
             target=self.target,
         )

@@ -6,6 +6,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from zeus_client.adapters.zeus_http.headers import (
+    TRACE_CLASS_DIRECT_READ,
+    correlation_headers,
+    merge_headers,
+)
 from zeus_client.adapters.zeus_http.verbs import EXPOSED_V2_VERB_SET, EXPOSED_V2_VERBS
 from zeus_client.config.models import DataTarget
 from zeus_client.domain.errors import ErrorCode, ZeusToolError
@@ -26,6 +31,10 @@ class VerbResult:
     body: Mapping[str, Any]
     error: str | None = None
     url_hint: str = ""
+    chat_id: str | None = None
+    turn_id: str | None = None
+    req_ids: tuple[str, ...] = ()
+    trace_class: str = TRACE_CLASS_DIRECT_READ
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -36,6 +45,10 @@ class VerbResult:
             "body": dict(self.body),
             "error": self.error,
             "url_hint": self.url_hint,
+            "chat_id": self.chat_id,
+            "turn_id": self.turn_id,
+            "req_ids": list(self.req_ids),
+            "trace_class": self.trace_class,
         }
 
 
@@ -47,6 +60,7 @@ async def run_data_verb(
     target: DataTarget,
     mode_header: str = "analytics",
     headers: Mapping[str, str] | None = None,
+    force_trace: bool = False,
 ) -> VerbResult:
     """Execute one allow-listed V2 verb via ZeusPort. Rejects ``pipeline``."""
     name = (verb or "").strip()
@@ -69,7 +83,13 @@ async def run_data_verb(
             body=dict(body or {}),
             target=target,
             mode_header=mode_header,
-            headers=dict(headers or {}),
+            headers=merge_headers(
+                correlation_headers(
+                    trace_class=TRACE_CLASS_DIRECT_READ,
+                    force_trace=force_trace,
+                ),
+                headers,
+            ),
         )
     )
     return VerbResult(
@@ -79,4 +99,7 @@ async def run_data_verb(
         req_id=hop.req_id,
         body=hop.body,
         error=hop.error,
+        url_hint=getattr(hop, "url", "") or "",
+        req_ids=(hop.req_id,) if hop.req_id else (),
+        trace_class=TRACE_CLASS_DIRECT_READ,
     )

@@ -164,3 +164,53 @@ async def test_basic_auth_never_logs_password() -> None:
     expected = base64.b64encode(b"admin:s3cret-pass").decode()
     assert expected in auth.headers["Authorization"]
     await port.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_data_verb_stamps_direct_read_class() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(f"{base}/v2/yelp-data/_default/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-dr"})
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=base, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        await run_data_verb(port, "find", {"entity_type": "Business"}, target=DataTarget())
+    finally:
+        await port.aclose()
+    h = route.calls.last.request.headers
+    assert h["X-Zeus-Trace-Class"] == "direct.read"
+    assert h.get("X-Zeus-Req-Id") in (None, "")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_http_verb_forwards_rewind_headers() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(f"{base}/v2/yelp-data/_default/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-fwd"})
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=base, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Business"},
+            target=DataTarget(),
+            mode_header="analytics",
+            headers={"X-Zeus-Chat-Id": "chat-1", "X-Zeus-Turn-Id": "turn-1"},
+        )
+    finally:
+        await port.aclose()
+    req = route.calls.last.request
+    assert req.headers["X-Zeus-Chat-Id"] == "chat-1"
+    assert req.headers["X-Zeus-Turn-Id"] == "turn-1"
+    assert req.headers["X-Zeus-Trace-Class"] == "direct.read"
+    assert req.headers["X-Zeus-Mode"] == "analytics"
+    assert req.headers.get("X-Zeus-Req-Id") in (None, "")
