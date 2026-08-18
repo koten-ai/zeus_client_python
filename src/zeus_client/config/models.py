@@ -11,6 +11,8 @@ __all__ = [
     "ZeusEndpointConfig",
     "DataTarget",
     "LlmProviderConfig",
+    "LlmRoleConfig",
+    "JobsConfig",
     "ClientSettings",
     "RetryPolicy",
     "RedactionPolicy",
@@ -56,6 +58,38 @@ class DataTarget:
 
 
 @dataclass(frozen=True, slots=True)
+class LlmRoleConfig:
+    model: str | None = None
+    api_key_env: str | None = None
+    base_url: str | None = None
+    provider: str | None = None
+    temperature: float | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"LlmRoleConfig(model={self.model!r}, api_key_env={self.api_key_env!r}, "
+            f"base_url={self.base_url!r}, provider={self.provider!r}, "
+            f"temperature={self.temperature!r})"
+        )
+
+    def to_public_dict(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "api_key_env": self.api_key_env,
+            "base_url": self.base_url,
+            "provider": self.provider,
+            "temperature": self.temperature,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class JobsConfig:
+    host_url: str | None = None
+    watch_transport: Literal["sse"] = "sse"
+    models: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class LlmProviderConfig:
     provider: str = "xai"
     base_url: str = "https://api.x.ai/v1"
@@ -64,13 +98,15 @@ class LlmProviderConfig:
     context_window_tokens: int = 128_000
     context_soft_limit: float = 0.8
     timeout_s: float = 120.0
+    roles: Mapping[str, LlmRoleConfig] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return (
             f"LlmProviderConfig(provider={self.provider!r}, base_url={self.base_url!r}, "
             f"model={self.model!r}, api_key_env={self.api_key_env!r}, "
             f"context_window_tokens={self.context_window_tokens!r}, "
-            f"context_soft_limit={self.context_soft_limit!r}, timeout_s={self.timeout_s!r})"
+            f"context_soft_limit={self.context_soft_limit!r}, timeout_s={self.timeout_s!r}, "
+            f"roles={dict(self.roles)!r})"
         )
 
 
@@ -137,6 +173,7 @@ class RuntimeConfig:
     debug: DebugPolicy = field(default_factory=DebugPolicy)
     rate_limit: RateLimitPolicy = field(default_factory=RateLimitPolicy)
     chat_requests_dir: str | None = None
+    jobs: JobsConfig = field(default_factory=JobsConfig)
 
     def __repr__(self) -> str:
         # Never dump nested secrets; models already use env-name-only fields.
@@ -144,7 +181,8 @@ class RuntimeConfig:
             f"RuntimeConfig(profile={self.profile!r}, zeus={self.zeus!r}, "
             f"target={self.target!r}, llm={self.llm!r}, settings={self.settings!r}, "
             f"retry={self.retry!r}, redaction={self.redaction!r}, debug={self.debug!r}, "
-            f"rate_limit={self.rate_limit!r}, chat_requests_dir={self.chat_requests_dir!r})"
+            f"rate_limit={self.rate_limit!r}, chat_requests_dir={self.chat_requests_dir!r}, "
+            f"jobs={self.jobs!r})"
         )
 
     def to_public_dict(self) -> dict[str, Any]:
@@ -173,6 +211,7 @@ class RuntimeConfig:
                 "context_window_tokens": self.llm.context_window_tokens,
                 "context_soft_limit": self.llm.context_soft_limit,
                 "timeout_s": self.llm.timeout_s,
+                "roles": {name: role.to_public_dict() for name, role in self.llm.roles.items()},
             },
             "settings": {
                 "ai_process_result": self.settings.ai_process_result,
@@ -210,6 +249,11 @@ class RuntimeConfig:
                 "typeahead_burst": self.rate_limit.typeahead_burst,
             },
             "chat_requests_dir": self.chat_requests_dir,
+            "jobs": {
+                "host_url": self.jobs.host_url,
+                "watch_transport": self.jobs.watch_transport,
+                "models": dict(self.jobs.models),
+            },
         }
 
     def with_overrides(self, **kwargs: Any) -> RuntimeConfig:
