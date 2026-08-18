@@ -28,7 +28,7 @@ def _unavailable() -> JobError:
     return JobError(code=ErrorCode.JOBS_UNAVAILABLE, component="api.jobs")
 
 
-def _parse_units(raw: Sequence[Mapping[str, Any]] | Sequence[UnitConfig]) -> list[UnitConfig]:
+def _parse_units(raw: Sequence[Any]) -> list[UnitConfig]:
     out: list[UnitConfig] = []
     for item in raw:
         if isinstance(item, UnitConfig):
@@ -66,6 +66,8 @@ class JobsAPI:
     def _port(self) -> JobRuntimePort:
         port = getattr(self._rt.services, "jobs", None)
         if port is None:
+            raise _unavailable()
+        if not isinstance(port, JobRuntimePort):
             raise _unavailable()
         return port
 

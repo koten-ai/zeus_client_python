@@ -10,7 +10,6 @@ from typing import Any
 from zeus_client.api.units import UnitsAPI
 from zeus_client.domain.errors import ErrorCode, JobError
 from zeus_client.domain.jobs import (
-    JobBudgets,
     JobEvent,
     JobHandle,
     JobSnapshot,
@@ -35,7 +34,14 @@ class FakeJobRuntime:
     def _now(self) -> int:
         return int(self._rt.services.clock.now_ms())
 
-    def _emit(self, job_id: str, typ: str, *, unit_id: str | None = None, payload: Mapping[str, Any] | None = None) -> JobEvent:
+    def _emit(
+        self,
+        job_id: str,
+        typ: str,
+        *,
+        unit_id: str | None = None,
+        payload: Mapping[str, Any] | None = None,
+    ) -> JobEvent:
         seq = len(self._events.setdefault(job_id, [])) + 1
         ev = JobEvent(
             seq=seq,
@@ -51,7 +57,6 @@ class FakeJobRuntime:
     async def run(self, request: Mapping[str, Any]) -> JobHandle:
         job_id = f"job_{uuid.uuid4().hex[:12]}"
         units: list[UnitConfig] = list(request.get("units") or [])
-        budgets: JobBudgets = request.get("budgets") or JobBudgets()
         self._cancels[job_id] = asyncio.Event()
         self._events[job_id] = []
         self._snaps[job_id] = JobSnapshot(job_id=job_id, status="running", seq=0)

@@ -53,6 +53,8 @@ packages = [
     "zeus_client.adapters.catalog_fs",
     "zeus_client.adapters.secrets_env",
     "zeus_client.adapters.otlp",
+    "zeus_client.adapters.jobs_http",
+    "zeus_client.adapters.jobs_fake",
     "zeus_client.config",
     "zeus_client.security",
     "zeus_client.compat",
