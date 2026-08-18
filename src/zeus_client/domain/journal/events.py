@@ -16,6 +16,10 @@ __all__ = [
     "EVENT_NOTE",
     "EVENT_ZEUS_HOP",
     "EVENT_LLM_ROUND",
+    "EVENT_JOB_STARTED",
+    "EVENT_JOB_FINISHED",
+    "EVENT_UNIT_STARTED",
+    "EVENT_UNIT_FINISHED",
 ]
 
 EVENT_TURN_STARTED = "turn.started"
@@ -26,6 +30,10 @@ EVENT_ERROR_RAISED = "error.raised"
 EVENT_NOTE = "note"
 EVENT_ZEUS_HOP = "zeus.hop"
 EVENT_LLM_ROUND = "llm.round"
+EVENT_JOB_STARTED = "job.started"
+EVENT_JOB_FINISHED = "job.finished"
+EVENT_UNIT_STARTED = "unit.started"
+EVENT_UNIT_FINISHED = "unit.finished"
 
 
 @dataclass(frozen=True, slots=True)
