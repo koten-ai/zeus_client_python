@@ -9,11 +9,15 @@ from zeus_client.domain.journal import (
     SpanTracer,
 )
 from zeus_client.domain.journal.events import (
+    EVENT_JOB_FINISHED,
+    EVENT_JOB_STARTED,
     EVENT_NOTE,
     EVENT_SPAN_ENDED,
     EVENT_SPAN_STARTED,
     EVENT_TURN_COMPLETED,
     EVENT_TURN_STARTED,
+    EVENT_UNIT_FINISHED,
+    EVENT_UNIT_STARTED,
 )
 from zeus_client.domain.journal.payload_store import InMemoryPayloadStore
 
@@ -113,3 +117,25 @@ def test_span_parent_linkage() -> None:
     assert events[2].span_id == child.span_id
     assert events[2].parent_span_id == root.span_id
     assert events[3].span_id == root.span_id
+
+
+def test_job_and_unit_lifecycle_event_types() -> None:
+    assert EVENT_JOB_STARTED == "job.started"
+    assert EVENT_JOB_FINISHED == "job.finished"
+    assert EVENT_UNIT_STARTED == "unit.started"
+    assert EVENT_UNIT_FINISHED == "unit.finished"
+    j = InMemoryJournal()
+    j.append(_evt("j1", 1, EVENT_JOB_STARTED, data={"job_id": "job_1", "llm.role": "worker"}))
+    j.append(_evt("u1", 2, EVENT_UNIT_STARTED, data={"unit_id": "u1", "llm.model": "fast"}))
+    j.append(_evt("u2", 3, EVENT_UNIT_FINISHED, data={"unit_id": "u1", "status": "ok"}))
+    j.append(_evt("j2", 4, EVENT_JOB_FINISHED, data={"job_id": "job_1", "status": "ok"}))
+    types = [e.type for e in j.events()]
+    assert types == [
+        EVENT_JOB_STARTED,
+        EVENT_UNIT_STARTED,
+        EVENT_UNIT_FINISHED,
+        EVENT_JOB_FINISHED,
+    ]
+    dumped = str([dict(e.data) for e in j.events()])
+    assert "password" not in dumped
+    assert "sk-" not in dumped
