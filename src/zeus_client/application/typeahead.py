@@ -74,6 +74,8 @@ class SuggestResult:
     error: str = ""
     fast_tier: bool = True
     ai_process_result: bool = False
+    req_ids: tuple[str, ...] = ()
+    trace_class: str = TRACE_CLASS_DIRECT_INTERACTIVE
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -87,6 +89,8 @@ class SuggestResult:
             "error": self.error or None,
             "fast_tier": self.fast_tier,
             "ai_process_result": self.ai_process_result,
+            "req_ids": list(self.req_ids),
+            "trace_class": self.trace_class,
         }
 
 
@@ -258,4 +262,6 @@ async def run_typeahead_search(
         source="fts" if merged else "empty",
         sources=sources,
         fts_req_id=hop.req_id or "",
+        req_ids=(hop.req_id,) if hop.req_id else (),
+        trace_class=TRACE_CLASS_DIRECT_INTERACTIVE,
     )

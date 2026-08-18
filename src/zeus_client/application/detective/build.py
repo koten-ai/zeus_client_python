@@ -61,6 +61,10 @@ def build_detective_briefing(
     hub_payload: Mapping[str, Any] | None = None,
     # legacy alias: public_trace dict
     public_trace: Mapping[str, Any] | None = None,
+    chat_id: str = "",
+    zeus_url: str | None = None,
+    client_version: str = "",
+    export_ref: str | None = None,
 ) -> dict[str, Any]:
     """Pure builder — schema v1 keys: version, source, hub_hydrated, overview, prompt, diagnosis."""
     pt = dict(public_trace or {})
@@ -121,9 +125,17 @@ def build_detective_briefing(
         contract_status=contract_status,
         layer_a=layer_a if isinstance(layer_a, Mapping) else None,
         turn_id=turn_id,
+        chat_id=chat_id,
+        session_id=session_id or "",
         status=status,
         total_ms=total_ms,
         rounds=rounds,
+        target=target,
+        zeus_url=zeus_url,
+        client_version=client_version,
+        catalog=catalog,
+        tokens=tokens_arg if isinstance(tokens_arg, Mapping) else None,
+        export_ref=export_ref or turn_id,
     )
     briefing: dict[str, Any] = {
         "version": 1,

@@ -76,6 +76,8 @@ class DebugBundle:
     """Turn debug plane — journal export + public_trace + notes (not user answer)."""
 
     turn_id: str = ""
+    chat_id: str | None = None
+    session_id: str | None = None
     notes: tuple[str, ...] = ()
     rounds: int = 0
     ai_process_result: bool = True
@@ -86,6 +88,42 @@ class DebugBundle:
     hooks_jailbreak_score: float = 0.0
     detective: Mapping[str, Any] | None = None
     preferred_req_id: str | None = None
+    req_ids: tuple[str, ...] = ()
+    zeus_url: str | None = None
+    client_version: str = ""
+    target: Mapping[str, Any] = field(default_factory=dict)
+    catalog: Mapping[str, Any] = field(default_factory=dict)
+    contract_status: str | None = None
+    tokens: Mapping[str, Any] | None = None
+    export_ref: str | None = None
+    journal_schema: int = 1
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-safe gather surface — never includes the chat answer."""
+        out: dict[str, Any] = {
+            "turn_id": self.turn_id,
+            "chat_id": self.chat_id,
+            "session_id": self.session_id,
+            "notes": list(self.notes),
+            "rounds": self.rounds,
+            "ai_process_result": self.ai_process_result,
+            "ai_process_result_exit": self.ai_process_result_exit,
+            "hops": [dict(h) for h in self.hops],
+            "journal_event_count": self.journal_event_count,
+            "preferred_req_id": self.preferred_req_id,
+            "req_ids": list(self.req_ids),
+            "zeus_url": self.zeus_url,
+            "client_version": self.client_version,
+            "target": dict(self.target),
+            "catalog": dict(self.catalog),
+            "contract_status": self.contract_status,
+            "tokens": dict(self.tokens) if isinstance(self.tokens, Mapping) else None,
+            "export_ref": self.export_ref,
+            "journal_schema": self.journal_schema,
+        }
+        if self.detective is not None:
+            out["detective"] = dict(self.detective)
+        return out
 
 
 @dataclass(frozen=True, slots=True)

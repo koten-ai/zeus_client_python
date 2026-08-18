@@ -15,7 +15,6 @@ Session commit / Detective are soft-optional; projectors never raise out of ok t
 from __future__ import annotations
 
 import json
-import os
 import time
 import uuid
 from collections.abc import Mapping, Sequence
@@ -24,9 +23,15 @@ from typing import Any
 
 from zeus_client.adapters.zeus_http.headers import TRACE_CLASS_AGENT, correlation_headers
 from zeus_client.application.detective import safe_build_detective_briefing
+from zeus_client.application.detective.extract import catalog_flags_of, collect_req_ids
 from zeus_client.application.middleware import MiddlewareChain, MiddlewareContext
 from zeus_client.application.projectors.public_trace import build_public_trace
-from zeus_client.application.projectors.session_trace import select_primary_req_id
+from zeus_client.application.projectors.session_trace import (
+    TRACE_SNIPPET_MAX,
+    extract_pipeline_meta,
+    project_session_trace,
+    select_primary_req_id,
+)
 from zeus_client.application.tokens import sum_provider_tokens
 from zeus_client.config.models import ClientSettings, DataTarget, DebugPolicy
 from zeus_client.domain.errors import ErrorCode, LlmError, ZeusClientError
@@ -38,6 +43,7 @@ from zeus_client.domain.journal.events import (
 from zeus_client.domain.journal.journal import InMemoryJournal
 from zeus_client.domain.layer_a import (
     LayerA,
+    compact_layer_a,
     parse_layer_a,
     peel_layer_a_summary,
     user_facing_answer,
@@ -89,6 +95,7 @@ class ToolRoundOutcome:
     steps: list[dict[str, Any]] = field(default_factory=list)
     # last return tool args for Layer A parse
     return_args: dict[str, Any] | None = None
+    terminate_via: str | None = None
 
 
 def _is_empty_json_value(v: Any) -> bool:
@@ -149,8 +156,11 @@ def _tools_from_request(req: TurnRequest) -> list[dict[str, Any]]:
         return [dict(t) for t in req.tools]
     cr = req.chat_request if isinstance(req.chat_request, Mapping) else {}
     tools = cr.get("tools") if cr else None
-    if isinstance(tools, list):
+    if isinstance(tools, list) and tools:
         return [dict(t) for t in tools if isinstance(t, Mapping)]
+    verbs = cr.get("verbs") if cr else None
+    if isinstance(verbs, list):
+        return [dict(t) for t in verbs if isinstance(t, Mapping)]
     return []
 
 
@@ -202,6 +212,8 @@ async def run_agent_turn(
     debug_policy: DebugPolicy | None = None,
     hub_base_url: str | None = None,
     env: Mapping[str, str] | None = None,
+    session_lifecycle: Any = None,
+    zeus_url: str | None = None,
 ) -> TurnResult:
     settings = req.settings or default_settings or ClientSettings()
     dbg_pol = debug_policy or DebugPolicy()
@@ -217,9 +229,11 @@ async def run_agent_turn(
         "debug_policy": dbg_pol,
         "hub_base_url": hub_base_url,
         "target": req.target,
-        "tools": req.tools,
+        "tools": (),
         "chat_request": req.chat_request,
         "env": env,
+        "chat_id": req.chat_id or "",
+        "zeus_url": zeus_url,
     }
 
     def _je(etype: str, data: Mapping[str, Any]) -> None:
@@ -237,6 +251,23 @@ async def run_agent_turn(
         )
 
     _je(EVENT_TURN_STARTED, {"message_preview": (req.message or "")[:200]})
+
+    session_handle = req.session
+    if req.enable_sessions and session_lifecycle is not None:
+        try:
+            session_handle = await session_lifecycle.setup(
+                chat_request=req.chat_request or {},
+                user_message=req.message,
+                prior=req.session,
+                chat_id=req.chat_id or "",
+                turn_id=turn_id,
+                mode=settings.mode,
+                enable_sessions=True,
+                force_trace=bool(settings.force_trace),
+            )
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"session_setup_failed: {exc}")
+            session_handle = req.session
 
     if not (req.message or "").strip():
         err = ErrorInfo(
@@ -256,7 +287,7 @@ async def run_agent_turn(
             steps=(),
             journal=journal,
             error=err,
-            session=req.session,
+            session=session_handle,
             layer=None,
             decision=None,
             t0=t0,
@@ -273,6 +304,7 @@ async def run_agent_turn(
 
     system = _system_from_request(req)
     tools = _tools_from_request(req)
+    finish_kw["tools"] = tuple(tools)
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     for pm in req.prior_messages:
         if isinstance(pm, Mapping):
@@ -286,6 +318,7 @@ async def run_agent_turn(
     answer: str | None = None
     exit_kind: str | None = None
     last_return_args: dict[str, Any] | None = None
+    last_terminate_via: str = "client_terminate"
     rounds_done = 0
 
     try:
@@ -327,7 +360,7 @@ async def run_agent_turn(
                     steps=tuple(steps),
                     journal=journal,
                     error=err,
-                    session=req.session,
+                    session=session_handle,
                     layer=None,
                     decision=None,
                     t0=t0,
@@ -399,6 +432,8 @@ async def run_agent_turn(
             mw_ctx.notes.clear()
             if outcome.return_args is not None:
                 last_return_args = outcome.return_args
+            if outcome.terminate_via:
+                last_terminate_via = outcome.terminate_via
 
             if outcome.return_seen:
                 terminal = (outcome.terminal_summary or "").strip()
@@ -461,7 +496,7 @@ async def run_agent_turn(
             steps=tuple(steps),
             journal=journal,
             error=err,
-            session=req.session,
+            session=session_handle,
             layer=None,
             decision=None,
             t0=t0,
@@ -520,6 +555,35 @@ async def run_agent_turn(
     else:
         status = TurnStatus.OK
 
+    if req.enable_sessions and session_lifecycle is not None and session_handle and session_handle.session_id:
+        compact = None
+        if layer is not None:
+            compact = compact_layer_a(layer, via=last_terminate_via)
+        try:
+            await project_session_trace(
+                session_lifecycle.client,
+                handle=session_handle,
+                hops=hops,
+                chat_request=req.chat_request or {},
+                layer_a=compact,
+                mode=settings.mode,
+            )
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"session_trace_failed: {exc}")
+        try:
+            commit = await session_lifecycle.commit(
+                session_handle,
+                chat_request=req.chat_request or {},
+                produced_delta=messages,
+                mode=settings.mode,
+                turn_id=turn_id,
+                force_trace=bool(settings.force_trace),
+            )
+            session_handle = commit.handle
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"session_commit_failed: {exc}")
+
+    finish_kw["layer_via"] = last_terminate_via
     return _finish(
         answer=final_answer,
         status=status,
@@ -532,7 +596,7 @@ async def run_agent_turn(
         steps=tuple(steps),
         journal=journal,
         error=None,
-        session=req.session,
+        session=session_handle,
         layer=layer,
         decision=decision,
         t0=t0,
@@ -624,6 +688,7 @@ async def _execute_tool_calls(
             final_summary = str(tc_args.get("summary") or "")
             return_seen = True
             outcome.return_args = dict(tc_args)
+            outcome.terminate_via = "client_terminate"
             messages.append(
                 {
                     "role": "tool",
@@ -670,13 +735,18 @@ async def _execute_tool_calls(
                 "content": text,
             }
         )
+        meta = extract_pipeline_meta(body)
         hop_rec = {
             "req_id": hop.req_id,
             "name": name,
+            "path_class": "pipeline" if name == "pipeline" else name,
             "status": hop.status_code,
             "ok": hop.ok,
             "ms": ms,
-            "snippet": text[:500],
+            "url": getattr(hop, "url", "") or "",
+            "error": hop.error,
+            "snippet": text[:TRACE_SNIPPET_MAX],
+            **meta,
         }
         outcome.hops.append(hop_rec)
         outcome.steps.append(
@@ -720,6 +790,7 @@ async def _execute_tool_calls(
                 and isinstance(cand.get("confidence"), str)
             ):
                 outcome.return_args = cand
+                outcome.terminate_via = "pipeline_turn_complete"
 
     outcome.return_seen = return_seen
     outcome.terminal_summary = final_summary if return_seen else None
@@ -751,18 +822,16 @@ def _finish(
     tools: tuple[Mapping[str, Any], ...] = (),
     chat_request: Mapping[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
+    chat_id: str = "",
+    zeus_url: str | None = None,
+    layer_via: str = "client_terminate",
 ) -> TurnResult:
+    from zeus_client._version import __version__ as PACKAGE_VERSION
+
     structured: StructuredResult | None = None
     layer_map: dict[str, Any] | None = None
     if layer is not None:
-        layer_map = {
-            "ok": layer.ok,
-            "summary": layer.summary,
-            "confidence": layer.confidence,
-            "policy_action": layer.policy_action,
-            "errors": list(layer.errors),
-            "warnings": list(layer.warnings),
-        }
+        layer_map = compact_layer_a(layer, via=layer_via)
         if decision is not None:
             structured = StructuredResult(
                 layer_a=layer_map,
@@ -774,6 +843,25 @@ def _finish(
             )
         else:
             structured = StructuredResult(layer_a=layer_map)
+
+    req_ids = collect_req_ids(hops)
+    pref: str | None = None
+    try:
+        pref = select_primary_req_id(list(hops)) if hops else None
+    except Exception:
+        pref = None
+    tokens = sum_provider_tokens(steps=steps)
+    sid = session.session_id if session and session.session_id else None
+    cst = session.contract_status if session else None
+    chat = (session.chat_id if session and session.chat_id else None) or (chat_id or None)
+    session_block: dict[str, Any] | None = None
+    if sid or req_ids:
+        session_block = {
+            "id": sid,
+            "req_ids": list(req_ids),
+            "preferred_req_id": pref,
+            "contract_status": cst,
+        }
 
     public = build_public_trace(
         turn_id=turn_id,
@@ -788,7 +876,8 @@ def _finish(
         policy=decision.policy if decision else None,
         flags=decision.flags if decision else {},
         steps=steps,
-        tokens=sum_provider_tokens(steps=steps),
+        tokens=tokens,
+        session=session_block,
     )
     # G2 never in answer
     if "wish_i_knew" in answer:
@@ -797,29 +886,46 @@ def _finish(
         ).strip()
 
     total_ms = int((time.time() - t0) * 1000)
-    pref: str | None = None
-    try:
-        pref = select_primary_req_id(list(hops))
-    except Exception:
-        pref = None
+    tgt = target
+    target_map: dict[str, Any] = {}
+    if tgt is not None:
+        target_map = {
+            "bucket": tgt.bucket,
+            "scope": tgt.scope,
+            "collection": tgt.collection,
+            "mode": settings.mode,
+        }
+    system = ""
+    for m in messages:
+        if isinstance(m, Mapping) and m.get("role") == "system":
+            c = m.get("content")
+            if isinstance(c, str):
+                system = c
+                break
+    flags = catalog_flags_of(
+        system=system,
+        catalog=dict(chat_request) if isinstance(chat_request, Mapping) else None,
+    )
+    catalog_block = {
+        "has_scope_brief": flags["has_scope_brief"],
+        "has_mini_schema": flags["has_mini_schema"],
+        "tools_count": len(tools),
+        "source": "tools" if tools else "none",
+        "brief_sha12": flags.get("brief_sha12"),
+        "mini_sha12": flags.get("mini_sha12"),
+    }
+    if not tools and isinstance(chat_request, Mapping) and chat_request.get("verbs"):
+        catalog_block["source"] = "verbs"
 
     detective = None
     det_notes = list(notes)
     try:
-        tgt = target
-        target_map = None
-        if tgt is not None:
-            target_map = {
-                "bucket": tgt.bucket,
-                "scope": tgt.scope,
-                "collection": tgt.collection,
-                "mode": settings.mode,
-            }
         catalog = dict(chat_request) if isinstance(chat_request, Mapping) else None
-        det = safe_build_detective_briefing(
+        detective = safe_build_detective_briefing(
             enabled=(debug_policy or DebugPolicy()).detective_briefing,
             env=env,
             turn_id=turn_id,
+            chat_id=chat or "",
             answer=answer,
             status=status.value,
             rounds=rounds,
@@ -831,53 +937,20 @@ def _finish(
             layer_a=layer_map,
             total_ms=total_ms,
             hub_base_url=hub_base_url,
-            session_id=session.session_id if session else None,
+            session_id=sid,
             target=target_map,
-            contract_status=session.contract_status if session else None,
+            contract_status=cst,
             ai_process_result=bool(settings.ai_process_result),
             ai_process_result_exit=ai_exit,
             public_trace=public,
+            zeus_url=zeus_url,
+            client_version=PACKAGE_VERSION,
+            export_ref=turn_id,
         )
-        if det is None and (debug_policy or DebugPolicy()).detective_briefing:
-            # distinguish kill-switch vs builder failure only loosely
-            if (
-                str((env or os.environ).get("ZEUS_CLIENT_DETECTIVE", "1")).lower()
-                in {
-                    "0",
-                    "false",
-                    "no",
-                    "off",
-                }
-                or not (debug_policy or DebugPolicy()).detective_briefing
-            ):
-                pass
-            else:
-                # enabled but None → soft fail inside safe_build swallowed exception
-                # only note when we expected a briefing (enabled)
-                pass
-        detective = det
-        if detective is None:
-            # If kill-switch off, stay silent; if on and failed, note.
-            enabled_flag = (debug_policy or DebugPolicy()).detective_briefing
-            env_on = str((env or os.environ).get("ZEUS_CLIENT_DETECTIVE", "1")).lower() not in {
-                "0",
-                "false",
-                "no",
-                "off",
-            }
-            if enabled_flag and env_on and answer is not None:
-                # Builder returned None unexpectedly only on exception; kill-switch also None.
-                # We cannot distinguish easily — safe_build returns None for both.
-                pass
     except Exception as exc:  # noqa: BLE001
         det_notes.append(f"detective_briefing_failed: {exc}")
         detective = None
 
-    if detective and "wish_i_knew" in str(detective.get("overview", {}).get("answer_preview", "")):
-        # belt — overview preview already from peeled answer
-        pass
-
-    # Put detective on public_trace for widget consumers
     if detective is not None:
         public = dict(public)
         public["detective"] = detective
@@ -890,6 +963,8 @@ def _finish(
 
     debug = DebugBundle(
         turn_id=turn_id,
+        chat_id=chat,
+        session_id=sid,
         notes=tuple(det_notes),
         rounds=rounds,
         ai_process_result=bool(settings.ai_process_result),
@@ -902,6 +977,15 @@ def _finish(
         preferred_req_id=pref_final
         if isinstance(pref_final, str) or pref_final is None
         else str(pref_final),
+        req_ids=req_ids,
+        zeus_url=zeus_url,
+        client_version=PACKAGE_VERSION,
+        target=target_map,
+        catalog=catalog_block,
+        contract_status=cst,
+        tokens=tokens,
+        export_ref=turn_id,
+        journal_schema=1,
     )
     try:
         je(
