@@ -10,8 +10,8 @@ Python client library for Zeus AI data servers. Orchestrates LLM agents that cal
 | --- | --- |
 | **claim_level** | **candidate** (not `supported`) |
 | **client_floor** | `client-floor-5` |
-| **modes** | `agent`, `direct` only |
-| **multi_agent** | no |
+| **modes** | `agent`, `direct` (optional Mode 3 `jobs`/`units` seam) |
+| **multi_agent** | **docs** |
 | **plugins** | no |
 | **suite** | `conformance-0.2-dev` (offline) |
 

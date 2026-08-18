@@ -15,7 +15,7 @@
 | GitHub Release via `.github/workflows/release.yml` | Automatic PyPI (publish step still commented) |
 | Design-repo **MATRIX / CHECKLIST** honesty PR | Agent flipping `claim_level` unattended |
 | Optional pins follow-up **after** MATRIX merges | Forging chat_request COMPAT rows |
-| Close ZCP-33 / ZCP-43 with evidence | Claiming multi-agent, plugins, or “v2 complete” family bar |
+| Close ZCP-33 / ZCP-43 with evidence | Claiming `multi_agent=demo`/`supported`, plugins, or “v2 complete” family bar |
 
 **Claim ladder (charter):** package may ship **2.0.0** while pins stay **`candidate`**.  
 `supported` is a **separate** human decision after suite + MATRIX (+ usually COMPAT).
@@ -311,7 +311,7 @@ Not required to close ZCP-43 if GH Release artifacts are the lab distribution ch
 
 ### Post-T9 backlog (not T9)
 
-- Remove `zeus_client_v2` alias ≤ **2.1.0**  
+- Remove `zeus_client_v2` alias ≤ **2.2.0**  
 - Remove `compat.v1` if usage low  
 - demo_yelp: `zeus_client_v2` → `zeus_client` (silence warnings)  
 - ZCM-030/031/041–043 polish; ZCM-044+ post-GA  

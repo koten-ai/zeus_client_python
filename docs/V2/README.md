@@ -9,6 +9,7 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 | [SECURITY.md](./SECURITY.md) | Threat model, authz, secrets, redaction, replay, secure defaults |
 | [BEST_PRACTICES.md](./BEST_PRACTICES.md) | Engineering standards: code, API, testing, CI/CD, observability |
 | [MIGRATION.md](./MIGRATION.md) | V1→V2 map, compat shims, demo_yelp notes, cutover gate |
+| [MULTI_AGENT.md](./MULTI_AGENT.md) | Pattern B jobs/units seam; claim `docs` not `demo` |
 | [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) | Human gate: tag `v2.0.0`, GH Release, design MATRIX, pins |
 
 ## Status

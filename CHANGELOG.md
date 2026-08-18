@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.1.0 — 2026-08-18
+
+### Added
+
+- Optional Mode 3 seam: `rt.jobs.*` + `rt.units.agent_turn` / `zeus_direct` + `config.llm.roles` (ZCP-64…75).
+- Family error band `130001`–`130013` (`JobError`).
+- Pattern B HTTP/SSE **WatchJob** client (`GET /v1/jobs/{id}/events?from_seq=`). `run`/`get`/`cancel` stay `130001` until the Go sidecar grows those routes.
+- Test-only `FakeJobRuntime` (not a product engine; not a MATRIX `demo`).
+- Package docs: `docs/V2/MULTI_AGENT.md`.
+
+### Changed
+
+- Claim `multi_agent` → **`docs`**. `claim_level` remains **candidate**.
+- `zeus_client_v2` alias kept; removal slipped to **≤2.2.0** (yelp still imports `_v2`).
+- `DataAPI.verb` accepts optional per-call `target=` and Rewind `chat_id` / `turn_id`.
+
+### Not claimed
+
+- `multi_agent=demo` / `supported`
+- Native Python orchestrator / FFI / `http_json` units / WS / gRPC
+
+---
+
 ## 2.0.0 — 2026-08-13
 
 ### Breaking

@@ -14,7 +14,7 @@ import sys
 import warnings
 
 warnings.warn(
-    "zeus_client_v2 is deprecated; import zeus_client (2.0+). Alias removes on or before 2.1.0.",
+    "zeus_client_v2 is deprecated; import zeus_client (2.0+). Alias removes on or before 2.2.0.",
     DeprecationWarning,
     stacklevel=2,
 )
