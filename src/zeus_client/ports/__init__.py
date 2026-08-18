@@ -51,6 +51,7 @@ class VerbHopResult:
     req_id: str | None
     body: Mapping[str, Any] = field(default_factory=dict)
     error: str | None = None
+    url: str = ""
 
 
 @dataclass(frozen=True, slots=True)

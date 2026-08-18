@@ -70,9 +70,17 @@ def build_diagnosis(
     contract_status: str | None = None,
     layer_a: Mapping[str, Any] | None = None,
     turn_id: str = "",
+    chat_id: str = "",
+    session_id: str = "",
     status: str = "",
     total_ms: int | None = None,
     rounds: int = 0,
+    target: Mapping[str, Any] | None = None,
+    zeus_url: str | None = None,
+    client_version: str = "",
+    catalog: Mapping[str, Any] | None = None,
+    tokens: Mapping[str, Any] | None = None,
+    export_ref: str | None = None,
 ) -> dict[str, Any]:
     hops = list(hops or ())
     prompt = dict(prompt or {})
@@ -107,12 +115,24 @@ def build_diagnosis(
     support = build_support_pack(
         headline=headline,
         turn_id=turn_id,
+        chat_id=chat_id,
+        session_id=session_id,
         preferred_req_id=pref,
         req_ids=req_ids,
+        hops=hops,
         playbooks=playbooks,
         prompt_verdict=prompt_grade,
         notes=notes,
         status=status,
+        target=target,
+        zeus_url=zeus_url,
+        client_version=client_version,
+        catalog=catalog,
+        contract_status=contract_status,
+        inject=prompt.get("inject") if isinstance(prompt.get("inject"), Mapping) else None,
+        layer_a=layer_a,
+        tokens=tokens,
+        export_ref=export_ref,
     )
 
     return {

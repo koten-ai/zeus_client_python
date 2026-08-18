@@ -94,8 +94,12 @@ def build_prompt_checklist(
     tool_n = len(list(tools or ()))
     if tool_n == 0 and isinstance(catalog, Mapping):
         cr_tools = catalog.get("tools")
-        if isinstance(cr_tools, list):
+        if isinstance(cr_tools, list) and cr_tools:
             tool_n = len(cr_tools)
+        else:
+            cr_verbs = catalog.get("verbs")
+            if isinstance(cr_verbs, list):
+                tool_n = len(cr_verbs)
     items.append(
         _item(
             id="tools_present",
@@ -136,6 +140,8 @@ def build_prompt_checklist(
             "mini_entity_types": list(flags.get("mini_entity_types") or []),
             "brief_sha12": flags.get("brief_sha12"),
             "mini_sha12": flags.get("mini_sha12"),
+            "brief_preview": flags.get("brief_preview"),
+            "mini_preview": flags.get("mini_preview"),
             "system_chars": len(system),
         },
         "notes": [],

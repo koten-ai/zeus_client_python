@@ -52,6 +52,11 @@ Pipeline hops are often edge-only in Rewind (Zeus does not `AppendToolCall`).
 `X-Zeus-Trace: 1` is opt-in via `ClientSettings.force_trace` / `ZEUS_CLIENT_FORCE_TRACE`.
 Never reuse `X-Zeus-Req-Id` across hops.
 
+## E2E debug gather
+
+Agent turns expose the nine gather fields on `TurnResult.debug` so integrators
+do not need Hub Detective. See `docs/DEBUG_GATHER.md`.
+
 ## URL routing (via dispatch)
 
 | Verb class | Path |

@@ -31,6 +31,10 @@ class VerbResult:
     body: Mapping[str, Any]
     error: str | None = None
     url_hint: str = ""
+    chat_id: str | None = None
+    turn_id: str | None = None
+    req_ids: tuple[str, ...] = ()
+    trace_class: str = TRACE_CLASS_DIRECT_READ
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -41,6 +45,10 @@ class VerbResult:
             "body": dict(self.body),
             "error": self.error,
             "url_hint": self.url_hint,
+            "chat_id": self.chat_id,
+            "turn_id": self.turn_id,
+            "req_ids": list(self.req_ids),
+            "trace_class": self.trace_class,
         }
 
 
@@ -91,4 +99,7 @@ async def run_data_verb(
         req_id=hop.req_id,
         body=hop.body,
         error=hop.error,
+        url_hint=getattr(hop, "url", "") or "",
+        req_ids=(hop.req_id,) if hop.req_id else (),
+        trace_class=TRACE_CLASS_DIRECT_READ,
     )
