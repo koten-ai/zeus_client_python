@@ -11,6 +11,7 @@ from zeus_client.application.typeahead import (
     SuggestResult,
     run_typeahead_search,
 )
+from zeus_client.config.models import DataTarget
 from zeus_client.domain.errors import ErrorCode, ZeusClientError
 
 if TYPE_CHECKING:
@@ -31,6 +32,10 @@ class DataAPI:
         body: Mapping[str, Any] | None = None,
         *,
         mode_header: str | None = None,
+        target: DataTarget | None = None,
+        headers: Mapping[str, str] | None = None,
+        chat_id: str | None = None,
+        turn_id: str | None = None,
     ) -> VerbResult:
         zeus = self._rt.services.zeus
         if zeus is None:
@@ -43,9 +48,12 @@ class DataAPI:
             zeus,
             name,
             body,
-            target=self._rt.config.target,
+            target=target or self._rt.config.target,
             mode_header=mode_header or self._rt.config.settings.mode,
             force_trace=self._rt.config.settings.force_trace,
+            headers=headers,
+            chat_id=chat_id,
+            turn_id=turn_id,
         )
         metrics = self._rt.services.metrics
         status_class = f"{result.status_code // 100}xx" if result.status_code else "err"
