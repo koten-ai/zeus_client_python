@@ -38,6 +38,7 @@ class Services:
     http: Any = None
     otlp: Any = None
     session_lifecycle: Any = None
+    jobs: Any = None
     _closed: bool = False
 
     async def aclose(self) -> None:
@@ -76,6 +77,7 @@ class ZeusRuntime:
         metrics: MetricsPort | None = None,
         rate_limiter: TokenBucketLimiter | None = None,
         otlp: Any = None,
+        jobs: Any = None,
     ) -> None:
         self.config = config
         svc = services or Services()
@@ -103,6 +105,8 @@ class ZeusRuntime:
             svc.http = http
         if otlp is not None:
             svc.otlp = otlp
+        if jobs is not None:
+            svc.jobs = jobs
         self._services = svc
         self._entered = False
         self._configure_rate_limits()
@@ -167,6 +171,20 @@ class ZeusRuntime:
         from zeus_client.api.debug import DebugAPI
 
         return DebugAPI(self)
+
+    @property
+    def units(self) -> Any:
+        """Mode 3 unit adapters (isolated agent_turn / zeus_direct)."""
+        from zeus_client.api.units import UnitsAPI
+
+        return UnitsAPI(self)
+
+    @property
+    def jobs(self) -> Any:
+        """Mode 3 jobs client (fail-closed without a job runtime host)."""
+        from zeus_client.api.jobs import JobsAPI
+
+        return JobsAPI(self)
 
     async def __aenter__(self) -> ZeusRuntime:
         self._entered = True
