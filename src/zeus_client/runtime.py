@@ -49,7 +49,7 @@ class Services:
         if http is not None and hasattr(http, "aclose"):
             await http.aclose()
         # Adapters may expose aclose as well
-        for name in ("zeus", "llm", "hub_debug", "otlp"):
+        for name in ("zeus", "llm", "hub_debug", "otlp", "jobs"):
             dep = getattr(self, name, None)
             if dep is not None and hasattr(dep, "aclose"):
                 await dep.aclose()
@@ -130,6 +130,10 @@ class ZeusRuntime:
         **overrides: Any,
     ) -> ZeusRuntime:
         cfg = load_runtime_config(path, profile=profile, env=env)
+        if "jobs" not in overrides and cfg.jobs.host_url:
+            from zeus_client.adapters.jobs_http.client import HttpxJobRuntime
+
+            overrides["jobs"] = HttpxJobRuntime(cfg.jobs.host_url)
         return cls(cfg, **overrides)
 
     @property
