@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.units_agent import run_agent_unit
 from zeus_client.application.units_direct import run_direct_unit
-from zeus_client.domain.jobs import UnitConfig, UnitKind, UnitResult
 from zeus_client.domain.errors import ErrorCode, JobError
+from zeus_client.domain.jobs import UnitConfig, UnitKind, UnitResult
 
 if TYPE_CHECKING:
     from zeus_client.runtime import ZeusRuntime

@@ -14,7 +14,9 @@ from zeus_client.domain.journal.events import EVENT_UNIT_FINISHED, EVENT_UNIT_ST
 __all__ = ["run_direct_unit"]
 
 
-def _append_unit_event(rt: Any, typ: str, *, job_id: str | None, unit_id: str, data: Mapping[str, Any]) -> None:
+def _append_unit_event(
+    rt: Any, typ: str, *, job_id: str | None, unit_id: str, data: Mapping[str, Any]
+) -> None:
     rt.journal.append(
         JournalEvent(
             event_id=f"evt_{uuid.uuid4().hex[:16]}",
@@ -91,7 +93,9 @@ async def run_direct_unit(
             plan_epoch=plan_epoch,
         )
 
-    req_ids = tuple(result.req_ids) if result.req_ids else ((result.req_id,) if result.req_id else ())
+    req_ids = (
+        tuple(result.req_ids) if result.req_ids else ((result.req_id,) if result.req_id else ())
+    )
     status = UnitStatus.OK if result.ok else UnitStatus.ERROR
     _append_unit_event(
         rt,

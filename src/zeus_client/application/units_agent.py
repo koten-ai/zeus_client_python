@@ -33,7 +33,9 @@ def _has_required_inject(chat_request: Mapping[str, Any] | None) -> bool:
     return "## MINI-SCHEMA" in text
 
 
-def _append_unit_event(rt: Any, typ: str, *, job_id: str | None, unit_id: str, data: Mapping[str, Any]) -> None:
+def _append_unit_event(
+    rt: Any, typ: str, *, job_id: str | None, unit_id: str, data: Mapping[str, Any]
+) -> None:
     rt.journal.append(
         JournalEvent(
             event_id=f"evt_{uuid.uuid4().hex[:16]}",
@@ -150,7 +152,9 @@ async def run_agent_unit(
             unit_id=unit.unit_id,
             data=payload | {"status": "error"},
         )
-        code = getattr(getattr(exc, "code", None), "value", None) or ErrorCode.AGENT_TURN_FAILED.value
+        code = (
+            getattr(getattr(exc, "code", None), "value", None) or ErrorCode.AGENT_TURN_FAILED.value
+        )
         return UnitResult(
             unit_id=unit.unit_id,
             status=UnitStatus.ERROR,
