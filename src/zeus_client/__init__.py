@@ -2,7 +2,7 @@
 
 ``import zeus_client`` loads the ZeusRuntime tree. Temporary alias
 ``import zeus_client_v2`` re-exports this package with DeprecationWarning
-(remove ≤1 minor / 2.1.0). Free-function migration aid: ``zeus_client.compat.v1``.
+(remove ≤2.2.0). Free-function migration aid: ``zeus_client.compat.v1``.
 See ``docs/V2/MIGRATION.md``.
 """
 
@@ -43,6 +43,16 @@ def __getattr__(name: str) -> Any:
         "sum_provider_tokens": ("zeus_client.application.tokens", "sum_provider_tokens"),
         "attach_trace_tokens": ("zeus_client.application.tokens", "attach_trace_tokens"),
         "normalize_usage": ("zeus_client.application.tokens", "normalize_usage"),
+        "JobHandle": ("zeus_client.domain.jobs", "JobHandle"),
+        "JobEvent": ("zeus_client.domain.jobs", "JobEvent"),
+        "JobBudgets": ("zeus_client.domain.jobs", "JobBudgets"),
+        "JobSnapshot": ("zeus_client.domain.jobs", "JobSnapshot"),
+        "UnitConfig": ("zeus_client.domain.jobs", "UnitConfig"),
+        "UnitKind": ("zeus_client.domain.jobs", "UnitKind"),
+        "UnitResult": ("zeus_client.domain.jobs", "UnitResult"),
+        "UnitStatus": ("zeus_client.domain.jobs", "UnitStatus"),
+        "LlmRoleConfig": ("zeus_client.config.models", "LlmRoleConfig"),
+        "JobsConfig": ("zeus_client.config.models", "JobsConfig"),
     }
     if name not in _lazy:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -81,4 +91,14 @@ __all__ = [
     "sum_provider_tokens",
     "attach_trace_tokens",
     "normalize_usage",
+    "JobHandle",
+    "JobEvent",
+    "JobBudgets",
+    "JobSnapshot",
+    "UnitConfig",
+    "UnitKind",
+    "UnitResult",
+    "UnitStatus",
+    "LlmRoleConfig",
+    "JobsConfig",
 ]

@@ -69,19 +69,21 @@ src/zeus_client/
   __init__.py
   py.typed
   runtime.py
-  api/{__init__,agent,data,catalog,debug}.py
-  domain/{ids,errors,contract,catalog,layer_a,policy,messages}.py
+  api/{__init__,agent,data,catalog,debug,jobs,units}.py
+  domain/{ids,errors,contract,catalog,layer_a,policy,messages,jobs,llm_roles}.py
   domain/journal/{__init__,events,journal,spans,export,payload_store}.py
-  application/{agent_turn,data_verb,typeahead,catalog_sync,session_lifecycle,middleware,plugins}.py
+  application/{agent_turn,data_verb,typeahead,catalog_sync,session_lifecycle,middleware,plugins,units_agent,units_direct}.py
   application/detective/{__init__,build,overview,prompt_checklist,diagnosis,playbooks,support_pack,extract,hub_hydrate}.py
   application/projectors/{__init__,session_trace,public_trace}.py
-  ports/{zeus,llm,hub_debug,catalog_store,secrets,clock,id_factory,http}.py
+  ports/{zeus,llm,hub_debug,catalog_store,secrets,clock,id_factory,http,jobs}.py
   adapters/zeus_http/{__init__,auth,session,verbs,catalog_remote,headers}.py
   adapters/llm_openai_compatible/{__init__,client}.py
   adapters/hub_debug_http/{__init__,client}.py
   adapters/catalog_fs/{__init__,store}.py
   adapters/secrets_env/{__init__,store}.py
   adapters/otlp/{__init__,exporter}.py
+  adapters/jobs_http/{__init__,client,paths,sse}.py
+  adapters/jobs_fake/{__init__,runtime}.py
   config/{models,loader,profiles}.py
   security/{redact,validate}.py
   compat/__init__.py
