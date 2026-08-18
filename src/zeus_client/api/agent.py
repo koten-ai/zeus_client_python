@@ -72,7 +72,9 @@ class AgentAPI:
             middleware=self._middleware,
             default_settings=self._rt.config.settings,
             debug_policy=self._rt.config.debug,
-            hub_base_url=None,
+            hub_base_url=self._rt.config.debug.hub_base_url,
+            session_lifecycle=getattr(self._rt.services, "session_lifecycle", None),
+            zeus_url=self._rt.config.zeus.url,
         )
         metrics = self._rt.services.metrics
         metrics.incr(

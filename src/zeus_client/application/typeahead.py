@@ -10,6 +10,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from zeus_client.adapters.zeus_http.headers import (
+    TRACE_CLASS_DIRECT_INTERACTIVE,
+    correlation_headers,
+)
 from zeus_client.config.models import DataTarget
 from zeus_client.ports import VerbRequest
 from zeus_client.ports.zeus import ZeusPort
@@ -70,6 +74,8 @@ class SuggestResult:
     error: str = ""
     fast_tier: bool = True
     ai_process_result: bool = False
+    req_ids: tuple[str, ...] = ()
+    trace_class: str = TRACE_CLASS_DIRECT_INTERACTIVE
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -83,6 +89,8 @@ class SuggestResult:
             "error": self.error or None,
             "fast_tier": self.fast_tier,
             "ai_process_result": self.ai_process_result,
+            "req_ids": list(self.req_ids),
+            "trace_class": self.trace_class,
         }
 
 
@@ -230,6 +238,7 @@ async def run_typeahead_search(
             body=body,
             target=target,
             mode_header=opts.mode_header,
+            headers=correlation_headers(trace_class=TRACE_CLASS_DIRECT_INTERACTIVE),
         )
     )
     if not hop.ok:
@@ -253,4 +262,6 @@ async def run_typeahead_search(
         source="fts" if merged else "empty",
         sources=sources,
         fts_req_id=hop.req_id or "",
+        req_ids=(hop.req_id,) if hop.req_id else (),
+        trace_class=TRACE_CLASS_DIRECT_INTERACTIVE,
     )

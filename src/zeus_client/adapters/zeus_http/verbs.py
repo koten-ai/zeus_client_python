@@ -183,6 +183,7 @@ class HttpxZeusPort:
             req_id=req_id,
             body=body,
             error=err,
+            url=url,
         )
 
     def _journal_hop(

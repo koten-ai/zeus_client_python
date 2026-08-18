@@ -45,6 +45,7 @@ class DataAPI:
             body,
             target=self._rt.config.target,
             mode_header=mode_header or self._rt.config.settings.mode,
+            force_trace=self._rt.config.settings.force_trace,
         )
         metrics = self._rt.services.metrics
         status_class = f"{result.status_code // 100}xx" if result.status_code else "err"

@@ -22,6 +22,7 @@ __all__ = [
     "user_facing_answer",
     "ui_view",
     "artifacts_view",
+    "compact_layer_a",
 ]
 
 _CONFIDENCE = frozenset({"high", "med", "low"})
@@ -421,4 +422,27 @@ def artifacts_view(
         "errors": list(layer.errors),
         "warnings": list(layer.warnings),
         "raw": layer.raw,
+    }
+
+
+def compact_layer_a(layer: LayerA, *, via: str = "client_terminate") -> dict[str, Any]:
+    """G2-free terminate bag for public_trace / session-trace."""
+    decomp = layer.decomposition if isinstance(layer.decomposition, dict) else {}
+    targets = decomp.get("targets") if decomp else None
+    empty_targets = not targets
+    synthetic = bool(
+        (layer.policy_action == "error" and empty_targets)
+        or looks_like_layer_a_dump(layer.summary or "")
+    )
+    return {
+        "ok": layer.ok,
+        "summary": layer.summary,
+        "confidence": layer.confidence,
+        "policy_action": layer.policy_action,
+        "query_decomposition": layer.query_decomposition,
+        "decomposition": layer.decomposition,
+        "synthetic": synthetic,
+        "via": via,
+        "errors": list(layer.errors),
+        "warnings": list(layer.warnings),
     }

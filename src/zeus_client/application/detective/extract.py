@@ -11,6 +11,7 @@ from zeus_client.application.projectors.session_trace import select_primary_req_
 
 __all__ = [
     "sha12",
+    "slice_block",
     "collect_req_ids",
     "preferred_req_id",
     "count_tool_errors",
@@ -20,6 +21,16 @@ __all__ = [
     "notes_blob",
     "hop_error_blob",
 ]
+
+_SLICE_SCOPE = re.compile(r"(?ms)^##\s+SCOPE\s+BRIEF\b.*?(?=^##\s|\Z)")
+_SLICE_MINI = re.compile(r"(?ms)^##\s+MINI-SCHEMA\b.*?(?=^##\s|\Z)")
+
+
+def slice_block(text: str, kind: str) -> str:
+    """Return the marked BRIEF or MINI block (empty if absent)."""
+    pat = _SLICE_SCOPE if kind == "brief" else _SLICE_MINI
+    m = pat.search(text or "")
+    return m.group(0).strip() if m else ""
 
 
 def sha12(text: str | None) -> str | None:
@@ -126,12 +137,16 @@ def catalog_flags_of(
     raw_types = cat.get("mini_entity_types")
     if isinstance(raw_types, (list, tuple)):
         mini_types = [str(x) for x in raw_types]
+    brief_slice = slice_block(system, "brief")
+    mini_slice = slice_block(system, "mini")
     return {
         "has_scope_brief": has_scope,
         "has_mini_schema": has_mini,
         "mini_entity_types": mini_types,
-        "brief_sha12": sha12(system) if has_scope else None,
-        "mini_sha12": sha12(system) if has_mini else None,
+        "brief_sha12": sha12(brief_slice) if has_scope else None,
+        "mini_sha12": sha12(mini_slice) if has_mini else None,
+        "brief_preview": (brief_slice[:400] if brief_slice else None),
+        "mini_preview": (mini_slice[:400] if mini_slice else None),
     }
 
 

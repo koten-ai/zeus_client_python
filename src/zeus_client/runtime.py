@@ -37,6 +37,7 @@ class Services:
     hub_debug: Any = None
     http: Any = None
     otlp: Any = None
+    session_lifecycle: Any = None
     _closed: bool = False
 
     async def aclose(self) -> None:

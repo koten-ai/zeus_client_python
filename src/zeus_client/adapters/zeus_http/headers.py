@@ -7,12 +7,23 @@ from collections.abc import Mapping
 from zeus_client._version import __version__ as PACKAGE_VERSION
 
 __all__ = [
+    "TRACE_CLASS_AGENT",
+    "TRACE_CLASS_SESSION",
+    "TRACE_CLASS_DIRECT_INTERACTIVE",
+    "TRACE_CLASS_DIRECT_READ",
+    "TRACE_CLASS_DIRECT_BATCH",
     "apply_mode_header",
     "apply_force_trace_header",
     "correlation_headers",
     "product_stamp_headers",
     "merge_headers",
 ]
+
+TRACE_CLASS_AGENT = "agent"
+TRACE_CLASS_SESSION = "session"
+TRACE_CLASS_DIRECT_INTERACTIVE = "direct.interactive"
+TRACE_CLASS_DIRECT_READ = "direct.read"
+TRACE_CLASS_DIRECT_BATCH = "direct.batch"
 
 _PRODUCT_USER = "zeus_client"
 
@@ -41,6 +52,7 @@ def correlation_headers(
     call_id: str = "",
     mode: str = "",
     force_trace: bool = False,
+    trace_class: str = "",
 ) -> dict[str, str]:
     h: dict[str, str] = {}
     if chat_id:
@@ -53,6 +65,9 @@ def correlation_headers(
         h["X-Zeus-Mode"] = str(mode)
     if force_trace:
         h["X-Zeus-Trace"] = "1"
+    tc = (trace_class or "").strip()
+    if tc:
+        h["X-Zeus-Trace-Class"] = tc
     return h
 
 

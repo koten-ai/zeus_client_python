@@ -23,6 +23,7 @@ def build_public_trace(
     flags: Mapping[str, bool] | None,
     steps: Sequence[Mapping[str, Any]] | None = None,
     tokens: Mapping[str, Any] | None = None,
+    session: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Widget-friendly projection — never put G2 dumps in answer field."""
     out: dict[str, Any] = {
@@ -45,4 +46,6 @@ def build_public_trace(
     }
     if tokens is not None:
         out["tokens"] = dict(tokens)
+    if session:
+        out["session"] = dict(session)
     return out
