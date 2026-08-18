@@ -8,7 +8,6 @@ import respx
 
 from zeus_client.adapters.jobs_http.client import HttpxJobRuntime
 from zeus_client.adapters.jobs_http.paths import FROM_SEQ_PARAM, events_url
-from zeus_client.config.models import JobsConfig, RuntimeConfig
 from zeus_client.domain.errors import ErrorCode, JobError
 from zeus_client.runtime import ZeusRuntime
 

@@ -555,7 +555,12 @@ async def run_agent_turn(
     else:
         status = TurnStatus.OK
 
-    if req.enable_sessions and session_lifecycle is not None and session_handle and session_handle.session_id:
+    if (
+        req.enable_sessions
+        and session_lifecycle is not None
+        and session_handle
+        and session_handle.session_id
+    ):
         compact = None
         if layer is not None:
             compact = compact_layer_a(layer, via=last_terminate_via)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from zeus_client.domain.errors import ErrorCode, JobError
@@ -19,7 +19,7 @@ def _ts_ms(raw: Any) -> int:
             text = raw.replace("Z", "+00:00")
             dt = datetime.fromisoformat(text)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return int(dt.timestamp() * 1000)
         except ValueError:
             return 0
