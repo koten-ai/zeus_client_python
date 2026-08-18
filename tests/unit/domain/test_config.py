@@ -117,6 +117,41 @@ def test_example_config_loads() -> None:
     assert cfg.settings.ai_process_result is True
 
 
+def test_load_llm_roles_and_jobs_host(tmp_path: Path) -> None:
+    p = tmp_path / "cfg.json"
+    p.write_text(
+        json.dumps(
+            {
+                "llm": {
+                    "model": "fast-worker",
+                    "api_key_env": "LLM_DEFAULT_KEY",
+                    "roles": {
+                        "orchestrator": {"model": "strong-planner", "api_key_env": "LLM_ORCH_KEY"},
+                        "advisor": {"model": "strong-planner"},
+                        "worker": {"model": "fast-worker", "api_key_env": "LLM_WORKER_KEY"},
+                    },
+                },
+                "jobs": {
+                    "host_url": "http://127.0.0.1:7090",
+                    "models": {"worker": {"model": "fast-worker-v2"}},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = load_runtime_config(p, profile="development", env={})
+    assert cfg.llm.roles["orchestrator"].model == "strong-planner"
+    assert cfg.llm.roles["orchestrator"].api_key_env == "LLM_ORCH_KEY"
+    assert cfg.llm.roles["advisor"].api_key_env == "LLM_DEFAULT_KEY"
+    assert cfg.jobs.host_url == "http://127.0.0.1:7090"
+    pub = cfg.to_public_dict()
+    assert pub["llm"]["roles"]["orchestrator"]["api_key_env"] == "LLM_ORCH_KEY"
+    assert "sk-" not in json.dumps(pub)
+    dumped = json.dumps(pub["llm"])
+    assert '"api_key"' not in dumped
+    assert "api_key_env" in dumped
+
+
 def test_env_secret_store() -> None:
     store = EnvSecretStore(environ={"XAI_API_KEY": "secret-value", "EMPTY": ""})
     assert store.get("XAI_API_KEY") == "secret-value"

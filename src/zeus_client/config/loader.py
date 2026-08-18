@@ -12,7 +12,9 @@ from zeus_client.config.models import (
     ClientSettings,
     DataTarget,
     DebugPolicy,
+    JobsConfig,
     LlmProviderConfig,
+    LlmRoleConfig,
     RateLimitPolicy,
     RedactionPolicy,
     RetryPolicy,
@@ -54,6 +56,41 @@ def _dig(mapping: Mapping[str, Any], *keys: str, default: Any = None) -> Any:
     return cur
 
 
+def _parse_llm_roles(
+    raw: Any,
+    *,
+    default_api_key_env: str,
+) -> dict[str, LlmRoleConfig]:
+    if not isinstance(raw, Mapping):
+        return {}
+    out: dict[str, LlmRoleConfig] = {}
+    for name, spec in raw.items():
+        if not isinstance(spec, Mapping):
+            continue
+        key_env = spec.get("api_key_env")
+        out[str(name)] = LlmRoleConfig(
+            model=spec.get("model"),
+            api_key_env=str(key_env) if key_env else default_api_key_env,
+            base_url=spec.get("base_url"),
+            provider=spec.get("provider"),
+            temperature=(
+                float(spec["temperature"]) if spec.get("temperature") is not None else None
+            ),
+        )
+    return out
+
+
+def _parse_jobs(raw: Any) -> JobsConfig:
+    if not isinstance(raw, Mapping):
+        return JobsConfig()
+    models = raw.get("models")
+    return JobsConfig(
+        host_url=str(raw["host_url"]) if raw.get("host_url") else None,
+        watch_transport="sse",
+        models=dict(models) if isinstance(models, Mapping) else {},
+    )
+
+
 def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) -> RuntimeConfig:
     """Build RuntimeConfig from a plain mapping (file JSON shape)."""
 
@@ -77,6 +114,9 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
     redaction: dict[str, Any] = _map("redaction")
     debug: dict[str, Any] = _map("debug")
     rate_limit: dict[str, Any] = _map("rate_limit")
+    jobs_raw: dict[str, Any] = _map("jobs")
+    default_key_env = str(llm.get("api_key_env", "XAI_API_KEY"))
+    roles = _parse_llm_roles(llm.get("roles"), default_api_key_env=default_key_env)
 
     auth_mode = str(z.get("auth_mode", "none")).lower()
     if auth_mode not in ("none", "basic", "bearer", "session"):
@@ -114,10 +154,11 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             provider=str(llm.get("provider", "xai")),
             base_url=str(llm.get("base_url", "https://api.x.ai/v1")).rstrip("/"),
             model=str(llm.get("model", "grok-4-1-non-reasoning")),
-            api_key_env=str(llm.get("api_key_env", "XAI_API_KEY")),
+            api_key_env=default_key_env,
             context_window_tokens=int(llm.get("context_window_tokens", 128_000)),
             context_soft_limit=float(llm.get("context_soft_limit", 0.8)),
             timeout_s=float(llm.get("timeout_s", 120.0)),
+            roles=roles,
         ),
         settings=ClientSettings(
             ai_process_result=_as_bool(settings.get("ai_process_result"), True),
@@ -157,6 +198,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             typeahead_burst=float(rate_limit.get("typeahead_burst", 20.0)),
         ),
         chat_requests_dir=data.get("chat_requests_dir"),
+        jobs=_parse_jobs(jobs_raw),
     )
     return apply_profile(cfg, cfg.profile)
 
@@ -219,6 +261,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             env.get("ZEUS_CLIENT_LLM_CONTEXT_SOFT_LIMIT", llm.context_soft_limit)
         ),
         timeout_s=float(env.get("ZEUS_CLIENT_LLM_TIMEOUT_S", llm.timeout_s)),
+        roles=llm.roles,
     )
 
     if "ZEUS_CLIENT_AI_PROCESS_RESULT" in env:
@@ -264,6 +307,13 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
 
     chat_dir = env.get("ZEUS_CLIENT_CHAT_REQUESTS_DIR", cfg.chat_requests_dir)
     profile = env.get("ZEUS_CLIENT_PROFILE", cfg.profile)
+    jobs = cfg.jobs
+    if host := env.get("ZEUS_CLIENT_JOBS_HOST_URL"):
+        jobs = JobsConfig(
+            host_url=host,
+            watch_transport=jobs.watch_transport,
+            models=jobs.models,
+        )
 
     out = cfg.with_overrides(
         profile=profile,
@@ -272,6 +322,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
         llm=llm,
         settings=settings,
         chat_requests_dir=chat_dir,
+        jobs=jobs,
     )
     return apply_profile(out, out.profile)
 
