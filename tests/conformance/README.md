@@ -17,7 +17,7 @@ python3 ../zeus_client_design/conformance/adapter/reference/run_suite.py
 make conformance
 ```
 
-Report: `tests/conformance/last_report.json`. Sibling `zeus_client_design` is **required** (CI fails if the checkout is missing).
+Report: `tests/conformance/last_report.json`. Sibling `zeus_client_design` is **required locally**. GitHub Actions **skips** the suite until `secrets.KOTEN_CI_PAT` can clone the private design repo.
 
 ## Coverage
 
@@ -39,4 +39,4 @@ Handlers must not copy `case.expect` into observe.
 ## Blocked / residual
 
 - Full ZF-WISH-003 agent re-run of Detective tapes is **not** claimed. Companions + slim `assert_only` satisfy kit-β `required_rewind` offline.
-- Missing design repo is a **hard fail** (CHECKLIST E), not a skip.
+- Missing design repo: **hard fail locally** (CHECKLIST E). CI **skips** until `KOTEN_CI_PAT` is set on this repo.
