@@ -5,10 +5,16 @@ from __future__ import annotations
 import pytest
 
 from zeus_client.adapters.jobs_fake import FakeJobRuntime
-from zeus_client.config.models import DataTarget, RuntimeConfig
+from zeus_client.config.models import (
+    ClientSettings,
+    DataTarget,
+    LlmProviderConfig,
+    LlmRoleConfig,
+    RuntimeConfig,
+)
 from zeus_client.domain.errors import ErrorCode, JobError
 from zeus_client.domain.jobs import UnitConfig, UnitKind
-from zeus_client.ports import VerbHopResult, VerbRequest
+from zeus_client.ports import LlmRequest, LlmResponse, VerbHopResult, VerbRequest
 from zeus_client.runtime import ZeusRuntime
 
 
@@ -83,6 +89,50 @@ async def test_fake_job_partial_on_one_unit_error() -> None:
     assert snap.status == "partial"
     assert {s["status"] for s in snap.unit_summaries} == {"error", "ok"}
     assert any(e.type == "job.finished" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_fake_job_forwards_unit_models_to_agent_turn() -> None:
+    class _Llm:
+        def __init__(self) -> None:
+            self.calls: list[LlmRequest] = []
+
+        async def complete(self, req: LlmRequest) -> LlmResponse:
+            self.calls.append(req)
+            return LlmResponse(content="ok", tool_calls=())
+
+    llm = _Llm()
+    zeus = RecordingZeus()
+    cfg = RuntimeConfig(
+        target=DataTarget(bucket="west", scope="s", collection="c"),
+        llm=LlmProviderConfig(
+            model="fast-worker",
+            api_key_env="LLM_DEFAULT_KEY",
+            roles={"worker": LlmRoleConfig(model="fast-worker", api_key_env="LLM_DEFAULT_KEY")},
+        ),
+        settings=ClientSettings(durable_sessions=False),
+    )
+    rt = ZeusRuntime(cfg, llm=llm, zeus=zeus)
+    rt.services.jobs = FakeJobRuntime(rt)
+    unit = UnitConfig(
+        unit_id="u1",
+        kind=UnitKind.AGENT_TURN,
+        goal="shortlist fruit beers",
+        zeus_url="http://127.0.0.1:8080",
+        bucket="beer-sample",
+        scope="sales",
+        collection="_default",
+        catalog_mode="analytics",
+        chat_request={"messages": [{"role": "system", "content": "## SCOPE BRIEF\nscope: b/s\n"}]},
+    )
+    async with rt:
+        await rt.jobs.run(
+            "fan-out",
+            units=[unit],
+            models={"units": {"u1": {"model": "fast-worker-v3"}}},
+        )
+    assert llm.calls
+    assert llm.calls[0].model == "fast-worker-v3"
 
 
 @pytest.mark.asyncio

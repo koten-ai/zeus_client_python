@@ -66,12 +66,17 @@ class FakeJobRuntime:
         summaries: list[Mapping[str, Any]] = []
         any_ok = False
         any_err = False
+        job_models = request.get("models")
+        models = dict(job_models) if isinstance(job_models, Mapping) else None
         for unit in units:
             if self._cancels[job_id].is_set():
                 break
             if unit.kind is UnitKind.AGENT_TURN:
                 result = await units_api.agent_turn(
-                    unit, job_id=job_id, cancel_event=self._cancels[job_id]
+                    unit,
+                    job_id=job_id,
+                    job_models=models,
+                    cancel_event=self._cancels[job_id],
                 )
             else:
                 result = await units_api.zeus_direct(
