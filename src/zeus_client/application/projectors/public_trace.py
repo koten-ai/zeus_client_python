@@ -24,6 +24,8 @@ def build_public_trace(
     steps: Sequence[Mapping[str, Any]] | None = None,
     tokens: Mapping[str, Any] | None = None,
     session: Mapping[str, Any] | None = None,
+    inject: Mapping[str, Any] | None = None,
+    stamp: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Widget-friendly projection — never put G2 dumps in answer field."""
     out: dict[str, Any] = {
@@ -48,4 +50,9 @@ def build_public_trace(
         out["tokens"] = dict(tokens)
     if session:
         out["session"] = dict(session)
+    if inject:
+        out["inject"] = dict(inject)
+    if stamp:
+        out["user"] = stamp.get("user")
+        out["stamp"] = dict(stamp)
     return out

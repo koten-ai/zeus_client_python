@@ -24,6 +24,7 @@ from zeus_client.domain.llm_classify import (
     RetryBudget,
     classify_llm_failure,
 )
+from zeus_client.observability.logging import get_family_logger
 from zeus_client.ports import LlmRequest, LlmResponse
 from zeus_client.ports.secrets import SecretStorePort
 
@@ -188,6 +189,19 @@ class OpenAICompatibleLlmClient:
         }
         if cls.message_preview:
             details["llm.message_preview"] = cls.message_preview[:200]
+        get_family_logger().error(
+            "zeus_client.llm.request_failed",
+            **{
+                "llm.provider": provider,
+                "llm.model": model,
+                "llm.error_class": cls.error_class.value,
+                "http.status_code": cls.http_status,
+                "llm.retryable": cls.retryable,
+                "error.code": cls.code.value,
+                "error.message": "llm request failed",
+                "result": "error",
+            },
+        )
         raise LlmError(
             code=cls.code,
             component=COMPONENT,
@@ -286,6 +300,15 @@ class OpenAICompatibleLlmClient:
         }
         url = f"{base}/chat/completions"
         client = await self._ensure_client()
+        log = get_family_logger()
+        log.info(
+            "zeus_client.llm.request_started",
+            **{
+                "llm.provider": self.config.provider,
+                "llm.model": model,
+                "llm.base_url_host": _host_of(self.config.base_url),
+            },
+        )
 
         budget = (
             self.budget
@@ -363,6 +386,18 @@ class OpenAICompatibleLlmClient:
                     usage=parsed.usage,
                     latency_ms=latency_ms,
                     tool_call_count=len(parsed.tool_calls),
+                )
+                usage = parsed.usage or {}
+                log.info(
+                    "zeus_client.llm.request_finished",
+                    **{
+                        "llm.provider": self.config.provider,
+                        "llm.model": model,
+                        "duration_ms": latency_ms,
+                        "result": "ok",
+                        "tokens.input": usage.get("prompt_tokens"),
+                        "tokens.output": usage.get("completion_tokens"),
+                    },
                 )
                 return parsed
 

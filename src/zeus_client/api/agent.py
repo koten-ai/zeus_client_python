@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.agent_turn import AgentTurnUseCase, run_agent_turn
-from zeus_client.application.middleware import MiddlewareChain
+from zeus_client.application.middleware import MiddlewareChain, SecurityHooks
 from zeus_client.config.models import ClientSettings, DataTarget
 from zeus_client.domain.errors import ErrorCode, ZeusClientError
 from zeus_client.domain.messages import TurnRequest, TurnResult
@@ -22,7 +22,7 @@ class AgentAPI:
 
     def __init__(self, runtime: ZeusRuntime) -> None:
         self._rt = runtime
-        self._middleware = MiddlewareChain()
+        self._middleware = MiddlewareChain(items=[SecurityHooks()])
 
     @property
     def middleware(self) -> MiddlewareChain:
@@ -41,7 +41,8 @@ class AgentAPI:
         chat_request: Mapping[str, Any] | None = None,
         chat_id: str | None = None,
         model: str | None = None,
-        enable_sessions: bool = False,
+        enable_sessions: bool | None = None,
+        base_id: str | None = None,
     ) -> TurnResult:
         llm = self._rt.services.llm
         if llm is None:
@@ -51,18 +52,40 @@ class AgentAPI:
                 public_message="LLM port not wired on runtime",
             )
         zeus = self._rt.services.zeus
+        cs = settings or self._rt.config.settings
+        pack_schema = None
+        cr = chat_request
+        extra_notes: list[str] = []
+        tgt = target or self._rt.config.target
+        if cr is None:
+            try:
+                loaded = await self._rt.catalog.load_for_turn(cs.mode, target=tgt, base_id=base_id)
+                cr = loaded.body
+                pack_schema = loaded.response_output_schema
+                extra_notes.append(f"chat_request: {loaded.source}")
+            except ZeusClientError:
+                cr = None
+        else:
+            merged = await self._rt.catalog.ensure_scope_brief(cr, target=tgt, mode=cs.mode)
+            cr = merged.body
+            extra_notes.append(merged.note)
+            if merged.req_id:
+                extra_notes.append(f"scope_brief.req_id={merged.req_id}")
+        sessions_on = bool(cs.durable_sessions) if enable_sessions is None else enable_sessions
         req = TurnRequest(
             message=message,
-            target=target or self._rt.config.target,
-            settings=settings or self._rt.config.settings,
+            target=tgt,
+            settings=cs,
             session=session,
             prior_messages=prior_messages,
             system_prompt=system_prompt or "You are a helpful Zeus data assistant.",
             tools=tools,
-            chat_request=chat_request,
+            chat_request=cr,
+            base_id=base_id,
+            pack_schema=pack_schema,
             chat_id=chat_id,
             model=model or self._rt.config.llm.model,
-            enable_sessions=enable_sessions,
+            enable_sessions=sessions_on,
         )
         result = await run_agent_turn(
             req,
@@ -75,6 +98,14 @@ class AgentAPI:
             hub_base_url=self._rt.config.debug.hub_base_url,
             session_lifecycle=getattr(self._rt.services, "session_lifecycle", None),
             zeus_url=self._rt.config.zeus.url,
+            client_floor=self._rt.config.client_floor,
+            extra_notes=tuple(extra_notes),
+            ids=self._rt.services.ids,
+            client_ip=self._rt.config.client.ip_address,
+            agent_memory=self._rt.services.agent_memory,
+            semantic_cache=self._rt.config.semantic_cache,
+            auth_mode=self._rt.config.zeus.auth_mode,
+            metrics=self._rt.services.metrics,
         )
         metrics = self._rt.services.metrics
         metrics.incr(
@@ -100,4 +131,8 @@ class AgentAPI:
             journal=self._rt.journal,
             middleware=self._middleware,
             default_settings=self._rt.config.settings,
+            agent_memory=self._rt.services.agent_memory,
+            semantic_cache=self._rt.config.semantic_cache,
+            auth_mode=self._rt.config.zeus.auth_mode,
+            metrics=self._rt.services.metrics,
         )

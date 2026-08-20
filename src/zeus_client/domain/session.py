@@ -17,6 +17,7 @@ class SessionHandle:
     contract_id: str = ""
     contract_hash: str = ""
     contract_status: str = "none"
+    mode: str = ""
     created: bool = False
     rehydrated: bool = False
     recovered_from: str = ""
@@ -33,6 +34,7 @@ class SessionHandle:
             "contract_id": self.contract_id,
             "contract_hash": self.contract_hash,
             "contract_status": self.contract_status,
+            "mode": self.mode,
             "created": self.created,
             "rehydrated": self.rehydrated,
             "recovered_from": self.recovered_from,

@@ -17,9 +17,12 @@ from zeus_client.config.models import RuntimeConfig, ZeusEndpointConfig
 from zeus_client.domain.errors import ConfigError, ErrorCode
 
 
-def test_ai_process_result_package_default_true() -> None:
+def test_ai_process_result_package_default_false() -> None:
     cfg = RuntimeConfig()
-    assert cfg.settings.ai_process_result is True
+    assert cfg.settings.ai_process_result is False
+    assert cfg.semantic_cache.enabled is False
+    assert cfg.semantic_cache.write.write_explicit_only is True
+    assert cfg.semantic_cache.apply_to_modes == ("agent",)
 
 
 def test_load_from_tmp_json(tmp_path: Path) -> None:
@@ -74,8 +77,32 @@ def test_env_overrides_url_and_bucket(tmp_path: Path) -> None:
     assert cfg.redaction.preview_max_chars == 2048
 
 
+def test_logging_and_ip_env_overlays(tmp_path: Path) -> None:
+    p = tmp_path / "cfg.json"
+    p.write_text(
+        json.dumps({"zeus": {"url": "http://file:1", "auth_mode": "basic", "username": "u"}}),
+        encoding="utf-8",
+    )
+    cfg = load_runtime_config(
+        p,
+        profile="production",
+        env={
+            "ZEUS_CLIENT_LOG_LEVEL": "debug",
+            "ZEUS_CLIENT_LOG_REDACT": "true",
+            "ZEUS_CLIENT_IP": "203.0.113.10",
+            "ZEUS_CLIENT_OTEL_ENDPOINT": "http://otel:4318",
+            "ZEUS_CLIENT_OTEL_ENABLED": "true",
+        },
+    )
+    assert cfg.logging.level == "debug"
+    assert cfg.logging.redact is True
+    assert cfg.client.ip_address == "203.0.113.10"
+    assert cfg.logging.otel_endpoint == "http://otel:4318"
+    assert cfg.logging.otel_enabled is True
+
+
 def test_profile_matrix() -> None:
-    assert set(list_profiles()) == {"development", "production", "ci"}
+    assert set(list_profiles()) == {"development", "production", "ci", "hub"}
     base = RuntimeConfig(
         zeus=ZeusEndpointConfig(auth_mode="basic", username="u", password_env="ZEUS_PASSWORD")
     )
@@ -114,7 +141,10 @@ def test_example_config_loads() -> None:
     assert "sk-" not in raw
     cfg = load_runtime_config(example, env={})
     assert cfg.zeus.url.startswith("http")
-    assert cfg.settings.ai_process_result is True
+    assert cfg.settings.ai_process_result is False
+    assert cfg.semantic_cache.enabled is False
+    assert cfg.semantic_cache.inject.key == "semantic_memory"
+    assert cfg.semantic_cache.write.write_explicit_only is True
 
 
 def test_load_llm_roles_and_jobs_host(tmp_path: Path) -> None:
@@ -150,6 +180,51 @@ def test_load_llm_roles_and_jobs_host(tmp_path: Path) -> None:
     dumped = json.dumps(pub["llm"])
     assert '"api_key"' not in dumped
     assert "api_key_env" in dumped
+
+
+def test_semantic_cache_bool_or_object_and_env(tmp_path: Path) -> None:
+    p = tmp_path / "cfg.json"
+    p.write_text(
+        json.dumps({"session": {"semantic_cache": False}}),
+        encoding="utf-8",
+    )
+    cfg = load_runtime_config(p, profile="development", env={})
+    assert cfg.semantic_cache.enabled is False
+
+    p.write_text(
+        json.dumps(
+            {
+                "session": {
+                    "semantic_cache": {
+                        "enabled": True,
+                        "recall": {"top_k": 3, "timeout_ms": 80, "min_score": 0.7},
+                        "inject": {"max_chars": 500},
+                        "write": {
+                            "write_explicit_only": False,
+                            "ttl_seconds": {"conversational": 3600, "profile": 86400},
+                        },
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = load_runtime_config(p, profile="development", env={})
+    assert cfg.semantic_cache.enabled is True
+    assert cfg.semantic_cache.recall.top_k == 3
+    assert cfg.semantic_cache.recall.timeout_ms == 80
+    assert cfg.semantic_cache.inject.max_chars == 500
+    assert cfg.semantic_cache.write.write_explicit_only is False
+    assert cfg.semantic_cache.write.ttl_seconds == 3600
+
+    off = load_runtime_config(p, profile="development", env={"ZEUS_CLIENT_SEMANTIC_CACHE": "false"})
+    assert off.semantic_cache.enabled is False
+    pub = cfg.to_public_dict()
+    assert pub["semantic_cache"]["enabled"] is True
+    assert (
+        "dev_user_id" not in pub["semantic_cache"]
+        or pub["semantic_cache"]["has_dev_user_id"] is False
+    )
 
 
 def test_env_secret_store() -> None:

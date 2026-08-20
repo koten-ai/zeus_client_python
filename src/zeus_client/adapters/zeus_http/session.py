@@ -16,8 +16,12 @@ from zeus_client.adapters.zeus_http.headers import (
     apply_mode_header,
     merge_headers,
     product_stamp_headers,
+    req_id_from_headers,
 )
-from zeus_client.config.models import DataTarget, ZeusEndpointConfig
+from zeus_client.config.models import ClientIdentity, DataTarget, ZeusEndpointConfig
+from zeus_client.domain.ids import new_zeus_req_id
+from zeus_client.domain.stamps import product_stamp, resolve_client_ip
+from zeus_client.observability.logging import get_family_logger
 from zeus_client.ports.secrets import SecretStorePort
 
 __all__ = ["SessionHttpResult", "HttpxSessionClient"]
@@ -43,6 +47,9 @@ class HttpxSessionClient:
     _owns_client: bool = False
     _auth: ZeusAuthResolver = field(init=False)
     timeout_s: float | None = None
+    identity: ClientIdentity | None = None
+    last_req_id: str | None = None
+    pre_mint_req_id: bool = False
 
     def __post_init__(self) -> None:
         self._auth = ZeusAuthResolver(endpoint=self.endpoint, secrets=self.secrets)
@@ -77,7 +84,24 @@ class HttpxSessionClient:
             {"Content-Type": "application/json", "Accept": "application/json"},
             extra,
         )
+        if self.pre_mint_req_id and not any(k.lower() == "x-zeus-req-id" for k in h):
+            h["X-Zeus-Req-Id"] = new_zeus_req_id()
         return apply_mode_header(h, mode)
+
+    def _sink_stamp(
+        self, *, session_id: str = "", extra: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
+        ip = None
+        if self.identity is not None:
+            ip = resolve_client_ip(self.identity.ip_address, probe_host=False)
+        stamp = product_stamp(ip_address=ip, session_id=session_id or None)
+        get_family_logger().debug(
+            "zeus_client.stamp.emitted",
+            **{"user": stamp.get("user"), "ip_present": "ip_address" in stamp},
+        )
+        if extra:
+            stamp.update(dict(extra))
+        return stamp
 
     async def create(
         self,
@@ -96,6 +120,7 @@ class HttpxSessionClient:
             "contract_hash": contract_hash or "",
             "chat_request": dict(chat_request or {}),
             "conversation": list(conversation or []),
+            **self._sink_stamp(),
         }
         h = await self._headers(mode=mode, extra=headers, target=target)
         return await self._post(url, h, payload, ok_codes=(200, 201))
@@ -115,12 +140,29 @@ class HttpxSessionClient:
         url = f"{self._base()}/v2/session/{sid}"
         h = await self._headers(mode=mode, extra=headers, target=target)
         client = await self._ensure_client()
+        log = get_family_logger()
         try:
             r = await client.get(url, headers=h, params={"rounds": int(rounds)})
+            req_id = req_id_from_headers(r.headers)
+            self.last_req_id = req_id
             if r.status_code != 200:
+                log.error(
+                    "zeus_client.session.failed",
+                    **{
+                        "session.id": sid,
+                        "req_id": req_id,
+                        "http.status_code": int(r.status_code),
+                        "zeus.url": self._base(),
+                        "result": "error",
+                    },
+                )
                 return None
             data = r.json()
-            return data if isinstance(data, dict) else None
+            if isinstance(data, dict):
+                if req_id:
+                    data["_req_id"] = req_id
+                return data
+            return None
         except (httpx.HTTPError, ValueError):
             return None
 
@@ -179,6 +221,10 @@ class HttpxSessionClient:
                 error="bad trace params",
             )
         url = f"{self._base()}/v2/session/trace"
+        zresp = dict(zeus_response or {})
+        stamp = self._sink_stamp(session_id=sid)
+        for k, v in stamp.items():
+            zresp.setdefault(k, v)
         payload = {
             "session_id": sid,
             "round": int(client_round),
@@ -187,8 +233,9 @@ class HttpxSessionClient:
             "contract_hash": contract_hash or "",
             "chat_request": dict(chat_request or {}),
             "turns": list(turns or []),
-            "zeus_response": dict(zeus_response or {}),
+            "zeus_response": zresp,
             "outcome": outcome or "ok",
+            **stamp,
         }
         h = await self._headers(mode=mode, extra=headers, target=target)
         return await self._post(url, h, payload, ok_codes=(200, 201))
@@ -204,7 +251,8 @@ class HttpxSessionClient:
         client = await self._ensure_client()
         try:
             r = await client.post(url, headers=dict(headers), json=dict(payload))
-            req_id = r.headers.get("X-Zeus-Req-Id") or r.headers.get("x-zeus-req-id")
+            req_id = req_id_from_headers(r.headers)
+            self.last_req_id = req_id
             status = int(r.status_code)
             if status in ok_codes:
                 try:

@@ -78,24 +78,22 @@ jobs:
         with:
           path: zeus_client_python
 
-      # Private sibling suite (optional until KOTEN_CI_PAT is set on this repo).
-      # Prefer secrets.KOTEN_CI_PAT (same as Zeus); fall back to github.token.
-      # Missing/unauthorized design → conformance tests pytest.skip (not fail).
+      # Private sibling suite. Prefer secrets.KOTEN_CI_PAT (same as Zeus).
+      # CHECKLIST E: missing design is a hard fail (not skip).
       - name: Checkout zeus_client_design (conformance)
-        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: koten-ai/zeus_client_design
           path: zeus_client_design
           token: ${{ secrets.KOTEN_CI_PAT || github.token }}
 
-      - name: Note design suite availability
+      - name: Require design suite
         run: |
-          if [ -f ../zeus_client_design/conformance/manifest.json ]; then
-            echo "design suite present — conformance will run"
-          else
-            echo "::warning::zeus_client_design not available; conformance tests will skip. Add secrets.KOTEN_CI_PAT with read access to koten-ai/zeus_client_design."
+          if [ ! -f ../zeus_client_design/conformance/manifest.json ]; then
+            echo "::error::zeus_client_design conformance suite missing. Set secrets.KOTEN_CI_PAT with read access to koten-ai/zeus_client_design."
+            exit 1
           fi
+          echo "design suite present — conformance will run"
 
       - uses: actions/setup-python@v5
         with:
@@ -123,6 +121,14 @@ jobs:
           name: coverage-xml
           path: zeus_client_python/coverage.xml
           if-no-files-found: ignore
+
+      - name: Upload conformance report (3.12 only)
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-report
+          path: zeus_client_python/tests/conformance/last_report.json
+          if-no-files-found: error
 
   build:
     name: build · twine check

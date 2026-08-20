@@ -111,6 +111,36 @@ async def test_agent_turn_unit_uses_worker_model_and_own_session() -> None:
 
 
 @pytest.mark.asyncio
+async def test_agent_turn_borrows_live_brief_when_inject_missing() -> None:
+    class _LiveRemote:
+        last_req_id = "req-brief-u"
+
+        async def fetch_chat_request(self, *args: object, **kwargs: object) -> dict:
+            return {
+                "messages": [
+                    {
+                        "content": (
+                            "## SCOPE BRIEF\nscope: beer-sample/sales\n\n"
+                            "## MINI-SCHEMA\n### Beer\n"
+                        )
+                    }
+                ]
+            }
+
+    llm = ScriptedLlm()
+    zeus = RecordingZeus()
+    async with _runtime(llm, zeus) as rt:
+        rt.services.catalog_remote = _LiveRemote()
+        result = await rt.units.agent_turn(_agent_unit("u1", brief=False), job_id="job_1")
+    assert result.status is UnitStatus.OK
+    assert result.answer == "unit answer"
+    assert llm.calls
+    system = llm.calls[0].messages[0]["content"]
+    assert "## SCOPE BRIEF" in system
+    assert "## MINI-SCHEMA" in system
+
+
+@pytest.mark.asyncio
 async def test_agent_turn_missing_inject_is_130012() -> None:
     llm = ScriptedLlm()
     zeus = RecordingZeus()

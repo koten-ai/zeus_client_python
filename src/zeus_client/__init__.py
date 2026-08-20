@@ -1,4 +1,4 @@
-"""kotenai-zeus-client 2.0 — journaled hexagonal runtime (default import).
+"""kotenai-zeus-client 2.3 — journaled hexagonal runtime (default import).
 
 ``import zeus_client`` loads the ZeusRuntime tree. Temporary alias
 ``import zeus_client_v2`` re-exports this package with DeprecationWarning

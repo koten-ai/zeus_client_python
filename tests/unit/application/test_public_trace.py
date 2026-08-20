@@ -44,3 +44,40 @@ def test_public_trace_omits_session_when_empty() -> None:
         flags={},
     )
     assert "session" not in pt
+
+
+def test_public_trace_includes_stamp() -> None:
+    pt = build_public_trace(
+        turn_id="t",
+        answer="ok",
+        status="ok",
+        rounds=1,
+        notes=(),
+        hops=(),
+        ai_process_result=False,
+        ai_process_result_exit=None,
+        layer_a=None,
+        policy=None,
+        flags={},
+        stamp={"user": "zeus_client", "version": "2.1.0"},
+    )
+    assert pt["user"] == "zeus_client"
+    assert pt["stamp"]["user"] == "zeus_client"
+
+
+def test_public_trace_includes_inject() -> None:
+    pt = build_public_trace(
+        turn_id="turn_1",
+        answer="ok",
+        status="ok",
+        rounds=1,
+        notes=(),
+        hops=(),
+        ai_process_result=True,
+        ai_process_result_exit="direct",
+        layer_a=None,
+        policy=None,
+        flags={},
+        inject={"has_scope_brief": True, "brief_sha12": "abc123def456"},
+    )
+    assert pt["inject"]["brief_sha12"] == "abc123def456"

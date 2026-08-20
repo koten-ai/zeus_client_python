@@ -37,60 +37,17 @@ from tests.conformance.paths import (  # noqa: E402
 
 
 def _assert_case(case_id: str, observe: dict[str, Any], expect: dict[str, Any]) -> list[str]:
-    if case_id == "L2.settings.ai_process_result.001":
-        if not observe.get("production_default_false"):
-            return ["production.ai_process_result must be false"]
-        return []
-    if case_id.startswith("DT."):
-        return _assert_dt(observe, expect)
-    # L1 gte keys
-    diffs = assert_expects(observe, expect)
-    return diffs
-
-
-def _assert_dt(observe: dict[str, Any], expect: dict[str, Any]) -> list[str]:
+    _ = case_id
     diffs: list[str] = []
+    rest: dict[str, Any] = {}
     for key, want in expect.items():
         if key.endswith("_contains") and isinstance(want, str):
-            if key == "lineage_contains":
-                hay = str(observe.get("lineage_contains") or "")
-            elif key == "custom_label_contains":
-                hay = str(observe.get("custom_label_contains") or "")
-            else:
-                hay = str(observe.get(key) or "")
+            hay = str(observe.get(key) or "")
             if want not in hay:
                 diffs.append(f"{key}: missing {want!r} in {hay[:120]!r}")
             continue
-        if key in (
-            "layer_a.required_four",
-            "inject_inspect.sent.mini_schema.present",
-            "inject_inspect.sent.scope_brief.present",
-        ):
-            if observe.get(key) is False:
-                diffs.append(f"{key}: got False")
-            continue
-        if key.startswith("diagnosis."):
-            got = observe.get(key)
-            if got is not None and got != want:
-                diffs.append(f"{key}: got {got!r} want {want!r}")
-            continue
-        if key in observe:
-            if observe[key] != want:
-                diffs.append(f"{key}: got {observe[key]!r} want {want!r}")
-        else:
-            if key in (
-                "result",
-                "error_class",
-                "companions_present",
-                "has_return",
-                "req_id",
-                "req_id.present",
-                "forged_hash",
-                "retryable",
-                "decision.policy",
-                "decision.reason",
-            ):
-                diffs.append(f"{key}: missing want {want!r}")
+        rest[key] = want
+    diffs.extend(assert_expects(observe, rest))
     return diffs
 
 

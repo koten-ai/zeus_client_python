@@ -25,7 +25,7 @@
 
 | Asset | Sensitivity | Where it appears |
 | --- | --- | --- |
-| Zeus Basic/session tokens | Critical | Auth adapter, HTTP headers |
+| Zeus Basic/session tokens | Critical | Auth adapter, HTTP headers. `auth_mode=basic` mints per-scope `POST /v1/{bucket}/{scope}/auth/session` (instance cache; never log the password). `auth_mode=certificate` is documented (`cert_file` / `key_file_env`) but raises `NOT_IMPLEMENTED`. |
 | LLM API keys | Critical | LLM adapter, env/config |
 | Couchbase credentials | Critical | Optional N1QL hydrate |
 | User prompts & answers | High | Agent messages, journals |
@@ -273,16 +273,20 @@ Jailbreak scores, wish_i_knew, and refuse reasons:
 
 ## 9. Secure logging
 
+Family logger (`zeus_client.observability.logging`): levels **INFO / ERROR / DEBUG / TRACE**
+only. `REDACT=true` in production. Secrets are hard-denied even when `REDACT=false`.
+Full tool JSON / prompts are TRACE-only (shape/sizes when redacted).
+
 | Rule | Reason |
 | --- | --- |
 | Default log level INFO in prod | Reduce payload temptation |
 | Log `ErrorCode`, latencies, ids — not bodies | Enough for SRE |
-| DEBUG bodies only if `logging.allow_bodies=true` AND non-prod profile | Dual gate |
-| Use structured logging (`key=value` or JSON) | Avoid string interpolation of headers |
-| Correlate with `turn_id` | Support without dumping prompts |
+| TRACE bodies only if `REDACT=false` **and** level=trace | Dual gate |
+| Structured `zeus_client.*` event names | Loki/OTel greps across languages |
+| Correlate with `session.id` / `req_id` / `trace_id` | Support without dumping prompts |
 | Never log full `zeus_headers` | Classic leak |
 
-Bridge: `StructuredLogBridge` maps selected journal events → logs **after** redaction.
+Env: `ZEUS_CLIENT_LOG_LEVEL`, `ZEUS_CLIENT_LOG_REDACT`, `ZEUS_CLIENT_OTEL_*`.
 
 ---
 

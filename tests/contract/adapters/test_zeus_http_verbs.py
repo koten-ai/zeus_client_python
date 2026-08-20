@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import json
 
 import httpx
@@ -146,8 +145,13 @@ async def test_runtime_data_verb_wiring() -> None:
 
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_basic_auth_never_logs_password() -> None:
     secrets = EnvSecretStore(environ={"ZEUS_PASSWORD": "s3cret-pass"})
+    respx.post("http://z/v1/yelp-data/_default/auth/session").mock(
+        return_value=httpx.Response(200, json={"session_id": "sess_lab"})
+    )
+    journal = InMemoryJournal()
     port = HttpxZeusPort(
         endpoint=ZeusEndpointConfig(
             url="http://z",
@@ -156,13 +160,12 @@ async def test_basic_auth_never_logs_password() -> None:
             password_env="ZEUS_PASSWORD",
         ),
         secrets=secrets,
-        journal=InMemoryJournal(),
+        journal=journal,
     )
     auth = await port.resolve_auth(DataTarget())
-    assert "Authorization" in auth.headers
-    # token encodes user:pass but journal path redacts Authorization
-    expected = base64.b64encode(b"admin:s3cret-pass").decode()
-    assert expected in auth.headers["Authorization"]
+    assert auth.headers.get("X-Zeus-Session") == "sess_lab"
+    dumped = json.dumps([e.data for e in journal.events()])
+    assert "s3cret-pass" not in dumped
     await port.aclose()
 
 

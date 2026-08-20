@@ -1,4 +1,4 @@
-"""Offline conformance adapter tests (ZCP-21)."""
+"""Offline conformance adapter tests (ZCP-21 / CHECKLIST E)."""
 
 from __future__ import annotations
 
@@ -10,16 +10,31 @@ import pytest
 from tests.conformance.paths import load_pins, resolve_design_root
 from tests.conformance.run_suite import run_suite
 
+_HANDLERS = Path(__file__).resolve().parent / "handlers.py"
+_REPORT = Path(__file__).resolve().parent / "last_report.json"
+
 
 def _require_design_root():
     """Conformance fixtures live in sibling zeus_client_design (pins local:../)."""
     try:
         design = resolve_design_root(load_pins())
     except FileNotFoundError as e:
-        pytest.skip(str(e))
+        pytest.fail(str(e))
     if not (design / "conformance" / "manifest.json").is_file():
-        pytest.skip(f"conformance manifest missing under {design}")
+        pytest.fail(
+            f"conformance manifest missing under {design}. "
+            "CHECKLIST E requires sibling zeus_client_design "
+            "(CI: secrets.KOTEN_CI_PAT with read access to koten-ai/zeus_client_design)."
+        )
     return design
+
+
+def test_handlers_do_not_echo_expect() -> None:
+    text = _HANDLERS.read_text(encoding="utf-8")
+    assert "dict(expect)" not in text
+    assert 'data.get("observe")' not in text
+    assert 'expect.get("error_class"' not in text
+    assert "expect.get('error_class'" not in text
 
 
 @pytest.mark.asyncio
@@ -32,10 +47,10 @@ async def test_conformance_suite_candidate_offline():
         levels={"L0", "L1", "L2", "L_detective", "L_rewind"},
         include_seed=False,
     )
+    _REPORT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     assert report["suite_version"] == "conformance-0.2-dev"
     assert report["language"] == "python"
     assert report["claim_level"] == "candidate"
-    # schema-ish required keys
     for k in (
         "suite_version",
         "language",
@@ -54,14 +69,17 @@ async def test_conformance_suite_candidate_offline():
     assert s["failed"] == 0 and s.get("error", 0) == 0, json.dumps(failed, indent=2)
     assert s["passed"] >= 10
 
-    # Must cover plan minimum
     ids = {c["id"] for c in report["cases"] if c["status"] == "passed"}
     assert "L0.catalog.load_mock.001" in ids
     assert "L1.loop.single_tool_return.001" in ids
+    assert "L1.loop.force_return_max_rounds.001" in ids
     assert "L2.layer_a.required_four.001" in ids
     assert "L2.policy.matrix.001" in ids
-    assert any(i.startswith("DT.smooth_short") for i in ids)
-    assert any(i.startswith("DT.fail_zeus") for i in ids)
+    assert "DT.smooth_short.beer_fruit_pipeline_base61.001" in ids
+    assert "DT.fail_zeus.contract_409.001" in ids
+    assert "DT.fail_client.missing_mini_schema.001" in ids
+    assert "DT.fail_llm.bad_layer_a.001" in ids
+    assert "DT.fail_control_plane.trigger_missing_data_ok.001" in ids
 
 
 def test_run_suite_cli_exit_zero():

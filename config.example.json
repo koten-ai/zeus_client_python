@@ -23,11 +23,47 @@
     "timeout_s": 120
   },
   "settings": {
-    "ai_process_result": true,
+    "ai_process_result": false,
     "max_rounds": 8,
     "force_trace": false,
     "mode": "analytics",
     "durable_sessions": true
+  },
+  "session": {
+    "semantic_cache": {
+      "enabled": false,
+      "apply_to_modes": ["agent"],
+      "recall": {
+        "enabled": true,
+        "top_k": 5,
+        "min_score": 0.0,
+        "min_query_chars": 12,
+        "timeout_ms": 150,
+        "fail_closed": false,
+        "types": ["profile", "semantic", "conversational"]
+      },
+      "inject": {
+        "bag": "B",
+        "key": "semantic_memory",
+        "max_chars": 4000,
+        "max_blocks": 5,
+        "include_fields": ["summary", "text"],
+        "order": "score_desc"
+      },
+      "write": {
+        "enabled": true,
+        "on_turn_commit": true,
+        "write_explicit_only": true,
+        "write_user_message": false,
+        "write_assistant_summary": false,
+        "default_type": "conversational",
+        "min_chars": 24,
+        "max_chars_per_block": 2000,
+        "max_blocks_per_turn": 3,
+        "ttl_seconds": 604800,
+        "async": true
+      }
+    }
   },
   "retry": {
     "max_attempts": 3,
@@ -38,6 +74,16 @@
   "redaction": {
     "enabled": true,
     "preview_max_chars": 2048
+  },
+  "logging": {
+    "level": "info",
+    "redact": true,
+    "otel_enabled": false,
+    "otel_endpoint": null,
+    "service_name": "zeus_client"
+  },
+  "client": {
+    "ip_address": null
   },
   "debug": {
     "detective_briefing": true,

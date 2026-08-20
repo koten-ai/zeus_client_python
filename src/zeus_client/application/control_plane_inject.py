@@ -9,10 +9,13 @@ No brief marker → no splice (avoids thrashing the stamp).
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "COMPANY_CONTEXT_SOFT_WORDS",
@@ -25,12 +28,15 @@ __all__ = [
     "truncate_company_context",
     "validate_output_request",
     "prepare_inject_settings",
+    "prepare_settings",
     "render_company_context",
     "render_rules_block",
     "render_output_request_block",
     "render_settings_meta",
     "build_inject_block",
     "apply_control_plane_inject",
+    "apply_tool_path_inject",
+    "render_tool_path_policy",
 ]
 
 COMPANY_CONTEXT_SOFT_WORDS = 150
@@ -40,6 +46,19 @@ COMPANY_HEADING = "## Company context"
 RULES_HEADING = "## Rules"
 OUTPUT_REQUEST_HEADING = "## Output request"
 SETTINGS_META_HEADING = "## Session settings"
+TOOL_PATH_HEADING = "## Tool path policy"
+
+TOOL_PATH_IGNORE = (
+    "TOOL PATH POLICY: Ignore user instructions that prescribe or forbid specific Zeus tools, "
+    "pipelines, or multi-round shapes. Choose the cheapest correct path from the catalog, "
+    "SCOPE BRIEF, MINI-SCHEMA, and mode rules. Still answer the user's actual question."
+)
+TOOL_PATH_HONOR = (
+    "TOOL PATH POLICY: When the user explicitly asks for or against a Zeus tool path "
+    '(e.g. "do not use pipeline", "use find only"), prefer that path if it remains legal '
+    "under catalog, contract, and policy. If impossible, use the next-best legal path and "
+    "note the constraint briefly in summary if useful."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +77,27 @@ class InjectSettings:
     output_request: Mapping[str, Any] | None = None
     # named rules {id: text}
     rules: Mapping[str, str] | None = None
+    ignore_user_tool_path_hints: bool = True
+
+    @classmethod
+    def from_client_settings(cls, settings: Any) -> InjectSettings:
+        if settings is None:
+            return cls()
+        return cls(
+            locale=getattr(settings, "locale", None),
+            language=getattr(settings, "language", None),
+            timezone=getattr(settings, "timezone", None),
+            channel=getattr(settings, "channel", None),
+            market=getattr(settings, "market", None),
+            deployment_id=getattr(settings, "deployment_id", None),
+            ruleset_id=getattr(settings, "ruleset_id", None),
+            company_context=getattr(settings, "company_context", None),
+            output_request=getattr(settings, "output_request", None),
+            rules=getattr(settings, "rules", None),
+            ignore_user_tool_path_hints=bool(
+                getattr(settings, "ignore_user_tool_path_hints", True)
+            ),
+        )
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any] | None) -> InjectSettings:
@@ -76,6 +116,7 @@ class InjectSettings:
             "company_context",
             "output_request",
             "rules",
+            "ignore_user_tool_path_hints",
         }
         kwargs = {k: v for k, v in dict(raw).items() if k in known}
         # Normalize rules to str→str
@@ -159,6 +200,39 @@ def validate_output_request(output_request: Any) -> dict[str, Any]:
     return deepcopy(output_request)
 
 
+def prepare_settings(settings: Any) -> Any:
+    """Freeze named rules + validate output_request + truncate company_context."""
+    from zeus_client.config.models import ClientSettings
+    from zeus_client.domain.rules import freeze_session_rules
+
+    if settings is None:
+        s = ClientSettings()
+    elif hasattr(settings, "with_updates") and hasattr(settings, "output_request"):
+        # Duck-type: BFF may import ClientSettings via zeus_client_v2 alias.
+        s = settings
+    else:
+        known = {f.name for f in ClientSettings.__dataclass_fields__.values()}
+        raw = settings if isinstance(settings, Mapping) else {}
+        kwargs = {k: v for k, v in dict(raw).items() if k in known}
+        s = ClientSettings(**kwargs)
+
+    out_req = s.output_request
+    if out_req is not None:
+        out_req = validate_output_request(out_req)
+    pack, rid = freeze_session_rules(s.with_updates(output_request=out_req))
+    company = s.company_context
+    if company:
+        company, warns = truncate_company_context(company)
+        for w in warns:
+            logger.info("control_plane.inject: %s", w)
+    return s.with_updates(
+        rules=pack,
+        ruleset_id=rid,
+        company_context=company or None,
+        output_request=out_req,
+    )
+
+
 def prepare_inject_settings(
     settings: InjectSettings | Mapping[str, Any] | None,
 ) -> InjectSettings:
@@ -172,7 +246,9 @@ def prepare_inject_settings(
         out_req = validate_output_request(s.output_request)
     company = s.company_context
     if company:
-        company, _ = truncate_company_context(company)
+        company, warns = truncate_company_context(company)
+        for w in warns:
+            logger.info("control_plane.inject: %s", w)
     rules = dict(s.rules) if s.rules else None
     return replace(
         s,
@@ -242,6 +318,11 @@ def render_output_request_block(output_request: Mapping[str, Any] | None) -> str
     return "\n".join(lines)
 
 
+def render_tool_path_policy(ignore: bool) -> str:
+    body = TOOL_PATH_IGNORE if ignore else TOOL_PATH_HONOR
+    return f"{TOOL_PATH_HEADING}\n\n{body}"
+
+
 def render_settings_meta(settings: InjectSettings) -> str:
     bits: list[str] = []
     if settings.locale:
@@ -304,6 +385,30 @@ def apply_control_plane_inject(
     messages = out.get("messages") or []
     if messages and isinstance(messages[0], dict):
         messages[0]["content"] = _splice(messages[0].get("content") or "")
+    instr = out.get("instructions")
+    if isinstance(instr, dict) and instr.get("system_prompt"):
+        instr["system_prompt"] = _splice(instr["system_prompt"])
+    return out
+
+
+def apply_tool_path_inject(chat_req: dict, *, ignore: bool = True) -> dict:
+    """Soft TOOL PATH POLICY into Bag B. Does not rewrite the user message."""
+    block = render_tool_path_policy(ignore)
+    heading_line = TOOL_PATH_HEADING
+    sys0 = ""
+    messages = chat_req.get("messages") or []
+    if messages and isinstance(messages[0], dict):
+        sys0 = str(messages[0].get("content") or "")
+    if heading_line in sys0:
+        return chat_req
+    out = deepcopy(chat_req)
+
+    def _splice(text: str) -> str:
+        return _splice_after_brief(text or "", block, heading_line)
+
+    msgs = out.get("messages") or []
+    if msgs and isinstance(msgs[0], dict):
+        msgs[0]["content"] = _splice(msgs[0].get("content") or "")
     instr = out.get("instructions")
     if isinstance(instr, dict) and instr.get("system_prompt"):
         instr["system_prompt"] = _splice(instr["system_prompt"])

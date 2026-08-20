@@ -44,12 +44,18 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Checkout zeus_client_design (conformance)
-        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: koten-ai/zeus_client_design
           path: zeus_client_design
           token: ${{ secrets.KOTEN_CI_PAT || github.token }}
+
+      - name: Require design suite
+        run: |
+          if [ ! -f ../zeus_client_design/conformance/manifest.json ]; then
+            echo "::error::zeus_client_design conformance suite missing. Set secrets.KOTEN_CI_PAT with read access to koten-ai/zeus_client_design."
+            exit 1
+          fi
 
       - uses: actions/setup-python@v5
         with:

@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from zeus_client.adapters.zeus_http.headers import req_id_from_headers
 from zeus_client.config.models import ZeusEndpointConfig
 from zeus_client.domain.errors import CatalogError, ErrorCode
 from zeus_client.ports.secrets import SecretStorePort
@@ -44,10 +45,14 @@ class HttpxCatalogRemote:
         self._client = client
         self._owns_client = client is None
         self._timeout_s = timeout_s if timeout_s is not None else endpoint.timeout_s
+        self.last_req_id: str = ""
 
     def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=self._timeout_s)
+            self._client = httpx.AsyncClient(
+                timeout=self._timeout_s,
+                verify=bool(self.endpoint.tls_verify),
+            )
             self._owns_client = True
         return self._client
 
@@ -90,6 +95,8 @@ class HttpxCatalogRemote:
                 public_message=f"catalog fetch transport error: {e}",
                 details={"bucket": bucket, "scope": scope, "mode": m},
             ) from e
+        req_id = req_id_from_headers(r.headers) or ""
+        self.last_req_id = req_id
         if r.status_code != 200:
             raise CatalogError(
                 code=ErrorCode.CATALOG_SYNC_FAILED,
@@ -100,6 +107,7 @@ class HttpxCatalogRemote:
                     "bucket": bucket,
                     "scope": scope,
                     "mode": m,
+                    "req_id": req_id,
                 },
             )
         try:

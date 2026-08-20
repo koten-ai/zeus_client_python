@@ -17,6 +17,7 @@ __all__ = [
     "normalize_triggers",
     "validate_app_output",
     "parse_layer_a",
+    "apply_pack_schema",
     "looks_like_layer_a_dump",
     "peel_layer_a_summary",
     "user_facing_answer",
@@ -97,28 +98,21 @@ def normalize_triggers(
     raw: Any,
     *,
     rule_ids: Sequence[str] | None = None,
-    allow_array: bool = True,
 ) -> tuple[dict[str, bool], list[str]]:
-    """Sparse object {id: bool}; missing ⇒ false. Dual-read array ≤1 release."""
-    warnings: list[str] = []
+    """Sparse object {id: bool}; missing ⇒ false. Arrays fail closed (no dual-read)."""
+    _ = rule_ids
+    errors: list[str] = []
     if raw is None:
-        return {}, warnings
+        return {}, errors
     if isinstance(raw, dict):
-        return {str(k): bool(v) for k, v in raw.items()}, warnings
+        return {str(k): bool(v) for k, v in raw.items()}, errors
     if isinstance(raw, list):
-        if not allow_array:
-            warnings.append("business_rules_triggers array rejected (allow_array_triggers=False)")
-            return {}, warnings
-        if not rule_ids:
-            warnings.append("business_rules_triggers array without rule_ids mapping; ignored")
-            return {}, warnings
-        out: dict[str, bool] = {}
-        for i, rid in enumerate(rule_ids):
-            out[str(rid)] = bool(raw[i]) if i < len(raw) else False
-        warnings.append("business_rules_triggers dual-read from array (deprecated)")
-        return out, warnings
-    warnings.append(f"business_rules_triggers ignored (type {type(raw).__name__})")
-    return {}, warnings
+        errors.append("business_rules_triggers must be an object {id: bool}; arrays rejected")
+        return {}, errors
+    errors.append(
+        f"business_rules_triggers must be an object {{id: bool}}; got {type(raw).__name__}"
+    )
+    return {}, errors
 
 
 def _type_name(t: str) -> str:
@@ -188,7 +182,6 @@ def parse_layer_a(
     return_args: Any,
     *,
     rule_ids: Sequence[str] | None = None,
-    allow_array_triggers: bool = True,
     output_request: Mapping[str, Any] | None = None,
     app_output_on_error: str = "strip",
 ) -> LayerA:
@@ -228,13 +221,12 @@ def parse_layer_a(
     if isinstance(pa, str) and pa.strip():
         layer.policy_action = pa.strip()
 
-    triggers, tw = normalize_triggers(
+    triggers, terr = normalize_triggers(
         return_args.get("business_rules_triggers"),
         rule_ids=rule_ids,
-        allow_array=allow_array_triggers,
     )
     layer.business_rules_triggers = triggers
-    layer.warnings.extend(tw)
+    layer.errors.extend(terr)
 
     jba = return_args.get("jail_break_attempt")
     if isinstance(jba, (int, float)) and not isinstance(jba, bool):
@@ -272,6 +264,27 @@ def parse_layer_a(
         else:
             layer.warnings.extend(app_errs)
 
+    return layer
+
+
+def apply_pack_schema(layer: LayerA, schema: Mapping[str, Any] | None) -> LayerA:
+    """Add errors when terminate payload misses pack ``response_output_schema`` required four."""
+    if not isinstance(schema, Mapping):
+        return layer
+    required = schema.get("required")
+    if not isinstance(required, list):
+        required = ["summary", "query_decomposition", "decomposition", "confidence"]
+    have = {
+        "summary": bool(layer.summary),
+        "query_decomposition": isinstance(layer.query_decomposition, dict),
+        "decomposition": isinstance(layer.decomposition, dict),
+        "confidence": bool(layer.confidence),
+    }
+    for key in required:
+        if key in have and not have[key]:
+            msg = f"pack schema required field {key} missing"
+            if msg not in layer.errors:
+                layer.errors.append(msg)
     return layer
 
 
