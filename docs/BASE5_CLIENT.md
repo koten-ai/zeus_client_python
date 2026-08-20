@@ -163,6 +163,16 @@ Claim remains **`candidate`**. Do not treat this section as MATRIX `supported`.
 - [x] Explicit write (`rt.session.semantic_cache.write`); Zeus embeds; no CB SDK
 - [x] Not Direct typeahead (`apply_to_modes=["agent"]`)
 - [x] MATRIX honesty **`flag`** (not `supported` — cosine_scan / no suite cases)
+- [x] Deny-list: secrets, full system/catalog dumps, G2 fields are not written
+
+### F. Multi-agent readiness (`docs` only)
+
+- [x] Seam: Mode 1 `rt.agent.run_turn` vs Mode 3 `rt.jobs.*` / `rt.units.*` — [MULTI_AGENT.md](V2/MULTI_AGENT.md)
+- [x] Pattern B attach: `jobs.host_url` → WatchJob SSE `GET /v1/jobs/{id}/events?from_seq=`; do not vendor Go; `run`/`get`/`cancel` stay `130001` until sidecar grows routes
+- [x] Events / budgets / cost: JobEvent wire map, `JobBudgets`, sidecar ledger; client `llm.role` + `model` + `api_key_env` name + optional `artifacts.usage`
+- [x] `config.llm.roles.orchestrator|advisor|worker` settable; worker slice applied (`llm_for_slice`); Mode 1 ignores roles; secrets are env **names**
+- [x] EXAMPLE §0 runbook: per-unit `zeus_url` + auth names on hops; catalog/`130011`/`130012`; job `models` via FakeJobRuntime
+- [x] MATRIX `multi_agent=docs` (not `demo` / `supported`; FakeJobRuntime is not a MATRIX demo)
 
 ## Tests
 
