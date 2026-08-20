@@ -67,6 +67,7 @@ class UnitConfig:
     auth_mode: str | None = None
     password_env: str | None = None  # name only
     token_env: str | None = None
+    username: str | None = None
     catalog_mode: str | None = None
     base_id: str | None = None
     chat_request: Mapping[str, Any] | None = None

@@ -42,15 +42,17 @@ class AgentAPI:
         chat_id: str | None = None,
         model: str | None = None,
         enable_sessions: bool = False,
+        llm: Any = None,
+        zeus: Any = None,
     ) -> TurnResult:
-        llm = self._rt.services.llm
+        llm = self._rt.services.llm if llm is None else llm
         if llm is None:
             raise ZeusClientError(
                 code=ErrorCode.NOT_IMPLEMENTED,
                 component="api.agent",
                 public_message="LLM port not wired on runtime",
             )
-        zeus = self._rt.services.zeus
+        zeus = self._rt.services.zeus if zeus is None else zeus
         req = TurnRequest(
             message=message,
             target=target or self._rt.config.target,
