@@ -28,6 +28,8 @@ multi_agent: docs
 - HTTP adapter `POST /v2/agent_memory/recall|blocks` + `GET /status` (Zeus embeds server-side; no client CB vector SDK).
 - Client deny-list: secrets, full system/catalog dumps, G2 fields are not written.
 - Direct typeahead / data verbs never call agent_memory (`apply_to_modes=["agent"]`).
+- CHECKLIST **F** closeout at `multi_agent=docs`: per-unit `zeus_url` + auth env names on every Zeus hop this process executes; worker `llm.roles` slice (including `api_key_env` / `base_url`) applied to `units.agent_turn`; job `models` forwarded through FakeJobRuntime; optional `UnitResult.artifacts["usage"]`.
+- Package docs: EXAMPLE §0 runbook map, JobEvent/budget/cost ownership in `docs/V2/MULTI_AGENT.md`. `config.example.json` includes `llm.roles` and `jobs.host_url` (placeholders; env **names** only).
 
 ### Not claimed
 

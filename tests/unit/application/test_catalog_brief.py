@@ -69,9 +69,7 @@ async def test_ensure_skips_when_already_present() -> None:
         return LIVE
 
     doc = {"messages": [{"role": "system", "content": "rules\n\n## SCOPE BRIEF\nold"}]}
-    out = await ensure_scope_brief(
-        doc, fetch=fetch, bucket="b", scope="s", mode="analytics"
-    )
+    out = await ensure_scope_brief(doc, fetch=fetch, bucket="b", scope="s", mode="analytics")
     assert out.merged is False
     assert calls == 0
     assert out.note == "scope_brief: already present"

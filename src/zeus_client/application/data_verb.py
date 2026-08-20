@@ -63,6 +63,11 @@ async def run_data_verb(
     force_trace: bool = False,
     chat_id: str | None = None,
     turn_id: str | None = None,
+    base_url: str | None = None,
+    auth_mode: str | None = None,
+    password_env: str | None = None,
+    token_env: str | None = None,
+    username: str | None = None,
 ) -> VerbResult:
     """Execute one allow-listed V2 verb via ZeusPort. Rejects ``pipeline``."""
     name = (verb or "").strip()
@@ -94,6 +99,11 @@ async def run_data_verb(
                 ),
                 headers,
             ),
+            base_url=base_url,
+            auth_mode=auth_mode,
+            password_env=password_env,
+            token_env=token_env,
+            username=username,
         )
     )
     return VerbResult(

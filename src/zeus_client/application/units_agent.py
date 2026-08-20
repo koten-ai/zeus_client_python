@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
+from zeus_client.application.units_transport import UnitScopedZeusPort, same_zeus_host
 from zeus_client.domain.catalog import extract_scope_brief
 from zeus_client.domain.errors import CatalogError, ErrorCode, JobError
 from zeus_client.domain.jobs import UnitConfig, UnitKind, UnitResult, UnitStatus, validate_unit_map
@@ -79,14 +80,18 @@ async def run_agent_unit(
                 component="application.units_agent",
                 public_message=exc.public_message,
             ) from exc
-    merged = await rt.catalog.ensure_scope_brief(
-        chat_request,
-        target=unit.target(),
-        mode=unit.catalog_mode or rt.config.settings.mode,
-    )
-    chat_request = merged.body
+    process_url = getattr(rt.config.zeus, "url", None)
     if not _has_required_inject(chat_request):
-        raise JobError(code=ErrorCode.UNITS_INJECT_MISSING, component="application.units_agent")
+        if unit.zeus_url and not same_zeus_host(unit.zeus_url, process_url):
+            raise JobError(code=ErrorCode.UNITS_INJECT_MISSING, component="application.units_agent")
+        merged = await rt.catalog.ensure_scope_brief(
+            chat_request,
+            target=unit.target(),
+            mode=unit.catalog_mode or rt.config.settings.mode,
+        )
+        chat_request = merged.body
+        if not _has_required_inject(chat_request):
+            raise JobError(code=ErrorCode.UNITS_INJECT_MISSING, component="application.units_agent")
 
     slice_ = resolve_llm_slice(
         rt.config.llm,
@@ -101,6 +106,7 @@ async def run_agent_unit(
         "plan_epoch": plan_epoch,
         "llm.role": slice_.role,
         "llm.model": slice_.model,
+        "api_key_env": slice_.api_key_env,
     }
     _append_unit_event(rt, EVENT_UNIT_STARTED, job_id=job_id, unit_id=unit.unit_id, data=payload)
 
@@ -121,6 +127,11 @@ async def run_agent_unit(
             durable_sessions=False,
         )
 
+    zeus = rt.services.zeus
+    if zeus is not None:
+        zeus = UnitScopedZeusPort(zeus, unit)
+    llm = rt.llm_for_slice(slice_) if hasattr(rt, "llm_for_slice") else rt.services.llm
+
     try:
         result = await rt.agent.run_turn(
             unit.goal,
@@ -131,6 +142,8 @@ async def run_agent_unit(
             chat_id=job_id or unit.unit_id,
             model=slice_.model,
             enable_sessions=False,
+            zeus=zeus,
+            llm=llm,
         )
     except Exception as exc:
         _append_unit_event(
@@ -153,6 +166,14 @@ async def run_agent_unit(
     req_ids = tuple(result.debug.req_ids) if result.debug.req_ids else ()
     status = UnitStatus.OK if result.error is None else UnitStatus.ERROR
     err_code = result.error.code if result.error is not None else None
+    artifacts: dict[str, Any] = {
+        "session_id": result.session.session_id if result.session else None,
+    }
+    usage = getattr(result.debug, "tokens", None)
+    if isinstance(usage, Mapping) and (
+        usage.get("ok") or usage.get("prompt") or usage.get("completion") or usage.get("total")
+    ):
+        artifacts["usage"] = dict(usage)
     _append_unit_event(
         rt,
         EVENT_UNIT_FINISHED,
@@ -165,7 +186,7 @@ async def run_agent_unit(
         status=status,
         answer=result.answer,
         req_ids=req_ids,
-        artifacts={"session_id": result.session.session_id if result.session else None},
+        artifacts=artifacts,
         error_code=err_code,
         plan_epoch=plan_epoch,
     )

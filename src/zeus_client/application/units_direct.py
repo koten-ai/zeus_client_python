@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
+from zeus_client.application.units_transport import verb_overrides
 from zeus_client.domain.errors import ErrorCode, JobError, ZeusToolError
 from zeus_client.domain.jobs import UnitConfig, UnitKind, UnitResult, UnitStatus, validate_unit_map
 from zeus_client.domain.journal.events import EVENT_UNIT_FINISHED, EVENT_UNIT_STARTED, JournalEvent
@@ -62,6 +63,7 @@ async def run_direct_unit(
             target=unit.target(),
             chat_id=job_id or unit.unit_id,
             turn_id=unit.unit_id,
+            **verb_overrides(unit),
         )
     except ZeusToolError as exc:
         _append_unit_event(

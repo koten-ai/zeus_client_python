@@ -8,7 +8,7 @@ from typing import Any
 
 from zeus_client.adapters.secrets_env.store import EnvSecretStore
 from zeus_client.config.loader import load_runtime_config
-from zeus_client.config.models import RuntimeConfig
+from zeus_client.config.models import LlmProviderConfig, RuntimeConfig
 from zeus_client.domain.journal import InMemoryJournal
 from zeus_client.observability.logging import configure_family_logger
 from zeus_client.observability.metrics import InMemoryMetrics, MetricsPort
@@ -42,6 +42,7 @@ class Services:
     session_lifecycle: Any = None
     jobs: Any = None
     agent_memory: Any = None
+    extra_llms: list[Any] = field(default_factory=list)
     _closed: bool = False
 
     async def aclose(self) -> None:
@@ -71,6 +72,9 @@ class Services:
             sess_client = getattr(life, "client", None)
             if sess_client is not None and hasattr(sess_client, "aclose"):
                 await sess_client.aclose()
+        for dep in list(self.extra_llms):
+            if dep is not None and hasattr(dep, "aclose"):
+                await dep.aclose()
 
 
 class ZeusRuntime:
@@ -136,6 +140,38 @@ class ZeusRuntime:
         self._ensure_session_lifecycle()
         self._ensure_agent_memory()
         self._ensure_otlp()
+
+    def llm_for_slice(self, slice: Any) -> Any:
+        """Return process LLM, or a temporary client when worker key/host differs."""
+        from zeus_client.domain.llm_roles import ResolvedLlmSlice
+
+        if not isinstance(slice, ResolvedLlmSlice):
+            return self.services.llm
+        base = self.config.llm
+        same_key = (slice.api_key_env or "") == (base.api_key_env or "")
+        same_url = (slice.base_url or base.base_url) == base.base_url
+        if same_key and same_url:
+            return self.services.llm
+        from zeus_client.adapters.llm_openai_compatible.client import OpenAICompatibleLlmClient
+
+        cfg = LlmProviderConfig(
+            provider=slice.provider or base.provider,
+            base_url=slice.base_url or base.base_url,
+            model=slice.model or base.model,
+            api_key_env=slice.api_key_env or base.api_key_env,
+            context_window_tokens=base.context_window_tokens,
+            context_soft_limit=base.context_soft_limit,
+            timeout_s=base.timeout_s,
+            roles=base.roles,
+        )
+        client = OpenAICompatibleLlmClient(
+            config=cfg,
+            secrets=self.services.secrets,
+            journal=self.journal,
+            retry=self.config.retry,
+        )
+        self._services.extra_llms.append(client)
+        return client
 
     def _configure_rate_limits(self) -> None:
         rl = self.config.rate_limit

@@ -118,7 +118,9 @@ class _FakeCatalogRemote:
         self.last_req_id = req_id
         self.calls = 0
 
-    async def fetch_chat_request(self, bucket: str, scope: str, mode: str, **kwargs: object) -> dict:
+    async def fetch_chat_request(
+        self, bucket: str, scope: str, mode: str, **kwargs: object
+    ) -> dict:
         self.calls += 1
         return self._body
 
@@ -145,9 +147,7 @@ async def test_mini_schema_get_live_and_disk_fallback() -> None:
         assert "Beer" in live["entity_types"]
 
         rt.services.catalog_remote = _BoomRemote()
-        disk = await rt.catalog.mini_schema.get(
-            "analytics", live=True, base_id="base-5.3"
-        )
+        disk = await rt.catalog.mini_schema.get("analytics", live=True, base_id="base-5.3")
         assert disk["source"] == "disk"
 
 
@@ -159,9 +159,7 @@ async def test_load_for_turn_merges_live_brief(tmp_path: Path) -> None:
         "messages": [{"role": "system", "content": "LOCKED RULES"}],
         "verbs": [{"function": {"name": "find"}}],
     }
-    (tmp_path / "chat_request_analytics_v2.json").write_text(
-        json.dumps(disk), encoding="utf-8"
-    )
+    (tmp_path / "chat_request_analytics_v2.json").write_text(json.dumps(disk), encoding="utf-8")
     live = base_chat_req()
     cfg = RuntimeConfig(
         chat_requests_dir=str(tmp_path),
@@ -191,9 +189,7 @@ async def test_load_for_turn_survives_dead_remote(tmp_path: Path) -> None:
     import json
 
     disk = {"messages": [{"role": "system", "content": "LOCKED RULES"}]}
-    (tmp_path / "chat_request_analytics_v2.json").write_text(
-        json.dumps(disk), encoding="utf-8"
-    )
+    (tmp_path / "chat_request_analytics_v2.json").write_text(json.dumps(disk), encoding="utf-8")
     cfg = RuntimeConfig(
         chat_requests_dir=str(tmp_path),
         target=DataTarget(bucket="x", scope="_default"),

@@ -65,7 +65,7 @@ packages = [
     "zeus_client.compat",
     "zeus_client.compat.v1",
     "zeus_client.observability",
-    # Temporary deprecation alias (slipped to ≤2.2.0; Mode 3 landed at 2.1.0)
+    # Temporary deprecation alias (slipped to ≤2.3.0; Mode 3 landed at 2.1.0)
     "zeus_client_v2",
 ]
 

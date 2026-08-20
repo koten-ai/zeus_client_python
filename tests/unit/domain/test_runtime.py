@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from zeus_client.config.models import RuntimeConfig
+from zeus_client.adapters.llm_openai_compatible.client import OpenAICompatibleLlmClient
+from zeus_client.config.models import LlmProviderConfig, LlmRoleConfig, RuntimeConfig
+from zeus_client.domain.llm_roles import LlmRole, resolve_llm_slice
 from zeus_client.runtime import Services, ZeusRuntime
 
 
@@ -68,3 +70,40 @@ def test_services_bundle_defaults() -> None:
     from zeus_client.domain.ids import is_uuid_v4
 
     assert is_uuid_v4(s.ids.turn_id())
+
+
+def test_llm_for_slice_reuses_process_llm_when_key_matches() -> None:
+    class _Llm:
+        pass
+
+    process = _Llm()
+    cfg = RuntimeConfig(
+        llm=LlmProviderConfig(
+            model="fast-worker",
+            api_key_env="LLM_DEFAULT_KEY",
+            roles={"worker": LlmRoleConfig(model="fast-worker", api_key_env="LLM_DEFAULT_KEY")},
+        )
+    )
+    rt = ZeusRuntime(cfg, llm=process)
+    slice_ = resolve_llm_slice(cfg.llm, role=LlmRole.WORKER)
+    assert rt.llm_for_slice(slice_) is process
+
+
+def test_llm_for_slice_builds_temp_client_when_key_differs() -> None:
+    class _Llm:
+        pass
+
+    process = _Llm()
+    cfg = RuntimeConfig(
+        llm=LlmProviderConfig(
+            model="fast-worker",
+            api_key_env="LLM_DEFAULT_KEY",
+            roles={"worker": LlmRoleConfig(model="fast-worker", api_key_env="LLM_WORKER_KEY")},
+        )
+    )
+    rt = ZeusRuntime(cfg, llm=process)
+    slice_ = resolve_llm_slice(cfg.llm, role=LlmRole.WORKER)
+    got = rt.llm_for_slice(slice_)
+    assert got is not process
+    assert isinstance(got, OpenAICompatibleLlmClient)
+    assert got.config.api_key_env == "LLM_WORKER_KEY"

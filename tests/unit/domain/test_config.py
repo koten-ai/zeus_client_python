@@ -227,6 +227,18 @@ def test_semantic_cache_bool_or_object_and_env(tmp_path: Path) -> None:
     )
 
 
+def test_config_example_json_loads_roles_and_jobs() -> None:
+    p = Path(__file__).resolve().parents[3] / "config.example.json"
+    cfg = load_runtime_config(p, profile="development", env={})
+    assert cfg.llm.roles["orchestrator"].model == "strong-planner"
+    assert cfg.llm.roles["orchestrator"].api_key_env == "LLM_ORCH_KEY"
+    assert cfg.llm.roles["worker"].api_key_env == "LLM_WORKER_KEY"
+    assert cfg.jobs.host_url is None
+    pub = json.dumps(cfg.to_public_dict())
+    assert "sk-" not in pub
+    assert "api_key_env" in pub
+
+
 def test_env_secret_store() -> None:
     store = EnvSecretStore(environ={"XAI_API_KEY": "secret-value", "EMPTY": ""})
     assert store.get("XAI_API_KEY") == "secret-value"

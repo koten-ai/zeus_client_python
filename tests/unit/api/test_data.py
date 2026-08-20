@@ -58,3 +58,26 @@ async def test_data_verb_forwards_rewind_chat_headers() -> None:
     assert headers["X-Zeus-Turn-Id"] == "unit_u1"
     assert headers["X-Zeus-Trace-Class"] == TRACE_CLASS_DIRECT_READ
     assert "X-Zeus-Req-Id" not in headers
+
+
+@pytest.mark.asyncio
+async def test_data_verb_optional_base_url_does_not_mutate_config() -> None:
+    zeus = _RecordingZeus()
+    cfg = RuntimeConfig()
+    assert cfg.zeus.url == "http://127.0.0.1:8080"
+    east = DataTarget(bucket="east", scope="sales", collection="_default")
+    async with ZeusRuntime(cfg, zeus=zeus) as rt:
+        await rt.data.find(
+            {"entity_type": "Beer"},
+            target=east,
+            base_url="http://zeus-b:8080",
+            auth_mode="none",
+            password_env="ZEUS_EAST_PASSWORD",
+        )
+    assert len(zeus.reqs) == 1
+    req = zeus.reqs[0]
+    assert req.base_url == "http://zeus-b:8080"
+    assert req.auth_mode == "none"
+    assert req.password_env == "ZEUS_EAST_PASSWORD"
+    assert rt.config.zeus.url == "http://127.0.0.1:8080"
+    assert req.target.bucket == "east"
