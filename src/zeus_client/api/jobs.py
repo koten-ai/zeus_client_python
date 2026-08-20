@@ -47,6 +47,7 @@ def _parse_units(raw: Sequence[Any]) -> list[UnitConfig]:
                 auth_mode=item.get("auth_mode"),
                 password_env=item.get("password_env"),
                 token_env=item.get("token_env"),
+                username=item.get("username"),
                 catalog_mode=item.get("catalog_mode"),
                 base_id=item.get("base_id"),
                 chat_request=item.get("chat_request"),
