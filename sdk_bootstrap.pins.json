@@ -2,7 +2,7 @@
   "$schema_comment": "Language-repo bootstrap pins (HOW_TO G0). Never invent production COMPAT triples or Hub stamps.",
   "doc": "docs/V2/IMPLEMENTATION_GUIDE.md",
   "pins_version": "1",
-  "last_reviewed": "2026-08-18",
+  "last_reviewed": "2026-08-20",
 
   "language": {
     "id": "python",

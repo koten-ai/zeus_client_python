@@ -1,6 +1,7 @@
 """Offline units illustration — NOT a MATRIX demo.
 
 FakeJobRuntime is sequential and has no planner LLM.
+See docs/V2/MULTI_AGENT.md for sidecar attach, budgets, cost, and EXAMPLE §0.
 Do not claim multi_agent=demo from this file.
 """
 

@@ -54,7 +54,7 @@ def test_public_all_matches_freeze() -> None:
 def test_public_symbols_importable() -> None:
     missing = [n for n in EXPECTED_PUBLIC if n != "__version__" and not hasattr(zc, n)]
     assert not missing, f"Missing public exports: {missing}"
-    assert zc.__version__ == "2.1.0"
+    assert zc.__version__ == "2.2.0"
     assert zc.ZeusRuntime is not None
 
 

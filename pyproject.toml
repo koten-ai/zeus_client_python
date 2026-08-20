@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kotenai-zeus-client"
 # GA cutover (ZCP-39): default import is V2 Runtime tree as zeus_client 2.0.0
-version = "2.1.0"
+version = "2.2.0"
 description = "Python client library for Zeus AI data servers"
 readme = "README.md"
 license = "MIT"
@@ -60,7 +60,7 @@ packages = [
     "zeus_client.compat",
     "zeus_client.compat.v1",
     "zeus_client.observability",
-    # Temporary deprecation alias (slipped to ≤2.2.0; Mode 3 landed at 2.1.0)
+    # Temporary deprecation alias (slipped to ≤2.3.0; Mode 3 landed at 2.1.0)
     "zeus_client_v2",
 ]
 
