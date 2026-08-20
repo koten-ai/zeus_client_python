@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.2.0 — 2026-08-20
+
+### Added
+
+- CHECKLIST **F** closeout at `multi_agent=docs`: per-unit `zeus_url` + auth env names on every Zeus hop this process executes; worker `llm.roles` slice (including `api_key_env` / `base_url`) applied to `units.agent_turn`; job `models` forwarded through FakeJobRuntime; optional `UnitResult.artifacts["usage"]`.
+- Package docs: EXAMPLE §0 runbook map, JobEvent/budget/cost ownership in `docs/V2/MULTI_AGENT.md`. `config.example.json` now includes `llm.roles` and `jobs.host_url` (placeholders; env **names** only).
+
+### Changed
+
+- `zeus_client_v2` alias kept; removal slipped to **≤2.3.0**.
+
+### Not claimed
+
+- `multi_agent=demo` / `supported`
+- Sidecar `POST /v1/jobs` (still `130001` until Go grows the route)
+- Native Python orchestrator / FFI / `http_json` units / WS / gRPC
+
+---
+
 ## 2.1.0 — 2026-08-18
 
 ### Added

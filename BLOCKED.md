@@ -14,6 +14,10 @@ _None yet — conformance adapter lands later (plan task S.1 / ZCP-21)._
 
 `pins.zeus.live_smoke` is **false**. Live Zeus + LLM not required for Phases 0–7 offline train.
 
+## Later CHECKLIST sections
+
+- **F** multi-agent — `docs` (CHECKLIST F closeout). Not `demo` / `supported` until a live sidecar RunJob + distinct orch vs worker model ids.
+
 ## Notes
 
 - Do not self-award MATRIX `supported` from this package alone.
