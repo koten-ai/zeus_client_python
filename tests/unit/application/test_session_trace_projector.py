@@ -8,9 +8,11 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
+from tests.fixtures.catalog_brief import BRIEF
 
 from zeus_client.adapters.secrets_env.store import EnvSecretStore
 from zeus_client.adapters.zeus_http.session import HttpxSessionClient
+from zeus_client.application.detective.extract import catalog_flags_of, sha12, slice_block
 from zeus_client.application.projectors.session_trace import (
     TRACE_SNIPPET_MAX,
     AggregateTracePayload,
@@ -25,6 +27,15 @@ from zeus_client.application.projectors.session_trace import (
 )
 from zeus_client.config.models import ZeusEndpointConfig
 from zeus_client.domain.session import SessionHandle
+
+
+def test_aggregate_includes_product_stamp() -> None:
+    agg = build_aggregate_trace_payload(
+        [{"req_id": "r1", "name": "find", "status": 200}],
+        stamp={"user": "zeus_client", "version": "2.1.0"},
+    )
+    assert agg.zeus_response["user"] == "zeus_client"
+    assert agg.zeus_response["version"] == "2.1.0"
 
 
 def test_normalize_legacy_tuple() -> None:
@@ -207,6 +218,43 @@ def test_build_aggregate_includes_layer_a() -> None:
     assert agg.zeus_response["layer_a"]["query_decomposition"]["entity"] == "Business"
 
 
+def test_build_aggregate_inject_brief_sha12_matches_catalog_slice() -> None:
+    system = "LOCKED RULES (hashed)\n\n" + BRIEF
+    hops = [{"req_id": "r1", "name": "find", "status": 200, "snippet": "ok"}]
+    flags = catalog_flags_of(system=system)
+    inj = {
+        "has_scope_brief": flags["has_scope_brief"],
+        "has_mini_schema": flags["has_mini_schema"],
+        "brief_sha12": flags["brief_sha12"],
+        "mini_sha12": flags["mini_sha12"],
+    }
+    agg = build_aggregate_trace_payload(hops, inject=inj)
+    brief = slice_block(system, "brief")
+    mini = slice_block(system, "mini")
+    zinj = agg.zeus_response["inject"]
+    assert zinj["brief_sha12"] == sha12(brief)
+    assert zinj["mini_sha12"] == sha12(mini)
+    assert zinj["brief_sha12"] != sha12(system)
+    assert zinj["has_scope_brief"] is True
+    assert zinj["has_mini_schema"] is True
+    assert "system_message" not in zinj
+    assert "brief_preview" not in zinj
+    assert "mini_preview" not in zinj
+
+
+def test_build_aggregate_empty_still_stamps_inject() -> None:
+    system = "LOCKED\n\n" + BRIEF
+    flags = catalog_flags_of(system=system)
+    inj = {
+        "has_scope_brief": flags["has_scope_brief"],
+        "has_mini_schema": flags["has_mini_schema"],
+        "brief_sha12": flags["brief_sha12"],
+        "mini_sha12": flags["mini_sha12"],
+    }
+    agg = build_aggregate_trace_payload([], inject=inj)
+    assert agg.zeus_response["inject"]["brief_sha12"] == sha12(slice_block(system, "brief"))
+
+
 @pytest.mark.asyncio
 @respx.mock
 async def test_project_session_trace_posts_identical_body_primary_last() -> None:
@@ -247,6 +295,7 @@ async def test_project_session_trace_posts_identical_body_primary_last() -> None
         handle=handle,
         hops=hops,
         chat_request={"messages": []},
+        inject={"has_scope_brief": True, "brief_sha12": "slicehash12"},
         mode="analytics",
     )
     assert result.ok
@@ -261,6 +310,7 @@ async def test_project_session_trace_posts_identical_body_primary_last() -> None
         assert p["zeus_response"]["aggregate"] is True
         assert p["zeus_response"]["primary_req_id"] == "s1"
         assert p["zeus_response"]["req_ids"] == ["p1", "s1"]
+        assert p["zeus_response"]["inject"]["brief_sha12"] == "slicehash12"
         assert p["outcome"] == "error"
         assert len(p["turns"]) == 2
     await http.aclose()

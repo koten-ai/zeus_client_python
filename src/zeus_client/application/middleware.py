@@ -6,6 +6,7 @@ for non-critical middleware failures.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
@@ -15,6 +16,7 @@ __all__ = [
     "Middleware",
     "MiddlewareChain",
     "NoopMiddleware",
+    "SecurityHooks",
 ]
 
 
@@ -144,3 +146,74 @@ class MiddlewareChain:
 
     async def on_turn_end(self, ctx: MiddlewareContext, answer: str) -> None:
         await self._run("on_turn_end", ctx, answer)
+
+
+_PROMPT_DUMP_RE = re.compile(
+    r"(system\s*prompt|show\s*(me\s*)?(your|the)\s*(rules|instructions|prompt)|"
+    r"ignore\s*(all\s*)?(previous|prior|system)|"
+    r"reveal\s*(hidden|internal)|dump\s*(the\s*)?(prompt|catalog))",
+    re.I,
+)
+_SECRETS_RE = re.compile(
+    r"(api[_-]?key|secret[_-]?key|bearer\s+[a-z0-9]|password\s*[:=])",
+    re.I,
+)
+
+
+@dataclass
+class SecurityHooks:
+    """Baseline AgentHooks: prompt-dump / secrets / denied verbs (CHECKLIST C)."""
+
+    name: str = "security"
+    critical: bool = False
+    denied_verbs: tuple[str, ...] = ()
+
+    def score_jailbreak(self, ctx: MiddlewareContext) -> float:
+        user_msg = str(ctx.user_msg or "")
+        score = 0.0
+        if _PROMPT_DUMP_RE.search(user_msg):
+            score = max(score, 0.85)
+        if _SECRETS_RE.search(user_msg):
+            score = max(score, 0.7)
+        denied = ctx.data.get("denied_verbs") or []
+        if denied:
+            score = max(score, 0.6)
+        return min(1.0, float(score))
+
+    def must_refuse(self, ctx: MiddlewareContext) -> bool:
+        return self.score_jailbreak(ctx) >= 0.85
+
+    async def on_turn_start(self, ctx: MiddlewareContext) -> None:
+        score = self.score_jailbreak(ctx)
+        ctx.data["hooks_jailbreak_score"] = score
+        ctx.data["hooks_must_refuse"] = score >= 0.85
+
+    async def before_llm(self, ctx: MiddlewareContext, messages: list[dict[str, Any]]) -> None:
+        return None
+
+    async def after_llm(self, ctx: MiddlewareContext, response: Mapping[str, Any]) -> None:
+        return None
+
+    async def before_zeus(
+        self, ctx: MiddlewareContext, name: str, args: dict[str, Any]
+    ) -> dict[str, Any]:
+        if name in self.denied_verbs:
+            denied = list(ctx.data.get("denied_verbs") or [])
+            denied.append(name)
+            ctx.data["denied_verbs"] = denied
+            ctx.data["hooks_jailbreak_score"] = max(
+                float(ctx.data.get("hooks_jailbreak_score") or 0.0), 0.6
+            )
+        return args
+
+    async def after_zeus(
+        self,
+        ctx: MiddlewareContext,
+        name: str,
+        status: int,
+        body: Mapping[str, Any] | str | None,
+    ) -> None:
+        return None
+
+    async def on_turn_end(self, ctx: MiddlewareContext, answer: str) -> None:
+        return None

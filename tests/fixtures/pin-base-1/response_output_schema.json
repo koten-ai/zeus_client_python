@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Layer A terminate — pin-era subset (MOCK)",
+  "type": "object",
+  "required": ["summary", "query_decomposition", "decomposition", "confidence"],
+  "properties": {
+    "summary": { "type": "string", "minLength": 1 },
+    "query_decomposition": { "type": "object" },
+    "decomposition": { "type": "object" },
+    "confidence": { "type": "string", "enum": ["high", "med", "low"] }
+  }
+}

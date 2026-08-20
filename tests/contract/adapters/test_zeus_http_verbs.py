@@ -146,8 +146,13 @@ async def test_runtime_data_verb_wiring() -> None:
 
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_basic_auth_never_logs_password() -> None:
     secrets = EnvSecretStore(environ={"ZEUS_PASSWORD": "s3cret-pass"})
+    respx.post("http://z/v1/yelp-data/_default/auth/session").mock(
+        return_value=httpx.Response(200, json={"session_id": "sess_lab"})
+    )
+    journal = InMemoryJournal()
     port = HttpxZeusPort(
         endpoint=ZeusEndpointConfig(
             url="http://z",
@@ -156,13 +161,12 @@ async def test_basic_auth_never_logs_password() -> None:
             password_env="ZEUS_PASSWORD",
         ),
         secrets=secrets,
-        journal=InMemoryJournal(),
+        journal=journal,
     )
     auth = await port.resolve_auth(DataTarget())
-    assert "Authorization" in auth.headers
-    # token encodes user:pass but journal path redacts Authorization
-    expected = base64.b64encode(b"admin:s3cret-pass").decode()
-    assert expected in auth.headers["Authorization"]
+    assert auth.headers.get("X-Zeus-Session") == "sess_lab"
+    dumped = json.dumps([e.data for e in journal.events()])
+    assert "s3cret-pass" not in dumped
     await port.aclose()
 
 
@@ -184,6 +188,85 @@ async def test_data_verb_stamps_direct_read_class() -> None:
     h = route.calls.last.request.headers
     assert h["X-Zeus-Trace-Class"] == "direct.read"
     assert h.get("X-Zeus-Req-Id") in (None, "")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_per_call_base_url_posts_to_override_host() -> None:
+    process = "http://zeus.test:8080"
+    unit = "http://zeus-b:8080"
+    route_unit = respx.post(f"{unit}/v2/east/sales/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-b"})
+    )
+    route_process = respx.post(f"{process}/v2/east/sales/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-a"})
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=process, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        r = await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Beer"},
+            target=DataTarget(bucket="east", scope="sales", collection="_default"),
+            base_url=unit,
+        )
+    finally:
+        await port.aclose()
+    assert r.ok
+    assert r.req_id == "r-b"
+    assert route_unit.called
+    assert not route_process.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_per_call_password_env_name_used_and_secret_not_journaled() -> None:
+    base = "http://zeus.test:8080"
+    mint = respx.post(f"{base}/v1/east/sales/auth/session").mock(
+        return_value=httpx.Response(200, json={"session_id": "sess_east"})
+    )
+    route = respx.post(f"{base}/v2/east/sales/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-auth"})
+    )
+    journal = InMemoryJournal()
+    secrets = EnvSecretStore(
+        environ={"ZEUS_PASSWORD": "process-secret", "ZEUS_EAST_PASSWORD": "east-secret"}
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(
+            url=base,
+            auth_mode="basic",
+            username="admin",
+            password_env="ZEUS_PASSWORD",
+        ),
+        secrets=secrets,
+        journal=journal,
+        turn_id="t",
+    )
+    try:
+        await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Beer"},
+            target=DataTarget(bucket="east", scope="sales", collection="_default"),
+            auth_mode="basic",
+            username="east-user",
+            password_env="ZEUS_EAST_PASSWORD",
+        )
+    finally:
+        await port.aclose()
+    assert mint.called
+    assert route.called
+    expected = base64.b64encode(b"east-user:east-secret").decode()
+    mint_auth = mint.calls.last.request.headers.get("Authorization") or ""
+    assert expected in mint_auth
+    assert route.calls.last.request.headers.get("X-Zeus-Session") == "sess_east"
+    blob = json.dumps([e.data for e in journal.events()])
+    assert "east-secret" not in blob
+    assert "process-secret" not in blob
 
 
 @pytest.mark.asyncio

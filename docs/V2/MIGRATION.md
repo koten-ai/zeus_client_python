@@ -1,8 +1,8 @@
 # Zeus Client V2 — Migration Guide
 
-**Status:** **GA cutover landed** on `feat/ZCP-ga-cutover-2.0.0` — package **2.0.0**, claim still **`candidate`** until human MATRIX  
-**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.0.0**)  
-**Deprecated alias:** `import zeus_client_v2` → re-exports `zeus_client` with `DeprecationWarning` (remove ≤2.1.0)  
+**Status:** **GA cutover landed** — package **2.3.0**, claim still **`candidate`** until human MATRIX  
+**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.3.0**)  
+**Deprecated alias:** `import zeus_client_v2` → re-exports `zeus_client` with `DeprecationWarning` (removal still deferred)  
 **V1 archive:** `src_v1_legacy/` (not installed); free functions via `zeus_client.compat.v1` only
 
 ---
@@ -11,8 +11,8 @@
 
 | Package | Path | Version clock |
 | --- | --- | --- |
-| `zeus_client` | `src/zeus_client/` | **2.0.0** (default) |
-| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.0.0** (deprecated alias) |
+| `zeus_client` | `src/zeus_client/` | **2.3.0** (default) |
+| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.3.0** (deprecated alias; remove ≤2.3.0) |
 | V1 free functions | `src_v1_legacy/` | archive only |
 
 ---
@@ -39,8 +39,13 @@
 | `samples.*` | `RuntimeConfig.target` / `DataTarget` |
 | `default_mode` | `RuntimeConfig.settings.mode` |
 | `COUCHBASE_*` | reserved / opt-in (no implicit `:8093`) |
+| — | `session.semantic_cache` (2.3.0 · ZF-WISH-001; default **off**; `rt.session.semantic_cache.write`) |
 
 See also IG Appendix A.
+
+### Semantic agent cache (2.3.0)
+
+L0 `session.semantic_cache.enabled` defaults **false** (zero `/v2/agent_memory` traffic). When on, Mode 1 `agent.run_turn` recalls before the first LLM round and injects bag B key `semantic_memory` (fail-open on timeout/5xx). Writes are explicit-only unless knobs flip `write_explicit_only`. Zeus owns embed/store (`POST /v2/agent_memory/recall|blocks`). Not Direct typeahead. Zeus **≥ 0.7.6** to use; older engines treat memory as off. MATRIX honesty: **`flag`**, not `supported`.
 
 ---
 
@@ -196,3 +201,13 @@ Ship **2.0.0** with claim **candidate** (T9 B1). Family MATRIX `supported` / pin
 - Catalog resolve never silent sibling `*__*` rglob.  
 - Package `ai_process_result` default remains **True** (Hub); pins may document product-cheap **false**.  
 - G2 / scores / `wish_i_knew` never in user-facing `answer`.
+
+---
+
+## Mode 3 (2.1.0) — additive
+
+`rt.jobs` / `rt.units` / `config.llm.roles` are **optional**. Mode 1/2 call shapes are unchanged. Single-agent chat still uses `rt.agent.run_turn`. See [MULTI_AGENT.md](./MULTI_AGENT.md).
+
+`zeus_client_v2` alias remains through **≤2.3.0** (not removed in 2.2.0).
+
+Per-unit `zeus_url` / auth env names and worker `llm.roles` slices apply when **this** process executes a unit (CHECKLIST F). `rt.data.verb` / `rt.agent.run_turn` stay backward compatible (overrides default off).

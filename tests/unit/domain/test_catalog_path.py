@@ -32,6 +32,15 @@ def test_chat_request_filename() -> None:
     )
 
 
+def test_catalog_filenames_for_mode_includes_stem() -> None:
+    from zeus_client.domain.catalog import catalog_filenames_for_mode
+
+    names = catalog_filenames_for_mode("mode_v2_base-6.1_analytics_stamped")
+    assert names[0] == "chat_request_mode_v2_base-6.1_analytics_stamped_v2.json"
+    assert "mode_v2_base-6.1_analytics_stamped.json" in names
+    assert catalog_filenames_for_mode("../escape") == []
+
+
 def test_mode_filename_roundtrip_compound() -> None:
     """List→load must round-trip; bare chat_request_*_base_6.json is NOT valid."""
     from zeus_client.domain.catalog import mode_from_filename
@@ -148,6 +157,59 @@ def test_merge_scope_brief_rstrips_and_appends() -> None:
     assert "marker only\n\n## SCOPE BRIEF" in out["instructions"]["system_prompt"]
     # original unchanged
     assert doc["messages"][0]["content"] == "rules only\n"
+
+
+def test_resolve_stem_named_mode_in_scope_dir(tmp_path: Path) -> None:
+    user = tmp_path / "user"
+    scope = user / "travel-sample__default"
+    scope.mkdir(parents=True)
+    stamped = scope / "mode_v2_base-6.1_analytics_stamped.json"
+    stamped.write_text("{}", encoding="utf-8")
+    (user / "chat_request_v2.json").write_text("{}", encoding="utf-8")
+
+    path = resolve_catalog_path(
+        mode="mode_v2_base-6.1_analytics_stamped",
+        bucket="travel-sample",
+        scope="_default",
+        user_dir=user,
+    )
+    assert path == stamped
+
+
+def test_resolve_unknown_mode_does_not_alias_generic(tmp_path: Path) -> None:
+    user = tmp_path / "user"
+    user.mkdir()
+    (user / "chat_request_v2.json").write_text("{}", encoding="utf-8")
+    (user / "chat_request_analytics_v2.json").write_text("{}", encoding="utf-8")
+    path = resolve_catalog_path(
+        mode="missing_mode_xyz_totally_absent",
+        bucket="travel-sample",
+        scope="_default",
+        user_dir=user,
+    )
+    assert path is None
+
+
+def test_fs_store_load_stem_named_mode(tmp_path: Path) -> None:
+    from zeus_client.adapters.catalog_fs.store import FsCatalogStore
+
+    user = tmp_path / "user"
+    scope = user / "travel-sample__default"
+    scope.mkdir(parents=True)
+    body = {"messages": [{"role": "system", "content": "stamped"}]}
+    stamped = scope / "mode_v2_base-6.1_analytics_stamped.json"
+    stamped.write_text(json.dumps(body), encoding="utf-8")
+    store = FsCatalogStore(root=user)
+    doc = store.load(
+        CatalogKey(
+            mode="mode_v2_base-6.1_analytics_stamped",
+            bucket="travel-sample",
+            scope="_default",
+        )
+    )
+    assert doc.body["messages"][0]["content"] == "stamped"
+    assert doc.path is not None
+    assert doc.path.endswith("mode_v2_base-6.1_analytics_stamped.json")
 
 
 def test_fs_store_load_raises_catalog_not_found(tmp_path: Path) -> None:

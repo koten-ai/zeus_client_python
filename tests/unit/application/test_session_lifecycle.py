@@ -418,3 +418,36 @@ async def test_lifecycle_create_stamps_session_rewind_headers() -> None:
     assert "X-Zeus-Call-Id" not in h
     assert route.calls.last.request.headers.get("X-Zeus-Req-Id") in (None, "")
     await http.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_mode_switch_creates_new_session() -> None:
+    respx.post(f"{ZEUS}/v2/session").mock(
+        return_value=httpx.Response(
+            201,
+            json={"session_id": "sid-new-mode", "round": 1, "contract_status": "match"},
+        )
+    )
+    http = HttpxSessionClient(
+        endpoint=ZeusEndpointConfig(url=ZEUS),
+        secrets=EnvSecretStore({}),
+    )
+    life = SessionLifecycle(http)
+    prior = SessionHandle(
+        session_id="sid-old",
+        round=3,
+        chat_id="c",
+        mode="analytics",
+    )
+    handle = await life.setup(
+        chat_request={"messages": [{"role": "system", "content": "x"}]},
+        user_message="switch",
+        prior=prior,
+        mode="explore",
+        chat_id="c",
+    )
+    assert handle.session_id == "sid-new-mode"
+    assert handle.created is True
+    assert handle.mode == "explore"
+    await http.aclose()

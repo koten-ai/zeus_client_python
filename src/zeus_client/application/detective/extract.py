@@ -18,8 +18,10 @@ __all__ = [
     "count_rows_signal",
     "system_prompt_of",
     "catalog_flags_of",
+    "inject_for_session_trace",
     "notes_blob",
     "hop_error_blob",
+    "tool_payload_shape",
 ]
 
 _SLICE_SCOPE = re.compile(r"(?ms)^##\s+SCOPE\s+BRIEF\b.*?(?=^##\s|\Z)")
@@ -150,8 +152,58 @@ def catalog_flags_of(
     }
 
 
+def inject_for_session_trace(
+    *,
+    system: str = "",
+    catalog: Mapping[str, Any] | None = None,
+    source: str | None = None,
+) -> dict[str, Any]:
+    """Compact zr.inject / public_trace.inject — slice shas, no prompt body."""
+    flags = catalog_flags_of(system=system, catalog=catalog)
+    out: dict[str, Any] = {
+        "has_scope_brief": flags["has_scope_brief"],
+        "has_mini_schema": flags["has_mini_schema"],
+        "brief_sha12": flags.get("brief_sha12"),
+        "mini_sha12": flags.get("mini_sha12"),
+    }
+    types = flags.get("mini_entity_types") or []
+    if types:
+        out["entity_types"] = list(types)
+    if source:
+        out["source"] = source
+    return out
+
+
 def notes_blob(notes: Sequence[str] | None) -> str:
     return "\n".join(str(n) for n in (notes or ()))
+
+
+def tool_payload_shape(body: Any) -> dict[str, Any]:
+    """TRACE-safe tool JSON shape — keys / sizes, not bodies."""
+    if body is None:
+        return {"bytes": 0, "row_count": 0, "keys": []}
+    if isinstance(body, Mapping):
+        keys = [str(k) for k in list(body.keys())[:24]]
+        raw = str(body)
+        sz = None
+        result = body.get("result") if isinstance(body.get("result"), Mapping) else None
+        if result is not None:
+            if isinstance(result.get("items"), list):
+                sz = len(result["items"])
+            elif isinstance(result.get("node_ids"), list):
+                sz = len(result["node_ids"])
+            elif result.get("returned_count") is not None:
+                try:
+                    sz = int(result["returned_count"])
+                except (TypeError, ValueError):
+                    sz = None
+        return {
+            "keys": keys,
+            "bytes": len(raw),
+            "row_count": sz if sz is not None else 0,
+        }
+    text = str(body)
+    return {"bytes": len(text), "row_count": 0, "keys": []}
 
 
 def hop_error_blob(hops: Sequence[Mapping[str, Any]] | None) -> str:

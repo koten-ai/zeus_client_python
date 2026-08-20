@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from zeus_client.config.models import ClientSettings, DataTarget
+from zeus_client.config.models import ClientSettings, DataTarget, SemanticCacheConfig
 from zeus_client.domain.layer_a import LayerA
 from zeus_client.domain.policy import PolicyDecision
 from zeus_client.domain.session import SessionHandle
@@ -97,6 +97,8 @@ class DebugBundle:
     tokens: Mapping[str, Any] | None = None
     export_ref: str | None = None
     journal_schema: int = 1
+    stamp: Mapping[str, Any] = field(default_factory=dict)
+    trace_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe gather surface — never includes the chat answer."""
@@ -120,6 +122,8 @@ class DebugBundle:
             "tokens": dict(self.tokens) if isinstance(self.tokens, Mapping) else None,
             "export_ref": self.export_ref,
             "journal_schema": self.journal_schema,
+            "stamp": dict(self.stamp),
+            "trace_id": self.trace_id,
         }
         if self.detective is not None:
             out["detective"] = dict(self.detective)
@@ -138,10 +142,12 @@ class TurnRequest:
     tools: tuple[Mapping[str, Any], ...] = ()
     chat_request: Mapping[str, Any] | None = None
     base_id: str | None = None
+    pack_schema: Mapping[str, Any] | None = None
     chat_id: str | None = None
     model: str | None = None
     # When False, skip durable session setup/commit (unit tests / pure offline)
     enable_sessions: bool = False
+    semantic_cache: SemanticCacheConfig | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,3 +161,4 @@ class TurnResult:
     messages: tuple[Mapping[str, Any], ...]
     layer_a: LayerA | None = None
     policy: PolicyDecision | None = None
+    tool_trail: tuple[Mapping[str, Any], ...] = ()

@@ -39,6 +39,7 @@ def test_production_accepts_basic_with_tls() -> None:
     assert out.debug.capture_bodies is False
     assert out.zeus.auth_mode == "basic"
     assert out.zeus.tls_verify is True
+    assert out.settings.ai_process_result is False
 
 
 def test_development_still_allows_auth_mode_none() -> None:
@@ -46,6 +47,14 @@ def test_development_still_allows_auth_mode_none() -> None:
     out = apply_profile(base, "development")
     assert out.profile == "development"
     assert out.zeus.auth_mode == "none"
+    assert out.settings.ai_process_result is False
+
+
+def test_hub_profile_insight_default() -> None:
+    out = apply_profile(RuntimeConfig(), "hub")
+    assert out.profile == "hub"
+    assert out.settings.ai_process_result is True
+    assert out.debug.capture_bodies is True
 
 
 def test_ci_still_allows_auth_mode_none() -> None:

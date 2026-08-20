@@ -1,0 +1,32 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_version": 2,
+  "_kit": "MOCK_NOT_FOR_PRODUCTION",
+  "_lineage": {
+    "base_id": "base-1",
+    "mode": "analytics",
+    "kind": "base",
+    "prototype": true,
+    "status": "offline_pin_shape"
+  },
+  "contract": {
+    "id": "analytics_pin_base1_mock",
+    "hash": "md5:bda2cbc73cb085d8bac37c3b8b921ca1",
+    "prototype": true
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "Pin-era analytics rules.\n\n## SCOPE BRIEF\nscope: mock/_default"
+    }
+  ],
+  "verbs": [
+    {
+      "type": "function",
+      "function": {
+        "name": "find",
+        "parameters": { "type": "object" }
+      }
+    }
+  ]
+}

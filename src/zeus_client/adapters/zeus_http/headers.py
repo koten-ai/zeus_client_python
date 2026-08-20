@@ -17,6 +17,7 @@ __all__ = [
     "correlation_headers",
     "product_stamp_headers",
     "merge_headers",
+    "req_id_from_headers",
 ]
 
 TRACE_CLASS_AGENT = "agent"
@@ -77,6 +78,17 @@ def product_stamp_headers(*, version: str | None = None) -> dict[str, str]:
         "X-Zeus-Client": _PRODUCT_USER,
         "X-Zeus-Client-Version": version or PACKAGE_VERSION,
     }
+
+
+def req_id_from_headers(headers: Mapping[str, str] | None) -> str | None:
+    """Full ``X-Zeus-Req-Id`` (never truncated). None when absent."""
+    if not headers:
+        return None
+    for key, val in headers.items():
+        if str(key).lower() == "x-zeus-req-id":
+            text = str(val or "").strip()
+            return text or None
+    return None
 
 
 def merge_headers(*parts: Mapping[str, str] | None) -> dict[str, str]:

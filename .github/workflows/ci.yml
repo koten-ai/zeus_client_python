@@ -3,7 +3,8 @@
 #
 # Conformance suite reads sibling koten-ai/zeus_client_design
 # (sdk_bootstrap.pins.json → local:../zeus_client_design). Private repo —
-# requires secrets.KOTEN_CI_PAT (repo-read PAT), same pattern as Zeus CI.
+# prefer secrets.KOTEN_CI_PAT (same as Zeus). Until that secret exists on
+# this repo, CI skips the suite (github.token cannot clone it).
 name: CI
 
 permissions:
@@ -78,9 +79,9 @@ jobs:
         with:
           path: zeus_client_python
 
-      # Private sibling suite (optional until KOTEN_CI_PAT is set on this repo).
-      # Prefer secrets.KOTEN_CI_PAT (same as Zeus); fall back to github.token.
-      # Missing/unauthorized design → conformance tests pytest.skip (not fail).
+      # Private sibling suite. Prefer secrets.KOTEN_CI_PAT (same as Zeus).
+      # This repo does not have that secret yet — github.token cannot read
+      # koten-ai/zeus_client_design (404). Soft-skip until the PAT is set.
       - name: Checkout zeus_client_design (conformance)
         continue-on-error: true
         uses: actions/checkout@v4
@@ -122,6 +123,14 @@ jobs:
         with:
           name: coverage-xml
           path: zeus_client_python/coverage.xml
+          if-no-files-found: ignore
+
+      - name: Upload conformance report (3.12 only)
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-report
+          path: zeus_client_python/tests/conformance/last_report.json
           if-no-files-found: ignore
 
   build:
