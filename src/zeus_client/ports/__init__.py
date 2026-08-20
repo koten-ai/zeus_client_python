@@ -42,6 +42,12 @@ class VerbRequest:
     headers: Mapping[str, str] = field(default_factory=dict)
     # Agent path may dispatch pipeline; Direct public surface must keep False.
     allow_pipeline: bool = False
+    # Optional per-call Zeus host / auth names (unit overrides). Secrets never here.
+    base_url: str | None = None
+    auth_mode: str | None = None
+    password_env: str | None = None
+    token_env: str | None = None
+    username: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
