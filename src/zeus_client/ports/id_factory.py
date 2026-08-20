@@ -20,13 +20,13 @@ class IdFactory(Protocol):
 
 class UuidIdFactory:
     def turn_id(self) -> str:
-        return f"turn_{uuid.uuid4().hex}"
+        return str(uuid.uuid4())
 
     def chat_id(self) -> str:
-        return f"chat_{uuid.uuid4().hex}"
+        return str(uuid.uuid4())
 
     def call_id(self) -> str:
-        return f"call_{uuid.uuid4().hex}"
+        return str(uuid.uuid4())
 
     def span_id(self) -> str:
-        return f"span_{uuid.uuid4().hex[:16]}"
+        return uuid.uuid4().hex[:16]

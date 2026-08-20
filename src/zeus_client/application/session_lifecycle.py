@@ -24,6 +24,7 @@ from zeus_client.domain.contract import (
     resolve_session_contract_hash,
 )
 from zeus_client.domain.session import SessionHandle
+from zeus_client.observability.logging import get_family_logger
 
 __all__ = [
     "SessionLifecycle",
@@ -130,9 +131,23 @@ class SessionLifecycle:
                 contract_hash=session_hash,
                 contract_status="none" if not cid else "match",
                 enabled=False,
+                mode=mode,
             )
 
         prior_sid = ((prior.session_id if prior else "") or "").strip()
+        prior_mode = ((prior.mode if prior else "") or "").strip()
+        if prior_sid and prior_mode and prior_mode != (mode or "").strip():
+            # Mode switch = new session (CHECKLIST B).
+            return await self._create(
+                chat_req=chat_req,
+                user_message=user_message,
+                contract_id=cid,
+                contract_hash=session_hash,
+                mode=mode,
+                chat_id=chat_id or (prior.chat_id if prior else ""),
+                headers=hop_headers,
+                recovered_from="",
+            )
 
         if prior_sid:
             reh = await self.client.rehydrate(
@@ -146,6 +161,16 @@ class SessionLifecycle:
                 reh_round = int(reh.get("round") or (prior.round if prior else 0) or 0)
                 this_round = reh_round + 1 if reh_round > 0 else 1
                 cst = contract_status_from_rehydrate(cid, session_hash, reh)
+                get_family_logger().info(
+                    "zeus_client.session.rehydrated",
+                    **{
+                        "session.id": prior_sid,
+                        "req_id": reh.get("_req_id") or getattr(self.client, "last_req_id", None),
+                        "zeus.round": this_round,
+                        "contract_status": cst,
+                        "result": "ok",
+                    },
+                )
                 return SessionHandle(
                     session_id=prior_sid,
                     round=this_round,
@@ -156,6 +181,7 @@ class SessionLifecycle:
                     created=False,
                     rehydrated=True,
                     enabled=True,
+                    mode=mode,
                 )
             # Dead/expired sid → same-turn recreate
             return await self._create(
@@ -208,6 +234,18 @@ class SessionLifecycle:
             # Wire may say "ok"; normalize to match/none vocabulary for handle.
             raw_cst = str(body.get("contract_status") or "none")
             cst = "match" if raw_cst in ("ok", "match") else raw_cst
+            log = get_family_logger()
+            log.info(
+                "zeus_client.session.created",
+                **{
+                    "session.id": sid,
+                    "req_id": result.req_id,
+                    "scope": f"{self.target.bucket}/{self.target.scope}" if self.target else "",
+                    "zeus.url": (self.client.endpoint.url or "").rstrip("/"),
+                    "contract_status": cst,
+                    "result": "ok",
+                },
+            )
             return SessionHandle(
                 session_id=sid,
                 round=rnd,
@@ -220,9 +258,19 @@ class SessionLifecycle:
                 recovered_from=recovered_from,
                 enabled=True,
                 create_req_id=result.req_id,
+                mode=mode,
             )
         err = result.error or (
             str(result.body)[:300] if result.body else f"HTTP {result.status_code}"
+        )
+        get_family_logger().error(
+            "zeus_client.session.failed",
+            **{
+                "req_id": result.req_id,
+                "http.status_code": result.status_code,
+                "error.message": err,
+                "result": "error",
+            },
         )
         return SessionHandle(
             session_id="",
@@ -236,6 +284,7 @@ class SessionLifecycle:
             enabled=True,
             create_req_id=result.req_id,
             error=err,
+            mode=mode,
         )
 
     async def commit(
@@ -286,6 +335,15 @@ class SessionLifecycle:
             target=self.target,
         )
         if result.ok:
+            get_family_logger().info(
+                "zeus_client.session.committed",
+                **{
+                    "session.id": handle.session_id,
+                    "round": turn_round,
+                    "req_id": result.req_id,
+                    "result": "ok",
+                },
+            )
             return CommitResult(
                 ok=True,
                 handle=handle.with_updates(
@@ -297,6 +355,15 @@ class SessionLifecycle:
                 turn_req_id=result.req_id,
             )
         err = result.error or str(result.body)[:300]
+        get_family_logger().error(
+            "zeus_client.session.failed",
+            **{
+                "session.id": handle.session_id,
+                "req_id": result.req_id,
+                "error.message": err,
+                "result": "error",
+            },
+        )
         return CommitResult(
             ok=False,
             handle=handle.with_updates(error=err),

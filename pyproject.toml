@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kotenai-zeus-client"
 # GA cutover (ZCP-39): default import is V2 Runtime tree as zeus_client 2.0.0
-version = "2.0.0"
+version = "2.3.0"
 description = "Python client library for Zeus AI data servers"
 readme = "README.md"
 license = "MIT"
@@ -30,6 +30,11 @@ dev = [
     "pip-audit>=2.7",
     "twine>=5.1",
 ]
+otel = [
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+]
 
 [project.urls]
 Homepage = "https://github.com/koten-ai/zeus_client_python"
@@ -53,12 +58,14 @@ packages = [
     "zeus_client.adapters.catalog_fs",
     "zeus_client.adapters.secrets_env",
     "zeus_client.adapters.otlp",
+    "zeus_client.adapters.jobs_http",
+    "zeus_client.adapters.jobs_fake",
     "zeus_client.config",
     "zeus_client.security",
     "zeus_client.compat",
     "zeus_client.compat.v1",
     "zeus_client.observability",
-    # Temporary deprecation alias (≤1 minor / 2.1.0)
+    # Temporary deprecation alias (slipped to ≤2.3.0; Mode 3 landed at 2.1.0)
     "zeus_client_v2",
 ]
 
@@ -140,3 +147,10 @@ module = [
     "zeus_client.compat.*",
 ]
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "opentelemetry",
+    "opentelemetry.*",
+]
+ignore_missing_imports = true

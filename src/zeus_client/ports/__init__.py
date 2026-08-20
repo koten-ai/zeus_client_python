@@ -24,6 +24,11 @@ __all__ = [
     "HttpPort",
     "Clock",
     "IdFactory",
+    "AgentMemoryPort",
+    "AgentMemoryStatus",
+    "RecalledBlock",
+    "RecallResult",
+    "WriteResult",
 ]
 
 
@@ -42,6 +47,14 @@ class VerbRequest:
     headers: Mapping[str, str] = field(default_factory=dict)
     # Agent path may dispatch pipeline; Direct public surface must keep False.
     allow_pipeline: bool = False
+    # Default omit X-Zeus-Req-Id (Zeus mints). Tests may pre-mint UUID v4.
+    pre_mint_req_id: bool = False
+    # Optional per-call Zeus host / auth names (unit overrides). Secrets never here.
+    base_url: str | None = None
+    auth_mode: str | None = None
+    password_env: str | None = None
+    token_env: str | None = None
+    username: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +101,13 @@ class CatalogDocument:
 
 
 # Re-export clock / id from dedicated modules for a single ports surface.
+from zeus_client.ports.agent_memory import (  # noqa: E402
+    AgentMemoryPort as AgentMemoryPort,
+)
+from zeus_client.ports.agent_memory import AgentMemoryStatus as AgentMemoryStatus
+from zeus_client.ports.agent_memory import RecalledBlock as RecalledBlock
+from zeus_client.ports.agent_memory import RecallResult as RecallResult
+from zeus_client.ports.agent_memory import WriteResult as WriteResult
 from zeus_client.ports.clock import Clock as Clock  # noqa: E402
 from zeus_client.ports.id_factory import IdFactory as IdFactory  # noqa: E402
 

@@ -93,7 +93,11 @@ def build_support_pack(
             "## 6. Hop errors / rows",
         ]
     )
-    errs = [h for h in hop_list if h.get("ok") is False or (isinstance(h.get("status"), int) and h["status"] >= 400)]
+    errs = [
+        h
+        for h in hop_list
+        if h.get("ok") is False or (isinstance(h.get("status"), int) and h["status"] >= 400)
+    ]
     if errs:
         lines.extend(_hop_line(h) for h in errs)
     else:

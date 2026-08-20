@@ -14,7 +14,9 @@ from zeus_client.application.control_plane_inject import (
     InjectSettings,
     apply_control_plane_inject,
     prepare_inject_settings,
+    prepare_settings,
 )
+from zeus_client.config.models import ClientSettings
 from zeus_client.domain.contract import compute_contract_hash
 
 
@@ -115,6 +117,28 @@ def test_inject_empty_settings_returns_same_object() -> None:
     settings = InjectSettings()
     out = apply_control_plane_inject(chat, settings)
     assert out is chat
+
+
+def test_prepare_settings_accepts_alias_shaped_client_settings() -> None:
+    """BFF may import ClientSettings via zeus_client_v2 — do not require identity."""
+
+    class _AliasSettings:
+        output_request = None
+        company_context = None
+        rules = None
+        tenant_rules = None
+        override_defaults = False
+        ruleset_id = None
+
+        def with_updates(self, **kwargs):  # noqa: ANN003
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+            return self
+
+    out = prepare_settings(_AliasSettings())
+    assert out.output_request is None
+    assert isinstance(out.rules, dict)
+    assert ClientSettings().ai_process_result is False
 
 
 def test_prepare_rejects_type_only_output_field() -> None:

@@ -1,0 +1,12 @@
+{
+  "_kit": "MOCK_NOT_FOR_PRODUCTION",
+  "summary": "Found two beers under 6% ABV.",
+  "query_decomposition": {"intent": "List", "entity": "Beer"},
+  "decomposition": {
+    "targets": [{"entity_type": "Beer", "focus": ["name", "abv"]}],
+    "predicates": {},
+    "output": "rows"
+  },
+  "confidence": "high",
+  "policy_action": "answer"
+}

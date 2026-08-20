@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from tests.conformance.paths import load_json
+from zeus_client.application.agent_turn import run_agent_turn
 from zeus_client.config.models import ClientSettings
+from zeus_client.domain.catalog import lineage_base_id
+from zeus_client.domain.contract import extract_stamped_hash
 from zeus_client.domain.layer_a import (
     parse_layer_a,
     ui_view,
 )
+from zeus_client.domain.messages import TurnRequest
+from zeus_client.domain.mini_schema import classify_mini_schema, get_mini_schema
 from zeus_client.domain.policy import decide_policy
+from zeus_client.domain.rules import merge_rules_frozen
+from zeus_client.domain.tool_trail import error_class_for
+from zeus_client.ports import LlmRequest, LlmResponse, VerbHopResult, VerbRequest
 
 __all__ = [
     "merge_rules_frozen",
@@ -22,20 +32,60 @@ __all__ = [
 ]
 
 
-def merge_rules_frozen(
-    base: Mapping[str, str],
-    overlay: Mapping[str, str],
-    *,
-    frozen: bool = False,
-) -> dict[str, str]:
-    """Named rules merge — freeze blocks overlay of existing keys."""
-    out = {str(k): str(v) for k, v in base.items()}
-    for k, v in overlay.items():
-        sk = str(k)
-        if frozen and sk in out:
-            continue
-        out[sk] = str(v)
-    return out
+@dataclass
+class _ScriptedLlm:
+    script: list[Any] = field(default_factory=list)
+    calls: list[LlmRequest] = field(default_factory=list)
+
+    async def complete(self, req: LlmRequest) -> LlmResponse:
+        self.calls.append(req)
+        if not self.script:
+            return LlmResponse(content="(empty script)", tool_calls=())
+        item = self.script.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+@dataclass
+class _ScriptedZeus:
+    results: dict[str, VerbHopResult] = field(default_factory=dict)
+    calls: list[VerbRequest] = field(default_factory=list)
+
+    async def resolve_auth(self, target, *, force: bool = False):
+        return type("A", (), {"headers": {}, "mode": "none"})()
+
+    async def call_verb(self, req: VerbRequest) -> VerbHopResult:
+        self.calls.append(req)
+        if req.verb in self.results:
+            return self.results[req.verb]
+        return VerbHopResult(
+            ok=True,
+            status_code=200,
+            req_id=f"req-{req.verb}",
+            body={"items": []},
+        )
+
+
+def _tc(name: str, args: dict, call_id: str = "c1") -> dict:
+    return {
+        "id": call_id,
+        "type": "function",
+        "function": {"name": name, "arguments": json.dumps(args)},
+    }
+
+
+def _return_payload_from_script(script: Mapping[str, Any]) -> dict[str, Any] | None:
+    for r in script.get("rounds") or []:
+        for tc in (r.get("assistant") or {}).get("tool_calls") or []:
+            fn = tc.get("function") or {}
+            if fn.get("name") == "return":
+                try:
+                    payload = json.loads(fn.get("arguments") or "{}")
+                except json.JSONDecodeError:
+                    return {}
+                return payload if isinstance(payload, dict) else {}
+    return None
 
 
 def _resolve(design_root: Path, rel: str) -> Path:
@@ -52,22 +102,22 @@ def run_l0_catalog(design_root: Path, case_dir: Path, case: dict) -> dict[str, A
     inp = case["input"]
     catalog = load_json(_resolve(design_root, inp["catalog_path"]))
     schema = load_json(_resolve(design_root, inp["schema_path"]))
-    lineage = catalog.get("_lineage")
-    base_id = catalog.get("base_id")
-    if isinstance(lineage, dict):
-        base_id = lineage.get("base_id") or base_id
+    base_id = lineage_base_id(catalog) or catalog.get("base_id")
     contract = catalog.get("contract") or {}
     verbs = catalog.get("verbs") or catalog.get("tools") or []
     required = (schema.get("required") or []) if isinstance(schema, dict) else []
     four = {"summary", "confidence", "query_decomposition", "decomposition"}
     props = set((schema.get("properties") or {}).keys()) if isinstance(schema, dict) else set()
+    stamped = extract_stamped_hash(catalog)
+    mini = get_mini_schema(catalog)
     return {
         "result": True,
         "catalog.base_id": base_id,
         "catalog.contract.id": contract.get("id"),
-        "catalog.contract.hash": contract.get("hash"),
+        "catalog.contract.hash": stamped or contract.get("hash"),
         "catalog.verb_count_gte": len(verbs) if isinstance(verbs, list) else 0,
         "schema.required_four_defined": four.issubset(set(required)) or four.issubset(props),
+        "catalog.mini_schema.parsed": bool(mini.get("entity_types") is not None),
     }
 
 
@@ -203,21 +253,24 @@ def run_l2_triggers(design_root: Path, case_dir: Path, case: dict) -> dict[str, 
 
 
 def run_l2_settings(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
-    """Product profile fixture: production default false (pins guidance).
+    """Product profiles default false; hub profile is the insight exception."""
+    from zeus_client.config.models import RuntimeConfig
+    from zeus_client.config.profiles import apply_profile
 
-    Package ``ClientSettings.ai_process_result`` remains True (Hub) — this case
-    asserts the **product profile fixture**, not the package default.
-    """
     data = load_json(case_dir / case["input"]["fixture"])
     profile = data["profiles"]
     prod = bool(profile["production"]["ai_process_result"])
     hub = bool(profile["hub_debug"]["ai_process_result"])
+    hub_profile = apply_profile(RuntimeConfig(), "hub")
+    pkg_false = ClientSettings().ai_process_result is False
     return {
-        "production.ai_process_result": prod,
+        "production.ai_process_result": False if (prod is False and pkg_false) else True,
         "hub.ai_process_result": hub,
-        "result": prod is False,
+        "result": prod is False and pkg_false,
         "production_default_false": prod is False,
-        "package_hub_default_true": ClientSettings().ai_process_result is True,
+        "package_default_false": pkg_false,
+        "hub_profile_true": hub_profile.settings.ai_process_result is True,
+        "package_hub_default_true": hub_profile.settings.ai_process_result is True,
     }
 
 
@@ -278,16 +331,46 @@ async def run_l1_single_tool(design_root: Path, case_dir: Path, case: dict) -> d
     }
 
 
-def run_l1_force_return(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+async def run_l1_force_return(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    """Drive ``run_agent_turn`` until the force-return nudge fires."""
+    _ = design_root
     data = load_json(case_dir / case["input"]["fixture"])
     max_rounds = int(data["max_rounds"])
-    rounds_used = int(data["rounds_without_return"])
-    force = rounds_used >= max_rounds
+    find_tc = _tc("find", {"entity_type": "Beer"})
+    script: list[Any] = [
+        LlmResponse(content=None, tool_calls=(find_tc,)) for _ in range(max(1, max_rounds - 1))
+    ]
+    script.append(LlmResponse(content="forced wrap-up", tool_calls=()))
+    llm = _ScriptedLlm(script=script)
+    zeus = _ScriptedZeus(
+        results={
+            "find": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-empty",
+                body={"items": []},
+            )
+        }
+    )
+    result = await run_agent_turn(
+        TurnRequest(
+            message="list beers",
+            tools=({"type": "function", "function": {"name": "find"}},),
+            settings=ClientSettings(
+                ai_process_result=False,
+                max_rounds=max_rounds,
+                force_return_rounds_left=1,
+            ),
+        ),
+        llm=llm,
+        zeus=zeus,
+    )
+    forced = any("force_return" in n for n in result.debug.notes)
     return {
-        "result": force is True,
-        "force_return": force,
+        "result": forced,
+        "force_return": forced,
         "max_rounds": max_rounds,
-        "rounds_without_return": rounds_used,
+        "rounds_without_return": int(result.debug.rounds or 0),
     }
 
 
@@ -302,15 +385,15 @@ def _get_path(obj: Any, dotted: str) -> Any:
 
 
 def run_dt_assert_only(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    """Parse slim Detective export. Does not copy ``expect`` into observe."""
+    _ = design_root
     inp = case.get("input") or {}
     export_name = inp.get("detective_export") or "detective_export.slim.json"
     export_path = case_dir / export_name
     if not export_path.exists():
-        return _run_dt_synthetic(design_root, case_dir, case)
+        return {}
     export = load_json(export_path)
-    expect = case.get("expect") or {}
-    observe: dict[str, Any] = {
-        "result": expect.get("result", True),
+    return {
         "diagnosis.prompt_grade": _get_path(export, "diagnosis.prompt_grade"),
         "diagnosis.output_grade": _get_path(export, "diagnosis.output_grade"),
         "diagnosis.error_grade": _get_path(export, "diagnosis.error_grade"),
@@ -328,46 +411,11 @@ def run_dt_assert_only(design_root: Path, case_dir: Path, case: dict) -> dict[st
         or _get_path(export, "diagnosis.prompt.lineage_line")
         or "",
         "custom_label_contains": _get_path(export, "diagnosis.prompt.custom_label") or "",
-        "layer_a.required_four": True,
     }
-    return observe
-
-
-def _run_dt_synthetic(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
-    expect = case.get("expect") or {}
-    inp = case.get("input") or {}
-    observe: dict[str, Any] = dict(expect)
-    if "zeus_response" in inp:
-        resp_path = _resolve(design_root, inp["zeus_response"])
-        resp = load_json(resp_path) if resp_path.exists() else {}
-        observe["result"] = False
-        observe["error_class"] = expect.get("error_class", "contract_mismatch")
-        headers = resp.get("headers") or {}
-        observe["req_id"] = headers.get("X-Zeus-Req-Id") or expect.get("req_id")
-        observe["req_id.present"] = bool(observe.get("req_id"))
-        observe["forged_hash"] = False
-        observe["retryable"] = bool((resp.get("client_expect") or {}).get("retryable", False))
-    fix = case_dir / "fixture.json"
-    if fix.exists():
-        data = load_json(fix)
-        observe.update(data.get("observe") or {})
-        for k, v in (data.get("expect") or {}).items():
-            observe.setdefault(k, v)
-        # Validate invalid_return through V2 policy when present
-        inv = data.get("invalid_return")
-        if isinstance(inv, dict):
-            layer = parse_layer_a(inv)
-            dec = decide_policy(layer)
-            observe["layer_a.required_four"] = layer.ok
-            observe["decision.policy"] = dec.policy
-            observe["decision.reason"] = dec.reason
-            if not layer.ok:
-                observe["error_class"] = "layer_a_validation_failed"
-                observe["result"] = False
-    return observe
 
 
 def run_dt_rewind_companions(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    _ = design_root, case
     script_p = case_dir / "llm_script.json"
     zeus_p = case_dir / "zeus_responses.json"
     if not script_p.exists() or not zeus_p.exists():
@@ -375,61 +423,158 @@ def run_dt_rewind_companions(design_root: Path, case_dir: Path, case: dict) -> d
             "result": False,
             "error_class": "rewind_companions_missing",
             "companions_present": False,
+            "has_return": False,
         }
     script = load_json(script_p)
     zeus = load_json(zeus_p)
     rounds = script.get("rounds") or []
     hops = zeus.get("hops") or zeus.get("responses") or []
-    has_return = any(
-        any(
-            (tc.get("function") or {}).get("name") == "return"
-            for tc in ((r.get("assistant") or {}).get("tool_calls") or [])
-        )
-        for r in rounds
-    )
+    payload = _return_payload_from_script(script)
+    has_return = payload is not None
+    layer_ok = False
+    if isinstance(payload, dict):
+        layer_ok = parse_layer_a(payload).ok
     return {
         "result": bool(rounds) and has_return,
         "companions_present": True,
         "llm_rounds": len(rounds),
         "zeus_hops": len(hops) if isinstance(hops, list) else 0,
         "has_return": has_return,
+        "layer_a.required_four": layer_ok,
         "mode_capable": "rewind",
     }
 
 
-def run_dt_fail_zeus(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
-    return _run_dt_synthetic(design_root, case_dir, case)
+def run_dt_smooth(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    observe = run_dt_rewind_companions(design_root, case_dir, case)
+    slim = run_dt_assert_only(design_root, case_dir, case)
+    for k, v in slim.items():
+        observe.setdefault(k, v)
+    observe["result"] = bool(observe.get("companions_present") and observe.get("has_return"))
+    return observe
+
+
+def run_dt_fail_client_mini(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    """Missing MINI-SCHEMA → stable ``error_class`` from V2 classifier."""
+    _ = design_root, case
+    doc: dict[str, Any] = {"messages": [{"role": "system", "content": "no brief here"}]}
+    fix = case_dir / "fixture.json"
+    if fix.exists():
+        data = load_json(fix)
+        if isinstance(data.get("catalog"), dict):
+            doc = data["catalog"]
+    return classify_mini_schema(get_mini_schema(doc))
+
+
+async def run_dt_fail_zeus(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    """409 contract mismatch via ``run_agent_turn`` + scripted Zeus hop."""
+    _ = case_dir
+    inp = case.get("input") or {}
+    rel = inp.get("zeus_response") or "wire/errors/contract_409.response.json"
+    resp_path = _resolve(design_root, rel)
+    resp = load_json(resp_path) if resp_path.exists() else {}
+    headers = resp.get("headers") or {}
+    req_id = str(headers.get("X-Zeus-Req-Id") or "")
+    status = int(resp.get("status") or 409)
+    body = resp.get("body") if isinstance(resp.get("body"), dict) else {}
+    llm = _ScriptedLlm(
+        script=[
+            LlmResponse(content=None, tool_calls=(_tc("search", {"query_text": "x"}),)),
+            LlmResponse(content="stopped retrying", tool_calls=()),
+        ]
+    )
+    zeus = _ScriptedZeus(
+        results={
+            "search": VerbHopResult(
+                ok=False,
+                status_code=status,
+                req_id=req_id or None,
+                error="contract mismatch",
+                body=body,
+            )
+        }
+    )
+    result = await run_agent_turn(
+        TurnRequest(
+            message="search fruit beers",
+            tools=({"type": "function", "function": {"name": "search"}},),
+            settings=ClientSettings(ai_process_result=False, max_rounds=3),
+        ),
+        llm=llm,
+        zeus=zeus,
+    )
+    trail = list(result.tool_trail or [])
+    hop = trail[0] if trail else {}
+    klass = hop.get("error_class") or error_class_for(ok=False, status=status)
+    got_req = str(hop.get("req_id") or req_id or "")
+    retryable = bool((resp.get("client_expect") or {}).get("retryable", False))
+    return {
+        "result": False,
+        "error_class": klass,
+        "req_id": got_req,
+        "req_id.present": bool(got_req),
+        "forged_hash": False,
+        "retryable": retryable,
+    }
+
+
+def run_dt_fail_llm(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    _ = design_root, case
+    data = load_json(case_dir / "fixture.json") if (case_dir / "fixture.json").exists() else {}
+    inv = data.get("invalid_return") if isinstance(data, dict) else None
+    if not isinstance(inv, dict):
+        inv = {}
+    layer = parse_layer_a(inv)
+    dec = decide_policy(layer)
+    return {
+        "result": False,
+        "error_class": None if layer.ok else "layer_a_validation_failed",
+        "layer_a.required_four": layer.ok,
+        "decision.policy": dec.policy,
+        "decision.reason": dec.reason,
+    }
+
+
+def run_dt_fail_control_plane(design_root: Path, case_dir: Path, case: dict) -> dict[str, Any]:
+    """Trigger missing/false while Layer A + data path still ok."""
+    _ = design_root, case
+    payload: dict[str, Any] = {
+        "summary": "Found beers from Zeus data.",
+        "query_decomposition": {"intent": "List", "entity": "Beer"},
+        "decomposition": {"targets": [{"entity_type": "Beer"}]},
+        "confidence": "high",
+        "policy_action": "answer",
+        "business_rules_triggers": {},
+    }
+    fix = case_dir / "fixture.json"
+    if fix.exists():
+        data = load_json(fix)
+        if isinstance(data.get("layer_a"), dict):
+            payload = data["layer_a"]
+    layer = parse_layer_a(payload)
+    dec = decide_policy(layer)
+    fired = any(bool(v) for v in layer.business_rules_triggers.values())
+    return {
+        "result": layer.ok,
+        "data_ok": layer.ok,
+        "trigger_fired": fired,
+        "partial_control_plane": layer.ok and not fired,
+        "error_class": None,
+        "decision.policy": dec.policy,
+    }
 
 
 async def run_dt_case(
     design_root: Path, case_dir: Path, case: dict, case_id: str
 ) -> dict[str, Any]:
-    mode = (case.get("input") or {}).get("mode")
-    has_comp = (case_dir / "llm_script.json").exists() and (
-        case_dir / "zeus_responses.json"
-    ).exists()
-    if case_id == "DT.fail_zeus.contract_409.001" or mode == "http_mock":
-        return run_dt_fail_zeus(design_root, case_dir, case)
-    if (
-        mode == "fixture"
-        or (case_dir / "fixture.json").exists()
-        and not (case_dir / "detective_export.slim.json").exists()
-    ):
-        return _run_dt_synthetic(design_root, case_dir, case)
-    if mode == "rewind" or has_comp:
-        observe = run_dt_rewind_companions(design_root, case_dir, case)
-        if (case_dir / "detective_export.slim.json").exists():
-            ao = run_dt_assert_only(design_root, case_dir, case)
-            for k, v in ao.items():
-                if k not in ("result", "companions_present", "has_return"):
-                    observe.setdefault(k, v)
-            if observe.get("companions_present") and observe.get("has_return"):
-                observe["result"] = True
-        return observe
-    return run_dt_assert_only(design_root, case_dir, case)
+    fn = HANDLERS.get(case_id)
+    if fn is None:
+        return {"result": False, "error_class": "no_v2_handler"}
+    if inspect.iscoroutinefunction(fn):
+        return await fn(design_root, case_dir, case)
+    return fn(design_root, case_dir, case)
 
 
-# Sync wrappers for runner that may be async for L1 only
 HANDLERS = {
     "L0.catalog.load_mock.001": run_l0_catalog,
     "L0.result.envelope.001": run_l0_envelope,
@@ -441,4 +586,10 @@ HANDLERS = {
     "L2.rules.merge_freeze.001": run_l2_rules,
     "L2.triggers.object_normalize.001": run_l2_triggers,
     "L2.settings.ai_process_result.001": run_l2_settings,
+    "DT.smooth_short.beer_fruit_pipeline_base61.001": run_dt_smooth,
+    "DT.smooth_long.beer_fruit_multi_round_no_pipeline_base61.001": run_dt_smooth,
+    "DT.fail_client.missing_mini_schema.001": run_dt_fail_client_mini,
+    "DT.fail_zeus.contract_409.001": run_dt_fail_zeus,
+    "DT.fail_llm.bad_layer_a.001": run_dt_fail_llm,
+    "DT.fail_control_plane.trigger_missing_data_ok.001": run_dt_fail_control_plane,
 }

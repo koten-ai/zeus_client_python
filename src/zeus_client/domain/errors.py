@@ -25,6 +25,7 @@ __all__ = [
     "PolicyError",
     "ValidationError",
     "InternalError",
+    "JobError",
     "default_retryable",
     "public_message_for",
 ]
@@ -74,6 +75,9 @@ class ErrorCode(str, Enum):
     SESSION_ID_MISSING = "040004"
     SESSION_DURABLE_DISABLED = "040005"
     SESSION_COMMIT_FAILED = "040006"
+    AGENT_MEMORY_RECALL_FAILED = "040008"
+    AGENT_MEMORY_WRITE_FAILED = "040009"
+    AGENT_MEMORY_UNAVAILABLE = "040010"
 
     # --- 05 agent / LLM ---
     AGENT_TURN_FAILED = "050001"
@@ -115,6 +119,17 @@ class ErrorCode(str, Enum):
     AUTH_FAILED = "100001"
     AUTH_SESSION_UNAVAILABLE = "100002"
 
+    # --- 13 multi-agent jobs / units ---
+    JOBS_UNAVAILABLE = "130001"
+    JOBS_INVALID_UNIT_MAP = "130002"
+    JOBS_BUDGET_INVALID = "130003"
+    JOBS_NOT_FOUND = "130004"
+    JOBS_WATCH_FAILED = "130005"
+    JOBS_UNIT_FAILED = "130010"
+    UNITS_CATALOG_MISSING = "130011"
+    UNITS_INJECT_MISSING = "130012"
+    UNITS_ISOLATION = "130013"
+
     # --- 99 internal ---
     INTERNAL_BUG = "990001"
 
@@ -132,6 +147,7 @@ _RETRYABLE: frozenset[ErrorCode] = frozenset(
         ErrorCode.ZEUS_TRANSPORT,
         ErrorCode.ZEUS_HTTP_5XX,
         ErrorCode.AUTH_SESSION_UNAVAILABLE,
+        ErrorCode.AGENT_MEMORY_RECALL_FAILED,
     }
 )
 
@@ -170,6 +186,9 @@ _PUBLIC_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SESSION_ID_MISSING: "session id missing",
     ErrorCode.SESSION_DURABLE_DISABLED: "durable sessions disabled",
     ErrorCode.SESSION_COMMIT_FAILED: "session commit/trace failed",
+    ErrorCode.AGENT_MEMORY_RECALL_FAILED: "agent memory recall failed",
+    ErrorCode.AGENT_MEMORY_WRITE_FAILED: "agent memory write failed",
+    ErrorCode.AGENT_MEMORY_UNAVAILABLE: "agent memory API unavailable",
     ErrorCode.AGENT_TURN_FAILED: "agent turn failed",
     ErrorCode.AGENT_MESSAGE_EMPTY: "agent message empty",
     ErrorCode.AGENT_MAX_ROUNDS: "agent max_rounds exceeded",
@@ -201,6 +220,15 @@ _PUBLIC_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.POLICY_REFUSE: "policy forced refuse",
     ErrorCode.AUTH_FAILED: "auth failed",
     ErrorCode.AUTH_SESSION_UNAVAILABLE: "auth session unavailable",
+    ErrorCode.JOBS_UNAVAILABLE: "multi-agent capability unavailable",
+    ErrorCode.JOBS_INVALID_UNIT_MAP: "invalid unit map / missing scope",
+    ErrorCode.JOBS_BUDGET_INVALID: "job budget invalid",
+    ErrorCode.JOBS_NOT_FOUND: "job not found",
+    ErrorCode.JOBS_WATCH_FAILED: "job watch transport failed",
+    ErrorCode.JOBS_UNIT_FAILED: "job failed (unit error)",
+    ErrorCode.UNITS_CATALOG_MISSING: "agent unit missing catalog pin",
+    ErrorCode.UNITS_INJECT_MISSING: "agent unit missing required inject",
+    ErrorCode.UNITS_ISOLATION: "unit isolation violation",
     ErrorCode.INTERNAL_BUG: "internal client bug",
 }
 
@@ -292,3 +320,7 @@ class ValidationError(ZeusClientError):
 
 class InternalError(ZeusClientError):
     """Bug; include journal ref in details when available."""
+
+
+class JobError(ZeusClientError):
+    """Mode 3 jobs/units failures (130000–139999). Not SDK-auto-retryable."""

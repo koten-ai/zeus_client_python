@@ -26,7 +26,7 @@ from zeus_client.observability.rate_limit import TokenBucket
 
 
 def test_package_version_is_2_0_0() -> None:
-    assert __version__ == "2.0.0"
+    assert __version__ == "2.3.0"
 
 
 def test_public_exports() -> None:
@@ -71,6 +71,7 @@ def test_otlp_factory_default_null() -> None:
     on = try_build_otlp_exporter(endpoint="http://127.0.0.1:4318", enabled=True)
     assert on.enabled is True
     assert on.export_events([{"type": "a"}, {"type": "b"}]) == 2
+    on.shutdown()
 
 
 def test_turn_result_as_v1_tuple() -> None:

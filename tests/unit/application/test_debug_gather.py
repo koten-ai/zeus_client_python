@@ -36,7 +36,9 @@ async def test_finish_stamps_chat_and_empty_req_ids_on_direct_exit() -> None:
         journal=journal,
         zeus_url="http://127.0.0.1:8080",
     )
-    assert result.debug.turn_id.startswith("turn_")
+    from zeus_client.domain.ids import is_uuid_v4
+
+    assert is_uuid_v4(result.debug.turn_id)
     assert result.debug.chat_id == "chat_x"
     assert result.debug.session_id is None
     assert result.debug.req_ids == ()
@@ -138,3 +140,16 @@ def test_slice_sha12_is_not_whole_system() -> None:
     assert flags["brief_sha12"] == sha12(slice_block(system, "brief"))
     assert flags["brief_sha12"] != sha12(system)
     assert flags["mini_sha12"] != sha12(system)
+
+
+def test_inject_for_session_trace_omits_previews_and_matches_slice() -> None:
+    from zeus_client.application.detective.extract import inject_for_session_trace
+
+    system = "You are helpful.\n\n## SCOPE BRIEF\nAAA\n\n## MINI-SCHEMA\nBBB\n"
+    inj = inject_for_session_trace(system=system, source="borrowed")
+    assert inj["brief_sha12"] == sha12(slice_block(system, "brief"))
+    assert inj["mini_sha12"] == sha12(slice_block(system, "mini"))
+    assert inj["source"] == "borrowed"
+    assert "brief_preview" not in inj
+    assert "mini_preview" not in inj
+    assert "system_message" not in inj

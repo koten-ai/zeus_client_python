@@ -31,6 +31,8 @@ def test_debug_bundle_to_dict_includes_nine_gather_keys() -> None:
             "ok": True,
         },
         export_ref="turn_abc",
+        stamp={"user": "zeus_client", "version": "2.1.0"},
+        trace_id="abc",
     )
     d = b.to_dict()
     assert d["turn_id"] == "turn_abc"
@@ -45,6 +47,8 @@ def test_debug_bundle_to_dict_includes_nine_gather_keys() -> None:
     assert d["contract_status"] == "match"
     assert d["tokens"]["ok"] is True
     assert d["export_ref"] == "turn_abc"
+    assert d["stamp"]["user"] == "zeus_client"
+    assert d["trace_id"] == "abc"
     assert "answer" not in d
 
 

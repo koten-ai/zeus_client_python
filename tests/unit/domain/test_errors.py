@@ -11,6 +11,7 @@ from zeus_client.domain.errors import (
     ContractError,
     ErrorCode,
     InternalError,
+    JobError,
     LlmError,
     PolicyError,
     SessionError,
@@ -115,3 +116,27 @@ def test_raise_and_catch_by_base() -> None:
         )
     assert ei.value.code is ErrorCode.CATALOG_NOT_FOUND
     assert ei.value.retryable is False
+
+
+def test_agent_memory_error_band_040008_through_040010() -> None:
+    assert ErrorCode.AGENT_MEMORY_RECALL_FAILED.value == "040008"
+    assert ErrorCode.AGENT_MEMORY_WRITE_FAILED.value == "040009"
+    assert ErrorCode.AGENT_MEMORY_UNAVAILABLE.value == "040010"
+    assert default_retryable(ErrorCode.AGENT_MEMORY_RECALL_FAILED) is True
+    assert "recall" in public_message_for(ErrorCode.AGENT_MEMORY_RECALL_FAILED)
+
+
+def test_multi_agent_error_band_130001_through_130013() -> None:
+    assert ErrorCode.JOBS_UNAVAILABLE.value == "130001"
+    assert ErrorCode.JOBS_INVALID_UNIT_MAP.value == "130002"
+    assert ErrorCode.JOBS_BUDGET_INVALID.value == "130003"
+    assert ErrorCode.JOBS_NOT_FOUND.value == "130004"
+    assert ErrorCode.JOBS_WATCH_FAILED.value == "130005"
+    assert ErrorCode.JOBS_UNIT_FAILED.value == "130010"
+    assert ErrorCode.UNITS_CATALOG_MISSING.value == "130011"
+    assert ErrorCode.UNITS_INJECT_MISSING.value == "130012"
+    assert ErrorCode.UNITS_ISOLATION.value == "130013"
+    err = JobError(code=ErrorCode.JOBS_UNAVAILABLE, component="api.jobs")
+    assert err.retryable is False
+    assert "130001" in str(err)
+    assert issubclass(JobError, ZeusClientError)

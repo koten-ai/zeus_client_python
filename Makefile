@@ -1,6 +1,6 @@
 # Local quality gates — keep in sync with .github/workflows/ci.yml
 # See docs/V2/BEST_PRACTICES.md §11.
-.PHONY: help install lint format typecheck test test-integration cov build audit ci clean
+.PHONY: help install lint format typecheck test test-integration cov build audit ci clean conformance
 
 PYTHON ?= python3
 PIP ?= pip
@@ -8,7 +8,7 @@ COV_FAIL_UNDER ?= 75
 PYTEST_FLAGS ?= -q -m "not integration"
 
 help:
-	@echo "Targets: install lint format typecheck test cov build audit ci clean"
+	@echo "Targets: install lint format typecheck test conformance cov build audit ci clean"
 
 install:
 	$(PIP) install -U pip
@@ -27,6 +27,9 @@ typecheck:
 
 test:
 	pytest $(PYTEST_FLAGS)
+
+conformance:
+	$(PYTHON) tests/conformance/run_suite.py
 
 cov:
 	pytest $(PYTEST_FLAGS) \

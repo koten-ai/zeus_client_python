@@ -1,9 +1,10 @@
-"""Named profiles: development / production / ci."""
+"""Named profiles: development / production / ci / hub."""
 
 from __future__ import annotations
 
 from zeus_client.config.models import (
     DebugPolicy,
+    LoggingPolicy,
     RedactionPolicy,
     RuntimeConfig,
 )
@@ -11,7 +12,7 @@ from zeus_client.domain.errors import ConfigError, ErrorCode
 
 __all__ = ["PROFILES", "apply_profile", "list_profiles", "validate_production_security"]
 
-PROFILES = ("development", "production", "ci")
+PROFILES = ("development", "production", "ci", "hub")
 
 
 def list_profiles() -> tuple[str, ...]:
@@ -54,6 +55,14 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
                 capture_bodies=True,
                 transport_replay=True,
             ),
+            logging=LoggingPolicy(
+                level=base.logging.level if base.logging.level != "info" else "debug",
+                redact=base.logging.redact,
+                otel_enabled=base.logging.otel_enabled,
+                otel_endpoint=base.logging.otel_endpoint,
+                service_name=base.logging.service_name,
+                service_version=base.logging.service_version,
+            ),
         )
     if name in ("prod", "production"):
         out = base.with_overrides(
@@ -63,6 +72,19 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
                 detective_briefing=True,
                 capture_bodies=False,
                 transport_replay=True,
+            ),
+            settings=base.settings.with_updates(ai_process_result=False),
+            logging=LoggingPolicy(
+                level=(
+                    base.logging.level
+                    if base.logging.level in {"error", "info", "debug", "trace"}
+                    else "info"
+                ),
+                redact=True,
+                otel_enabled=bool(base.logging.otel_endpoint) or base.logging.otel_enabled,
+                otel_endpoint=base.logging.otel_endpoint,
+                service_name=base.logging.service_name,
+                service_version=base.logging.service_version,
             ),
         )
         validate_production_security(out)
@@ -76,6 +98,18 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
                 capture_bodies=False,
                 transport_replay=True,
             ),
+            settings=base.settings.with_updates(ai_process_result=False),
+        )
+    if name == "hub":
+        return base.with_overrides(
+            profile="hub",
+            redaction=RedactionPolicy(enabled=True, preview_max_chars=16_384),
+            debug=DebugPolicy(
+                detective_briefing=True,
+                capture_bodies=True,
+                transport_replay=True,
+            ),
+            settings=base.settings.with_updates(ai_process_result=True),
         )
     # Unknown profile → treat as development but keep requested name for diagnostics.
     return base.with_overrides(

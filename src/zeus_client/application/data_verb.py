@@ -61,6 +61,13 @@ async def run_data_verb(
     mode_header: str = "analytics",
     headers: Mapping[str, str] | None = None,
     force_trace: bool = False,
+    chat_id: str | None = None,
+    turn_id: str | None = None,
+    base_url: str | None = None,
+    auth_mode: str | None = None,
+    password_env: str | None = None,
+    token_env: str | None = None,
+    username: str | None = None,
 ) -> VerbResult:
     """Execute one allow-listed V2 verb via ZeusPort. Rejects ``pipeline``."""
     name = (verb or "").strip()
@@ -85,11 +92,18 @@ async def run_data_verb(
             mode_header=mode_header,
             headers=merge_headers(
                 correlation_headers(
+                    chat_id=chat_id or "",
+                    turn_id=turn_id or "",
                     trace_class=TRACE_CLASS_DIRECT_READ,
                     force_trace=force_trace,
                 ),
                 headers,
             ),
+            base_url=base_url,
+            auth_mode=auth_mode,
+            password_env=password_env,
+            token_env=token_env,
+            username=username,
         )
     )
     return VerbResult(
@@ -100,6 +114,8 @@ async def run_data_verb(
         body=hop.body,
         error=hop.error,
         url_hint=getattr(hop, "url", "") or "",
+        chat_id=chat_id,
+        turn_id=turn_id,
         req_ids=(hop.req_id,) if hop.req_id else (),
         trace_class=TRACE_CLASS_DIRECT_READ,
     )

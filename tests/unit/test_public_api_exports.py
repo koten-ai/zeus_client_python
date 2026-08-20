@@ -33,6 +33,16 @@ EXPECTED_PUBLIC = frozenset(
         "sum_provider_tokens",
         "attach_trace_tokens",
         "normalize_usage",
+        "JobHandle",
+        "JobEvent",
+        "JobBudgets",
+        "JobSnapshot",
+        "UnitConfig",
+        "UnitKind",
+        "UnitResult",
+        "UnitStatus",
+        "LlmRoleConfig",
+        "JobsConfig",
     }
 )
 
@@ -44,7 +54,7 @@ def test_public_all_matches_freeze() -> None:
 def test_public_symbols_importable() -> None:
     missing = [n for n in EXPECTED_PUBLIC if n != "__version__" and not hasattr(zc, n)]
     assert not missing, f"Missing public exports: {missing}"
-    assert zc.__version__ == "2.0.0"
+    assert zc.__version__ == "2.3.0"
     assert zc.ZeusRuntime is not None
 
 
