@@ -75,6 +75,9 @@ class ErrorCode(str, Enum):
     SESSION_ID_MISSING = "040004"
     SESSION_DURABLE_DISABLED = "040005"
     SESSION_COMMIT_FAILED = "040006"
+    AGENT_MEMORY_RECALL_FAILED = "040008"
+    AGENT_MEMORY_WRITE_FAILED = "040009"
+    AGENT_MEMORY_UNAVAILABLE = "040010"
 
     # --- 05 agent / LLM ---
     AGENT_TURN_FAILED = "050001"
@@ -144,6 +147,7 @@ _RETRYABLE: frozenset[ErrorCode] = frozenset(
         ErrorCode.ZEUS_TRANSPORT,
         ErrorCode.ZEUS_HTTP_5XX,
         ErrorCode.AUTH_SESSION_UNAVAILABLE,
+        ErrorCode.AGENT_MEMORY_RECALL_FAILED,
     }
 )
 
@@ -182,6 +186,9 @@ _PUBLIC_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SESSION_ID_MISSING: "session id missing",
     ErrorCode.SESSION_DURABLE_DISABLED: "durable sessions disabled",
     ErrorCode.SESSION_COMMIT_FAILED: "session commit/trace failed",
+    ErrorCode.AGENT_MEMORY_RECALL_FAILED: "agent memory recall failed",
+    ErrorCode.AGENT_MEMORY_WRITE_FAILED: "agent memory write failed",
+    ErrorCode.AGENT_MEMORY_UNAVAILABLE: "agent memory API unavailable",
     ErrorCode.AGENT_TURN_FAILED: "agent turn failed",
     ErrorCode.AGENT_MESSAGE_EMPTY: "agent message empty",
     ErrorCode.AGENT_MAX_ROUNDS: "agent max_rounds exceeded",

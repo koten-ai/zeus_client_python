@@ -1,3 +1,3 @@
 """Package version clock (importable without loading the full public surface)."""
 
-__version__ = "2.1.0"
+__version__ = "2.3.0"

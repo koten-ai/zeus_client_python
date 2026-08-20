@@ -264,6 +264,8 @@ def build_aggregate_trace_payload(
     hops: Sequence[HopLike] | None,
     *,
     layer_a: Mapping[str, Any] | None = None,
+    inject: Mapping[str, Any] | None = None,
+    stamp: Mapping[str, Any] | None = None,
 ) -> AggregateTracePayload:
     """Build typed aggregate for one round (identical body for every hop post)."""
     norm = normalize_hops(hops)
@@ -271,6 +273,10 @@ def build_aggregate_trace_payload(
         z: dict[str, Any] = {}
         if layer_a:
             z["layer_a"] = dict(layer_a)
+        if inject:
+            z["inject"] = dict(inject)
+        if stamp:
+            z.update({k: v for k, v in dict(stamp).items() if v is not None})
         return AggregateTracePayload(
             primary_req_id=None,
             turns=(),
@@ -333,6 +339,12 @@ def build_aggregate_trace_payload(
         zeus_response["result_size"] = sz
     if layer_a:
         zeus_response["layer_a"] = dict(layer_a)
+    if inject:
+        zeus_response["inject"] = dict(inject)
+    if stamp:
+        for k, v in dict(stamp).items():
+            if v is not None:
+                zeus_response.setdefault(k, v)
 
     return AggregateTracePayload(
         primary_req_id=primary_rid,
@@ -437,6 +449,8 @@ async def project_session_trace(
     hops: Sequence[HopLike] | None,
     chat_request: Mapping[str, Any] | None = None,
     layer_a: Mapping[str, Any] | None = None,
+    inject: Mapping[str, Any] | None = None,
+    stamp: Mapping[str, Any] | None = None,
     mode: str = "analytics",
     headers: Mapping[str, str] | None = None,
 ) -> SessionTraceProjectResult:
@@ -454,7 +468,7 @@ async def project_session_trace(
             posts=0,
         )
 
-    agg = build_aggregate_trace_payload(hops, layer_a=layer_a)
+    agg = build_aggregate_trace_payload(hops, layer_a=layer_a, inject=inject, stamp=stamp)
     post_order = ordered_req_ids_for_trace_posts(hops)
     if not post_order:
         return SessionTraceProjectResult(
@@ -495,11 +509,11 @@ async def project_session_trace(
                         live_cst = str(cst)
             else:
                 errors.append(
-                    f"trace {rid[:12]}… -> {result.status_code}: "
+                    f"trace {rid} -> {result.status_code}: "
                     f"{(result.error or str(result.body)[:120])}"
                 )
         except Exception as e:  # pragma: no cover — defensive soft-fail
-            errors.append(f"trace {rid[:12]}… exception: {e}")
+            errors.append(f"trace {rid} exception: {e}")
 
     return SessionTraceProjectResult(
         ok=not errors,

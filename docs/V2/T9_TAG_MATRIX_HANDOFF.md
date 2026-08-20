@@ -179,7 +179,7 @@ Charter default if unsure: **B1**. Shipping the tag does **not** force B2.
 | BASE packs claimed | offline mock `base-5-mock` + lab stamped scopes; **not** a forged COMPAT triple |
 | Suite | `conformance-0.2-dev` offline required (L0–L2) — record suite id honestly |
 | multi_agent | **no** |
-| semantic_cache | **docs** (v2 ship bar residual — not runtime **supported**) |
+| semantic_cache | **flag** (E2 runtime hooks; default off; not **supported**) |
 | Status | **candidate** (B1) or **supported** (B2 only) |
 
 Update doc header “last reviewed” date.
@@ -200,16 +200,16 @@ Prefer suite-backed **yes** over README optimism. Starting point for human edit 
 | output_request → app_output | **yes** / **partial** | Layer A path |
 | Post-terminate policy table | **yes** / **partial** | domain policy |
 | Required four Layer A | **yes** | peel + quarantine |
-| G1/G2/G3 redaction | **partial** / **yes** | journal/export redactor; family LOGGING depth may lag |
+| G1/G2/G3 redaction | **yes** | journal/export + family logger REDACT; G2 never UI |
 | AgentHooks + dual jailbreak scores | **partial** / **yes** | middleware / policy |
 | Durable sessions | **yes** | session lifecycle + session-trace projector |
-| Stamp `user` + `ip_address` | **partial** | pins `user=zeus_client`; ip product residual |
+| Stamp `user` + `ip_address` | **yes** | `user=zeus_client`; `ip_address` omit-if-unknown |
 | `ai_process_result` default false | **no** (honest) | **package default True (Hub)**; pins document product-cheap false |
 | `ignore_user_tool_path_hints` | **docs** / **partial** | family ZCF — don’t over-claim |
 | Conformance suite adapter | **yes** (offline) | ZCP-21; suite version in pins |
-| OTel logs + REDACT + 4 levels | **partial** | optional OTLP stub; not full family LOGGING bar |
+| OTel logs + REDACT + 4 levels | **yes** | family logger + optional `[otel]` extra |
 | Multi-agent ready | **no** | |
-| Semantic agent cache | **docs** | |
+| Semantic agent cache | **flag** | default `enabled=false`; Zeus ≥ 0.7.6 to use |
 
 ### 3.4 `MATRIX.md` §5 Conformance suite versions
 
@@ -224,7 +224,7 @@ If suite id/name differs in design repo, **use design SoT**, not this draft.
 - [ ] CHECKLIST: no box implies `supported` without suite note  
 - [ ] Pri-1 ZCM-001…012: status **done** + Python **2.0.0** where code truly shipped (catalogue still lags some **partial** rows — fix or leave with reason)  
 - [ ] Do **not** mark post-GA ZCM-044+ done  
-- [ ] semantic_cache / multi_agent remain non-supported unless deliberately in scope  
+- [ ] semantic_cache is **flag** (not `supported`); multi_agent remains non-supported unless deliberately in scope  
 
 ### 3.6 Design PR body template
 
@@ -244,7 +244,7 @@ Claim path: B1 candidate | B2 supported  (pick one)
 ### Explicit non-claims
 - multi_agent=no
 - plugins=no
-- semantic_cache ≠ supported
+- semantic_cache = flag (not supported)
 - no new COMPAT triple forged in this PR
 - package ai_process_result default remains True (Hub)
 

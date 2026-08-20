@@ -7,7 +7,6 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
-from zeus_client.config.models import ClientSettings
 from zeus_client.domain.catalog import extract_scope_brief
 from zeus_client.domain.errors import CatalogError, ErrorCode, JobError
 from zeus_client.domain.jobs import UnitConfig, UnitKind, UnitResult, UnitStatus, validate_unit_map
@@ -80,6 +79,12 @@ async def run_agent_unit(
                 component="application.units_agent",
                 public_message=exc.public_message,
             ) from exc
+    merged = await rt.catalog.ensure_scope_brief(
+        chat_request,
+        target=unit.target(),
+        mode=unit.catalog_mode or rt.config.settings.mode,
+    )
+    chat_request = merged.body
     if not _has_required_inject(chat_request):
         raise JobError(code=ErrorCode.UNITS_INJECT_MISSING, component="application.units_agent")
 
@@ -105,32 +110,15 @@ async def run_agent_unit(
 
     settings = rt.config.settings
     if unit.max_rounds is not None:
-        settings = ClientSettings(
-            ai_process_result=settings.ai_process_result,
+        settings = settings.with_updates(
             max_rounds=unit.max_rounds,
-            force_trace=settings.force_trace,
             mode=unit.catalog_mode or settings.mode,
             durable_sessions=False,
-            sticky_flags=settings.sticky_flags,
-            messages=settings.messages,
-            soft_require_policy_action=settings.soft_require_policy_action,
-            allow_array_triggers=settings.allow_array_triggers,
-            app_output_on_error=settings.app_output_on_error,
-            output_request=settings.output_request,
         )
     else:
-        settings = ClientSettings(
-            ai_process_result=settings.ai_process_result,
-            max_rounds=settings.max_rounds,
-            force_trace=settings.force_trace,
+        settings = settings.with_updates(
             mode=unit.catalog_mode or settings.mode,
             durable_sessions=False,
-            sticky_flags=settings.sticky_flags,
-            messages=settings.messages,
-            soft_require_policy_action=settings.soft_require_policy_action,
-            allow_array_triggers=settings.allow_array_triggers,
-            app_output_on_error=settings.app_output_on_error,
-            output_request=settings.output_request,
         )
 
     try:

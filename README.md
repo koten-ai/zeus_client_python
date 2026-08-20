@@ -2,29 +2,35 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
-> **2.0.0 GA cutover** on `feat/ZCP-ga-cutover-2.0.0` — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md).
+> **2.3.0** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md).
 
 ## Claim (family honesty)
 
 | Field | Value |
 | --- | --- |
+| **package** | `kotenai-zeus-client` **2.3.0** |
 | **claim_level** | **candidate** (not `supported`) |
 | **client_floor** | `client-floor-5` |
 | **modes** | `agent`, `direct` (optional Mode 3 `jobs`/`units` seam) |
 | **multi_agent** | **docs** |
+| **semantic_cache** | **flag** (CHECKLIST E2; default `session.semantic_cache.enabled=false`) |
 | **plugins** | no |
 | **suite** | `conformance-0.2-dev` (offline) |
+| **BASE packs tested** | mock `base-5-mock`; fixtures `base-5.3`; pin-shaped `base-1` (not a COMPAT triple) |
+| **Zeus versions tested** | `0.6.x` offline (Detective tapes sample 0.6.64; `live_smoke=false`). Semantic cache HTTP is Zeus **≥ 0.7.6**; older engines fail-open. |
 
 Pins file: [`sdk_bootstrap.pins.json`](sdk_bootstrap.pins.json) (HOW_TO G0). Never invent production `contract_hash` / Hub stamps.
 
-Family law and ship bar (sibling design repo):
+Family law and ship bar:
 
-- [HOW_TO_MAKE_A_CLIENT.md](../zeus_client_design/HOW_TO_MAKE_A_CLIENT.md)
-- [CHECKLIST.md](../zeus_client_design/CHECKLIST.md)
-- [MATRIX.md](../zeus_client_design/MATRIX.md)
-- [COMPAT](../Zeus/ai/zeus_chat_request/COMPAT.md) (engine pack triples — not invented here)
+- [HOW_TO_MAKE_A_CLIENT.md](https://github.com/koten-ai/zeus_client_design/blob/main/HOW_TO_MAKE_A_CLIENT.md)
+- [CHECKLIST.md](https://github.com/koten-ai/zeus_client_design/blob/main/CHECKLIST.md)
+- [MATRIX.md](https://github.com/koten-ai/zeus_client_design/blob/main/MATRIX.md)
+- [COMPAT.md](https://github.com/koten-ai/zeus_chat_request/blob/main/COMPAT.md) (engine pack triples — not invented here)
 
-**Note on `ai_process_result`:** pins document product-cheap guidance default `false`; package `ClientSettings.ai_process_result` default remains **`true`** (Hub parity). Cheap products must set it explicitly.
+**Note on `ai_process_result`:** package default is **`false`** (cheap path). Use profile **`hub`** or `ClientSettings(ai_process_result=True)` for Hub Debug insight.
+
+**Note on `session.semantic_cache`:** capability ships (CHECKLIST E2) with master **`enabled=false`**. Opt in via config; recall injects bag B `semantic_memory`; writes are **explicit-only** by default (`rt.session.semantic_cache.write(...)`). Zeus embeds/stores (`POST /v2/agent_memory/*`). Direct typeahead is never included. Using the flag needs Zeus **≥ 0.7.6**; 0.6.x fail-open (no inject). Not MATRIX `supported` ([redacted-recall-impl] MVP).
 
 ## Install
 
@@ -39,6 +45,24 @@ git clone https://github.com/koten-ai/zeus_client_python.git
 cd zeus_client_python
 pip install -e ".[dev]"
 ```
+
+Optional OpenTelemetry Logs export:
+
+```bash
+pip install -e ".[otel]"
+```
+
+| Env | Meaning |
+| --- | --- |
+| `ZEUS_CLIENT_LOG_LEVEL` | `error` \| `info` \| `debug` \| `trace` (prod default `info`) |
+| `ZEUS_CLIENT_LOG_REDACT` | `true` (prod default) / `false` (lab; secrets still hard-denied) |
+| `ZEUS_CLIENT_OTEL_ENABLED` | OTLP Logs when an endpoint is also set |
+| `ZEUS_CLIENT_OTEL_ENDPOINT` | Collector URL (e.g. `http://localhost:4318/v1/logs`) |
+| `ZEUS_CLIENT_SERVICE_NAME` | OTel `service.name` (default `zeus_client`) |
+| `ZEUS_CLIENT_IP` | Optional host IPv4/IPv6 for session/report stamps; omit when unknown |
+| `ZEUS_CLIENT_SEMANTIC_CACHE` | Master `session.semantic_cache.enabled` (`true`/`false`; default off) |
+
+Product sinks stamp `user=zeus_client` (never Hub `admin`). Chat/turn ids are UUID v4 when the client mints them; Zeus mints `X-Zeus-Req-Id` unless a test pre-mints v4.
 
 ## Version 0.3.0 — direct V2 verbs + `run_<verb>` naming
 
@@ -72,9 +96,9 @@ flowchart LR
 ```
 
 1. **Auth** — `resolve_zeus_auth` mints or reuses Zeus session headers (per scope when configured).
-2. **Load catalog** — `load_chat_request` resolves a stamped `chat_request` from the user sync dir, then bundled package data. If the on-disk file has no `## SCOPE BRIEF`, the client borrows the live brief from Zeus and merges it in (brief content is stripped before hashing).
-3. **Contract + session** — `resolve_contract_for_scope` binds `contract_id` / `contract_hash` from config. When durable sessions are enabled, the client creates a new `/v2/session` or rehydrates an existing one, preferring the server-stamped hash embedded in the catalog file.
-4. **LLM rounds** — multi-round tool loop: provider chat completion → Zeus dispatch (V1 tools or V2 verbs) → optional hook interception.
+2. **Load catalog** — `rt.catalog.load(mode, base_id=...)` resolves a stamped `chat_request` (scope dir → general → bundled; lineage files `chat_request_{mode}_{base_id}.json`). Brief / mini-schema inject is hash-excluded.
+3. **Contract + session** — `rt.catalog.contract.bind` uses the published stamp (never invents a hash). Durable sessions create or rehydrate `/v2/session`; a **mode switch** starts a new session.
+4. **LLM rounds** — multi-round tool loop: provider chat completion → Zeus dispatch (V2 verbs) → `SecurityHooks` + `tool_trail` inject. Force-return when the round budget is nearly exhausted.
 5. **Commit turn** — multi-hop session-trace aggregate via `post_session_trace` (same rich body per tool `req_id` so every hop joins Detective; preferred hop last) plus a turn shard via `continue_session_turn`. Agent dispatches stamp `X-Zeus-Mode` (and optional `X-Zeus-Trace: 1`).
 6. **Audit** — runtime contract checks appended to `trace["notes"]`.
 

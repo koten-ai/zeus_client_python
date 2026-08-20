@@ -12,6 +12,8 @@ from zeus_client.domain.catalog import (
     MANIFEST_NAME,
     LoadedCatalog,
     chat_request_filename,
+    check_lineage,
+    lineage_base_id,
     list_catalog_entries,
     path_source_label,
     prepare_loaded_document,
@@ -20,6 +22,7 @@ from zeus_client.domain.catalog import (
 )
 from zeus_client.domain.contract import extract_stamped_hash
 from zeus_client.domain.errors import CatalogError, ErrorCode
+from zeus_client.domain.pack_schema import load_sibling_pack_schema
 from zeus_client.ports import CatalogDocument, CatalogKey
 
 __all__ = ["FsCatalogStore"]
@@ -44,6 +47,7 @@ class FsCatalogStore:
             scope=key.scope,
             user_dir=self.root,
             bundled_dir=self.bundled_dir,
+            base_id=key.base_id,
         )
 
     def load(self, key: CatalogKey) -> CatalogDocument:
@@ -54,13 +58,15 @@ class FsCatalogStore:
                 component="adapters.catalog_fs",
                 public_message=(
                     f"catalog not found for mode={key.mode!r} "
+                    f"base_id={key.base_id!r} "
                     f"scope={key.bucket}/{key.scope}; "
                     f"expected under {self.root / scope_chat_requests_subdir(key.bucket, key.scope)} "
-                    f"or top-level {self.root / chat_request_filename(key.mode)}"
+                    f"or top-level {self.root / chat_request_filename(key.mode, key.base_id)}"
                     + (f" or bundled {self.bundled_dir}" if self.bundled_dir is not None else "")
                 ),
                 details={
                     "mode": key.mode,
+                    "base_id": key.base_id,
                     "bucket": key.bucket,
                     "scope": key.scope,
                     "user_dir": str(self.root),
@@ -84,6 +90,13 @@ class FsCatalogStore:
             ) from e
 
         body = prepare_loaded_document(raw if isinstance(raw, dict) else {})
+        if key.base_id:
+            check_lineage(
+                body,
+                key.base_id,
+                require_lineage=True,
+                path_name=path.name,
+            )
         stamped = extract_stamped_hash(body)
         return CatalogDocument(
             body=body,
@@ -100,17 +113,24 @@ class FsCatalogStore:
             if path is not None
             else "unknown"
         )
+        body = dict(doc.body)
+        lineage = lineage_base_id(body)
+        schema, example = load_sibling_pack_schema(doc.path)
         return LoadedCatalog(
-            body=dict(doc.body),
+            body=body,
             path=doc.path,
             source=source,
             contract_hash=doc.contract_hash,
+            base_id=key.base_id or lineage,
+            lineage_id=lineage,
+            response_output_schema=schema,
+            response_output_example=example,
         )
 
     def save(self, key: CatalogKey, doc: CatalogDocument) -> None:
         """Write catalog into the **scope** subdir under root (never sibling guess)."""
         scope_dir = self.root / scope_chat_requests_subdir(key.bucket, key.scope)
-        filename = chat_request_filename(key.mode)
+        filename = chat_request_filename(key.mode, key.base_id)
         out = scope_dir / filename
         body = dict(doc.body) if isinstance(doc.body, Mapping) else {}
         self._atomic_write_json(out, body)
@@ -119,7 +139,7 @@ class FsCatalogStore:
         return (
             self.root
             / scope_chat_requests_subdir(key.bucket, key.scope)
-            / chat_request_filename(key.mode)
+            / chat_request_filename(key.mode, key.base_id)
         )
 
     def list_entries(self) -> list[dict[str, str]]:

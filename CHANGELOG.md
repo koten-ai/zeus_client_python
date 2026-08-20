@@ -1,5 +1,87 @@
 # Changelog
 
+## Unreleased
+
+—
+
+---
+
+## 2.3.0 — 2026-08-20
+
+### Pins (ZCF-WISH-030)
+
+```text
+suite_version: conformance-0.2-dev
+client_floor: client-floor-5
+claim_level: candidate
+semantic_cache: flag (CHECKLIST E2 / ZF-WISH-001; default enabled=false)
+BASE packs tested: offline mock base-5-mock; pack fixtures base-5.3; pin-shaped base-1 (not a COMPAT triple)
+zeus_engine: 0.6.x offline tapes; live agent_memory requires Zeus ≥ 0.7.6 ([redacted-recall-impl] MVP)
+zeus_client_design: 4ba1df97fcc56b9f1627561a8d1047195980b5ee
+compat_row: none — do not invent; see chat_request COMPAT.md
+multi_agent: docs
+```
+
+### Added
+
+- CHECKLIST **E2** semantic agent cache (ZF-WISH-001): L0 `session.semantic_cache` (default **`enabled=false`**), bag B inject key `semantic_memory`, fail-open recall timeout, explicit `rt.session.semantic_cache.write` / `.recall` / `.status`.
+- HTTP adapter `POST /v2/agent_memory/recall|blocks` + `GET /status` (Zeus embeds server-side; no client CB vector SDK).
+- Client deny-list: secrets, full system/catalog dumps, G2 fields are not written.
+- Direct typeahead / data verbs never call agent_memory (`apply_to_modes=["agent"]`).
+
+### Not claimed
+
+- MATRIX `semantic_cache=supported` (Zeus recall is [redacted-recall-impl] / no Search Vector Index ops bar; no shared suite cases yet). Honest value is **`flag`**.
+- Family `supported` / new COMPAT triple / `multi_agent=demo`.
+
+---
+
+## 2.2.0 — 2026-08-20
+
+### Pins (ZCF-WISH-030)
+
+```text
+suite_version: conformance-0.2-dev
+client_floor: client-floor-5
+claim_level: candidate
+BASE packs tested: offline mock base-5-mock; pack fixtures base-5.3; pin-shaped base-1 (not a COMPAT triple)
+zeus_engine: 0.6.x (Detective tapes sample 0.6.64; pins.live_smoke=false)
+zeus_client_design: 4ba1df97fcc56b9f1627561a8d1047195980b5ee
+compat_row: none — do not invent; see chat_request COMPAT.md
+multi_agent: docs
+detective_tapes: smooth_short + fail_zeus (+ fail_client / fail_llm / fail_control_plane / smooth_long)
+```
+
+### Breaking
+
+- `ClientSettings.ai_process_result` default is **`false`** (CHECKLIST / API_CONFIG). Use profile **`hub`** (or set the flag) for Hub Debug insight.
+- Array `business_rules_triggers` dual-read **removed** on V2. Object `{id: bool}` only. Arrays fail closed.
+- `auth_mode=basic` now **mints a per-scope session** (`POST /v1/{bucket}/{scope}/auth/session`) instead of sending HTTP Basic on every hop.
+
+### Added
+
+- CHECKLIST D (sessions / observability / stamps): product sink `user=zeus_client` + optional `ip_address`; family logger (`INFO`/`ERROR`/`DEBUG`/`TRACE`, `REDACT`); UUID v4 chat/turn/call mint; full `X-Zeus-Req-Id` capture on 4xx/5xx; optional OTLP Logs extra `[otel]`; auto-wired durable `SessionLifecycle`.
+- `rt.catalog.load(..., base_id=)` / `info` / `load_pin` / `contract.hash|id|bind` / `mini_schema.get|from_catalog` (CHECKLIST A).
+- Same-`base_id` `response_output_schema.json` + `response_output_example.json` load; fail-closed when pack wire > `client_floor`.
+- Offline pin-shaped `base-1` fixture (not a COMPAT triple).
+- Named `rules{}` merge/freeze (`domain.rules`) wired into `run_agent_turn` inject.
+- Soft `session.ignore_user_tool_path_hints` inject (default **true**).
+- Force-return nudge near `max_rounds`; `TurnResult.tool_trail` + bag B inject.
+- Baseline `SecurityHooks` (prompt-dump / secrets / denied verbs) and dual jailbreak scores on policy.
+- Turn journal + `debug.catalog` carry `base_id` and `client_floor`.
+- Profile **`hub`** (`ai_process_result=True`).
+- Documented-but-deferred `auth_mode=certificate` (`cert_file` / `key_file_env`).
+- Agent `run_turn` / `catalog.load_for_turn` borrow live `## SCOPE BRIEF` + `## MINI-SCHEMA` when the on-disk catalog has none (V1 `merge_scope_brief`).
+- Cheap-final no longer treats `describe` / `explain` as product data (orientation hops keep looping).
+- CHECKLIST E: conformance adapter drives V2 APIs for fail tapes (no lang-only expect-echo); CI requires sibling design suite; GitHub README links CHECKLIST / MATRIX / COMPAT.
+
+### Not claimed
+
+- MATRIX `supported` / new COMPAT triple / `multi_agent=demo`.
+- Full Detective agent rewind (ZF-WISH-003). Kit-β companions + slim assert_only only.
+
+---
+
 ## 2.1.0 — 2026-08-18
 
 ### Added

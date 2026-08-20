@@ -36,6 +36,9 @@ async def test_runtime_from_config_development() -> None:
         assert rt.config.profile == "development"
         assert rt.journal is not None
         assert rt.services.secrets is not None
+        assert rt.services.session_lifecycle is not None
+        assert rt.services.agent_memory is not None
+        assert rt.config.semantic_cache.enabled is False
 
 
 @pytest.mark.asyncio
@@ -62,4 +65,6 @@ def test_services_bundle_defaults() -> None:
     s = Services()
     assert s.journal is not None
     assert s.clock.now_ms() > 0
-    assert s.ids.turn_id().startswith("turn_")
+    from zeus_client.domain.ids import is_uuid_v4
+
+    assert is_uuid_v4(s.ids.turn_id())

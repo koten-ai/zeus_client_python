@@ -59,20 +59,14 @@ def test_object_triggers():
     assert layer.business_rules_triggers["coupon"] is False
 
 
-def test_array_triggers_dual_read():
-    trig, warns = normalize_triggers(
-        [True, False, True],
-        rule_ids=["a", "b", "c"],
-        allow_array=True,
-    )
-    assert trig == {"a": True, "b": False, "c": True}
-    assert any("dual-read" in w for w in warns)
-
-
-def test_array_triggers_rejected_when_disabled():
-    trig, warns = normalize_triggers([True], rule_ids=["a"], allow_array=False)
+def test_array_triggers_rejected_by_default():
+    trig, errs = normalize_triggers([True], rule_ids=["a"])
     assert trig == {}
-    assert any("rejected" in w for w in warns)
+    assert any("rejected" in e for e in errs)
+    layer = parse_layer_a(_valid_return(business_rules_triggers=[True, False]))
+    assert not layer.ok
+    assert layer.business_rules_triggers == {}
+    assert any("arrays rejected" in e for e in layer.errors)
 
 
 def test_ui_view_strips_g2():

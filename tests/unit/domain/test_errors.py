@@ -118,6 +118,14 @@ def test_raise_and_catch_by_base() -> None:
     assert ei.value.retryable is False
 
 
+def test_agent_memory_error_band_040008_through_040010() -> None:
+    assert ErrorCode.AGENT_MEMORY_RECALL_FAILED.value == "040008"
+    assert ErrorCode.AGENT_MEMORY_WRITE_FAILED.value == "040009"
+    assert ErrorCode.AGENT_MEMORY_UNAVAILABLE.value == "040010"
+    assert default_retryable(ErrorCode.AGENT_MEMORY_RECALL_FAILED) is True
+    assert "recall" in public_message_for(ErrorCode.AGENT_MEMORY_RECALL_FAILED)
+
+
 def test_multi_agent_error_band_130001_through_130013() -> None:
     assert ErrorCode.JOBS_UNAVAILABLE.value == "130001"
     assert ErrorCode.JOBS_INVALID_UNIT_MAP.value == "130002"
