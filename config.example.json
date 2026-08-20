@@ -20,7 +20,16 @@
     "api_key_env": "XAI_API_KEY",
     "context_window_tokens": 128000,
     "context_soft_limit": 0.8,
-    "timeout_s": 120
+    "timeout_s": 120,
+    "roles": {
+      "orchestrator": { "model": "strong-planner", "api_key_env": "LLM_ORCH_KEY" },
+      "advisor": { "model": "strong-planner", "api_key_env": "LLM_ADV_KEY" },
+      "worker": { "model": "fast-worker", "api_key_env": "LLM_WORKER_KEY" }
+    }
+  },
+  "jobs": {
+    "host_url": null,
+    "watch_transport": "sse"
   },
   "settings": {
     "ai_process_result": false,

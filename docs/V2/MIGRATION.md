@@ -12,7 +12,7 @@
 | Package | Path | Version clock |
 | --- | --- | --- |
 | `zeus_client` | `src/zeus_client/` | **2.3.0** (default) |
-| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.3.0** (deprecated alias; not removed in this train) |
+| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.3.0** (deprecated alias; remove ≤2.3.0) |
 | V1 free functions | `src_v1_legacy/` | archive only |
 
 ---
@@ -208,4 +208,6 @@ Ship **2.0.0** with claim **candidate** (T9 B1). Family MATRIX `supported` / pin
 
 `rt.jobs` / `rt.units` / `config.llm.roles` are **optional**. Mode 1/2 call shapes are unchanged. Single-agent chat still uses `rt.agent.run_turn`. See [MULTI_AGENT.md](./MULTI_AGENT.md).
 
-`zeus_client_v2` alias remains through **≤2.2.0** (not removed in 2.1.0).
+`zeus_client_v2` alias remains through **≤2.3.0** (not removed in 2.2.0).
+
+Per-unit `zeus_url` / auth env names and worker `llm.roles` slices apply when **this** process executes a unit (CHECKLIST F). `rt.data.verb` / `rt.agent.run_turn` stay backward compatible (overrides default off).

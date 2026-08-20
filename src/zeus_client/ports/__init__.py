@@ -49,6 +49,12 @@ class VerbRequest:
     allow_pipeline: bool = False
     # Default omit X-Zeus-Req-Id (Zeus mints). Tests may pre-mint UUID v4.
     pre_mint_req_id: bool = False
+    # Optional per-call Zeus host / auth names (unit overrides). Secrets never here.
+    base_url: str | None = None
+    auth_mode: str | None = None
+    password_env: str | None = None
+    token_env: str | None = None
+    username: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
