@@ -188,6 +188,80 @@ async def test_data_verb_stamps_direct_read_class() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_per_call_base_url_posts_to_override_host() -> None:
+    process = "http://zeus.test:8080"
+    unit = "http://zeus-b:8080"
+    route_unit = respx.post(f"{unit}/v2/east/sales/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-b"})
+    )
+    route_process = respx.post(f"{process}/v2/east/sales/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-a"})
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=process, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        r = await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Beer"},
+            target=DataTarget(bucket="east", scope="sales", collection="_default"),
+            base_url=unit,
+        )
+    finally:
+        await port.aclose()
+    assert r.ok
+    assert r.req_id == "r-b"
+    assert route_unit.called
+    assert not route_process.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_per_call_password_env_name_used_and_secret_not_journaled() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(f"{base}/v2/east/sales/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-auth"})
+    )
+    journal = InMemoryJournal()
+    secrets = EnvSecretStore(
+        environ={"ZEUS_PASSWORD": "process-secret", "ZEUS_EAST_PASSWORD": "east-secret"}
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(
+            url=base,
+            auth_mode="basic",
+            username="admin",
+            password_env="ZEUS_PASSWORD",
+        ),
+        secrets=secrets,
+        journal=journal,
+        turn_id="t",
+    )
+    try:
+        await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Beer"},
+            target=DataTarget(bucket="east", scope="sales", collection="_default"),
+            auth_mode="basic",
+            username="east-user",
+            password_env="ZEUS_EAST_PASSWORD",
+        )
+    finally:
+        await port.aclose()
+    assert route.called
+    auth = route.calls.last.request.headers.get("Authorization") or ""
+    expected = base64.b64encode(b"east-user:east-secret").decode()
+    assert expected in auth
+    blob = json.dumps([e.data for e in journal.events()])
+    assert "east-secret" not in blob
+    assert "process-secret" not in blob
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_http_verb_forwards_rewind_headers() -> None:
     base = "http://zeus.test:8080"
     route = respx.post(f"{base}/v2/yelp-data/_default/_default/find").mock(

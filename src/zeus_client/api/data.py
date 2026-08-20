@@ -36,6 +36,11 @@ class DataAPI:
         headers: Mapping[str, str] | None = None,
         chat_id: str | None = None,
         turn_id: str | None = None,
+        base_url: str | None = None,
+        auth_mode: str | None = None,
+        password_env: str | None = None,
+        token_env: str | None = None,
+        username: str | None = None,
     ) -> VerbResult:
         zeus = self._rt.services.zeus
         if zeus is None:
@@ -54,6 +59,11 @@ class DataAPI:
             headers=headers,
             chat_id=chat_id,
             turn_id=turn_id,
+            base_url=base_url,
+            auth_mode=auth_mode,
+            password_env=password_env,
+            token_env=token_env,
+            username=username,
         )
         metrics = self._rt.services.metrics
         status_class = f"{result.status_code // 100}xx" if result.status_code else "err"

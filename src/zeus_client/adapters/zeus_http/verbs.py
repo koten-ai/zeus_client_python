@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import quote
 
@@ -99,6 +99,38 @@ class HttpxZeusPort:
     async def resolve_auth(self, target: DataTarget, *, force: bool = False) -> AuthContext:
         return await self._auth.resolve(target, force=force)
 
+    def _endpoint_for(self, req: VerbRequest) -> ZeusEndpointConfig:
+        url = req.base_url or self.endpoint.url
+        auth_mode = req.auth_mode if req.auth_mode is not None else self.endpoint.auth_mode
+        username = req.username if req.username is not None else self.endpoint.username
+        password_env = (
+            req.password_env if req.password_env is not None else self.endpoint.password_env
+        )
+        token_env = req.token_env if req.token_env is not None else self.endpoint.token_env
+        if (
+            url == self.endpoint.url
+            and auth_mode == self.endpoint.auth_mode
+            and username == self.endpoint.username
+            and password_env == self.endpoint.password_env
+            and token_env == self.endpoint.token_env
+        ):
+            return self.endpoint
+        return replace(
+            self.endpoint,
+            url=url,
+            auth_mode=auth_mode,  # type: ignore[arg-type]
+            username=username,
+            password_env=password_env,
+            token_env=token_env,
+        )
+
+    async def _auth_for(self, req: VerbRequest, target: DataTarget) -> AuthContext:
+        endpoint = self._endpoint_for(req)
+        if endpoint is self.endpoint:
+            return await self._auth.resolve(target)
+        resolver = ZeusAuthResolver(endpoint=endpoint, secrets=self.secrets)
+        return await resolver.resolve(target)
+
     async def call_verb(self, req: VerbRequest) -> VerbHopResult:
         verb = (req.verb or "").strip()
         if verb == "pipeline" and not req.allow_pipeline:
@@ -117,8 +149,8 @@ class HttpxZeusPort:
                 details={"verb": verb},
             )
 
-        auth = await self.resolve_auth(req.target)
-        url = verb_url(self.endpoint.url, req.target, verb)
+        auth = await self._auth_for(req, req.target)
+        url = verb_url(self._endpoint_for(req).url, req.target, verb)
         headers = merge_headers(
             auth.headers,
             product_stamp_headers(),
