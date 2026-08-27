@@ -508,6 +508,87 @@ async def test_tool_hop_stamps_rewind_correlation_headers() -> None:
     assert "X-Zeus-Req-Id" not in h
 
 
+PIPELINE_TOOL = {
+    "type": "function",
+    "function": {"name": "pipeline", "parameters": {"type": "object", "properties": {}}},
+}
+
+_HTML_PIPELINE = (
+    "```html\n"
+    "<pipeline>\n"
+    '<steps>[{"as": "airports", "verb": "find", "entity_type": "Airport", '
+    '"where": {"country": "United States"}, "limit": 50, "return": "ids"}, '
+    '{"as": "rows", "verb": "project", "ids": "@airports.ids", '
+    '"fields": ["airportname", "faa"], "format": "row"}]</steps>\n'
+    '<return>["rows"]</return>\n'
+    "<summary>Airports in the United States.</summary>\n"
+    '<query_decomposition>{"intent": "list_airports", "entity": "Airport"}</query_decomposition>\n'
+    "<confidence>high</confidence>\n"
+    '<decomposition>{"targets": ["Airport"]}</decomposition>\n'
+    "</pipeline>\n"
+    "```"
+)
+
+
+@pytest.mark.asyncio
+async def test_recovers_html_pipeline_envelope_as_tool_call():
+    llm = ScriptedLlm(script=[LlmResponse(content=_HTML_PIPELINE, tool_calls=())])
+    zeus = ScriptedZeus(
+        results={
+            "pipeline": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-pipe-xml",
+                body={
+                    "turn_complete": True,
+                    "summary": "Airports in the United States.",
+                    "rows": [
+                        {"airportname": "SFO", "faa": "SFO"},
+                        {"airportname": "LAX", "faa": "LAX"},
+                    ],
+                },
+            )
+        }
+    )
+    result = await run_agent_turn(
+        TurnRequest(
+            message="give the list of airports in US",
+            tools=(PIPELINE_TOOL,),
+            settings=ClientSettings(ai_process_result=False, mode="analytics"),
+        ),
+        llm=llm,
+        zeus=zeus,
+    )
+    assert len(zeus.calls) == 1
+    assert zeus.calls[0].verb == "pipeline"
+    assert zeus.calls[0].allow_pipeline is True
+    assert zeus.calls[0].body["steps"][0]["entity_type"] == "Airport"
+    assert result.debug.ai_process_result_exit == "cheap_terminal"
+    assert result.answer == "Airports in the United States."
+    assert "```html" not in result.answer
+    assert "<pipeline>" not in result.answer
+    assert any("recovered pipeline envelope" in n for n in result.debug.notes)
+    hop = result.debug.hops[0]
+    assert hop["result_json"]["rows"][0]["airportname"] == "SFO"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_xml_without_pipeline_tool_stays_direct():
+    llm = ScriptedLlm(script=[LlmResponse(content=_HTML_PIPELINE, tool_calls=())])
+    result = await run_agent_turn(
+        TurnRequest(
+            message="list airports",
+            tools=(FIND_TOOL,),
+            settings=ClientSettings(ai_process_result=False),
+        ),
+        llm=llm,
+        zeus=ScriptedZeus(),
+    )
+    assert result.debug.ai_process_result_exit == "direct"
+    assert result.answer == "Airports in the United States."
+    assert "<pipeline>" not in result.answer
+
+
 def _brief_catalog() -> dict:
     return {
         "messages": [

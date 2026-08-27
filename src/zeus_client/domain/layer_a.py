@@ -20,6 +20,7 @@ __all__ = [
     "apply_pack_schema",
     "looks_like_layer_a_dump",
     "peel_layer_a_summary",
+    "parse_pipeline_envelope",
     "user_facing_answer",
     "ui_view",
     "artifacts_view",
@@ -57,7 +58,7 @@ _LAYER_A_DUMP_META = (
 )
 
 _FENCE_WRAP = re.compile(
-    r"^```(?:json|yaml|yml|text)?\s*\n([\s\S]*?)\n```\s*$",
+    r"^```(?:json|yaml|yml|text|html|xml|pipeline)?\s*\n([\s\S]*?)\n```\s*$",
     re.IGNORECASE,
 )
 _SUMMARY_QUOTED = re.compile(
@@ -65,6 +66,14 @@ _SUMMARY_QUOTED = re.compile(
 )
 _SUMMARY_UNQUOTED = re.compile(
     r"(?m)^summary\s*:\s*(.+?)\s*$",
+)
+_PIPELINE_BLOCK = re.compile(
+    r"<pipeline\b[^>]*>([\s\S]*?)</pipeline>",
+    re.IGNORECASE,
+)
+_PIPELINE_CHILD = re.compile(
+    r"<([a-zA-Z_][\w-]*)\b[^>]*>([\s\S]*?)</\1>",
+    re.IGNORECASE,
 )
 
 
@@ -305,6 +314,43 @@ def _strip_code_fence(text: str) -> str:
     return t
 
 
+def _maybe_json_value(raw: str) -> Any:
+    s = (raw or "").strip()
+    if not s:
+        return s
+    if s[0] in "{[" or s in {"true", "false", "null"}:
+        try:
+            return json.loads(s)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return s
+    return s
+
+
+def parse_pipeline_envelope(text: str | None) -> dict[str, Any] | None:
+    """Parse a fenced/XML ``<pipeline>`` dump into pipeline tool args.
+
+    Models sometimes emit a terminating pipeline as HTML/XML in the
+    assistant message instead of a native ``pipeline`` tool call. Returns
+    ``None`` unless ``steps`` is a non-empty list.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return None
+    body = _strip_code_fence(text)
+    match = _PIPELINE_BLOCK.search(body)
+    if not match:
+        return None
+    args: dict[str, Any] = {}
+    for tag, content in _PIPELINE_CHILD.findall(match.group(1)):
+        key = str(tag or "").strip()
+        if not key or key.lower() == "pipeline":
+            continue
+        args[key] = _maybe_json_value(content)
+    steps = args.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return None
+    return args
+
+
 def looks_like_layer_a_dump(text: str | None) -> bool:
     """True when *text* is a Layer A / pipeline-args envelope, not chat prose."""
     if not isinstance(text, str):
@@ -389,6 +435,20 @@ def user_facing_answer(
         peeled = peel_layer_a_summary(raw)
         if peeled:
             return peeled
+        if preferred:
+            return preferred
+    pipe = parse_pipeline_envelope(raw)
+    if pipe:
+        preferred_is_prose = (
+            preferred
+            and not looks_like_layer_a_dump(preferred)
+            and parse_pipeline_envelope(preferred) is None
+        )
+        if preferred_is_prose:
+            return preferred
+        summary = pipe.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            return summary.strip()
         if preferred:
             return preferred
     return raw
