@@ -527,6 +527,7 @@ Library maintainers: security contact in README; private disclosure window befor
 - [ ] Prod profile rejects `auth_mode=none` and TLS verify off  ✅ (ZCP-36 cutover)  
 - [ ] Tool retries default off  ✅  
 - [ ] Typeahead rate limiter  ✅ (ZCP-22)  
+- [x] Jailbreak attempt catalog (ZCP-101): multi-surface hooks score + pre-LLM refuse + untrusted tool JSON  ✅
 - [ ] Header charset validation  (partial / adapter)  
 - [ ] Plugin capability deny-by-default for secrets  N/A (`plugins=no`)  
 - [ ] Support pack redaction tests  ✅ (detective/support path)  

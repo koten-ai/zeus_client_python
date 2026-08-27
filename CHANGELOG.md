@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-—
+### Security (ZCP-101)
+
+- Floor-5 jailbreak control plane: multi-surface scorer (`zeus_client.security.jailbreak`) covering catalog families R–H (paraphrase dump, clean terminate, commercial invent, retrieval injection, multi-turn grooming, encoding, summary leak).
+- `SecurityHooks` scores user text + prior turns + decoded payloads + Zeus tool JSON + terminate/cheap-path summaries. Hard refuse (`>= 0.85`) skips the LLM/Zeus loop; poisoned tool bodies are replaced with `untrusted_tool_payload`.
+- Catalog tool allowlist denies unknown verbs (except `return`). Request overlay cannot reword default jailbreak rule text unless `override_defaults=True` (I1).
+- Tests: `tests/unit/security/test_jailbreak.py`, `tests/unit/application/test_jailbreak_turns.py`.
 
 ---
 

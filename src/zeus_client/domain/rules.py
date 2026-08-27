@@ -58,13 +58,17 @@ def merge_rules(
         pack.update(_as_rules_object(tenant_rules))
     req = _as_rules_object(request_rules)
     if req:
-        if not override_defaults:
-            for key, text in list(req.items()):
-                if key in JAILBREAK_RULE_IDS and not str(text).strip():
+        filtered: dict[str, str] = {}
+        for key, text in req.items():
+            if key in JAILBREAK_RULE_IDS and not override_defaults:
+                if not str(text).strip():
                     raise ValueError(
                         f"cannot clear default jailbreak rule {key!r} unless override_defaults=True"
                     )
-        pack.update({k: v for k, v in req.items() if str(v).strip() or override_defaults})
+                # I1: request overlay cannot reword SDK/tenant jailbreak keys.
+                continue
+            filtered[key] = text
+        pack.update({k: v for k, v in filtered.items() if str(v).strip() or override_defaults})
     return pack
 
 
