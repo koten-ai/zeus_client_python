@@ -269,6 +269,8 @@ Jailbreak scores, wish_i_knew, and refuse reasons:
 - **Never** concatenated into user-facing `answer`  
 - Not written to third-party analytics without policy review  
 
+Attempt shapes against these gates (regex hits vs paraphrase dump, clean Layer A, retrieval injection): [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md).  
+
 ---
 
 ## 9. Secure logging
