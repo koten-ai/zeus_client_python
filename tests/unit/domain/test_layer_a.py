@@ -6,6 +6,7 @@ from zeus_client.domain.layer_a import (
     artifacts_view,
     normalize_triggers,
     parse_layer_a,
+    parse_pipeline_envelope,
     peel_layer_a_summary,
     ui_view,
     user_facing_answer,
@@ -156,3 +157,36 @@ def test_peel_layer_a_summary_unescapes_newlines():
         'query_decomposition: {"intent": "x"}\n'
     )
     assert peel_layer_a_summary(dump) == "Line one.\nLine two."
+
+
+_HTML_PIPELINE = (
+    "```html\n"
+    "<pipeline>\n"
+    '<steps>[{"as": "airports", "verb": "find", "entity_type": "Airport", '
+    '"where": {"country": "United States"}, "limit": 50, "return": "ids"}]</steps>\n'
+    '<return>["rows"]</return>\n'
+    "<summary>Airports in the United States (sample of matching Airport records).</summary>\n"
+    '<query_decomposition>{"intent": "list_airports", "entity": "Airport"}</query_decomposition>\n'
+    "<confidence>high</confidence>\n"
+    '<decomposition>{"targets": ["Airport"]}</decomposition>\n'
+    "</pipeline>\n"
+    "```"
+)
+
+
+def test_parse_pipeline_envelope_from_html_fence():
+    args = parse_pipeline_envelope(_HTML_PIPELINE)
+    assert args is not None
+    assert args["steps"][0]["verb"] == "find"
+    assert args["return"] == ["rows"]
+    assert args["confidence"] == "high"
+    assert args["query_decomposition"]["entity"] == "Airport"
+
+
+def test_user_facing_answer_peels_pipeline_xml_summary():
+    assert (
+        user_facing_answer(_HTML_PIPELINE)
+        == "Airports in the United States (sample of matching Airport records)."
+    )
+    assert parse_pipeline_envelope("Hello from Zeus.") is None
+    assert user_facing_answer("Hello from Zeus.") == "Hello from Zeus."

@@ -70,6 +70,7 @@ from zeus_client.domain.layer_a import (
     apply_pack_schema,
     compact_layer_a,
     parse_layer_a,
+    parse_pipeline_envelope,
     peel_layer_a_summary,
     user_facing_answer,
 )
@@ -198,6 +199,25 @@ def _tools_from_request(req: TurnRequest) -> list[dict[str, Any]]:
     if isinstance(verbs, list):
         return [dict(t) for t in verbs if isinstance(t, Mapping)]
     return []
+
+
+def _catalog_tool_names(tools: Sequence[Mapping[str, Any]]) -> set[str]:
+    names: set[str] = set()
+    for t in tools:
+        if not isinstance(t, Mapping):
+            continue
+        fn = t.get("function") if isinstance(t.get("function"), Mapping) else t
+        if isinstance(fn, Mapping) and fn.get("name"):
+            names.add(str(fn["name"]))
+    return names
+
+
+def _synthetic_pipeline_call(args: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "id": new_zeus_req_id(),
+        "type": "function",
+        "function": {"name": "pipeline", "arguments": json.dumps(dict(args))},
+    }
 
 
 def _system_from_request(req: TurnRequest) -> str:
@@ -580,6 +600,17 @@ async def run_agent_turn(
             mw_ctx.notes.clear()
 
             tool_calls = list(llm_resp.tool_calls or ())
+            if not tool_calls:
+                envelope = parse_pipeline_envelope(llm_resp.content)
+                if (
+                    envelope
+                    and zeus is not None
+                    and "pipeline" in _catalog_tool_names(tools)
+                ):
+                    tool_calls = [_synthetic_pipeline_call(envelope)]
+                    notes.append(
+                        "recovered pipeline envelope from model content as pipeline tool call"
+                    )
             steps.append(
                 {
                     "round": rnd,
@@ -1093,6 +1124,8 @@ async def _execute_tool_calls(
             "scope": f"{target.bucket}/{target.scope}" if target.bucket else "",
             **meta,
         }
+        if isinstance(body, Mapping) and body:
+            hop_rec["result_json"] = dict(body)
         outcome.hops.append(hop_rec)
         outcome.steps.append(
             {
