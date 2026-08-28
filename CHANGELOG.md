@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-—
+### Added (ZCP-112)
+
+- Opt-in Zeus verbose persist: `DebugPolicy.rewind` / `ZEUS_REWIND=true` sends query `rewind=true` on V2 verbs and query+body on session create/turn/trace. Default **off**. `X-Zeus-Trace: 1` still only force-keeps; it does not upgrade slim → verbose. Verb JSON never forwards a `rewind` argument.
 
 ---
 

@@ -453,6 +453,7 @@ async def project_session_trace(
     stamp: Mapping[str, Any] | None = None,
     mode: str = "analytics",
     headers: Mapping[str, str] | None = None,
+    rewind: bool = False,
 ) -> SessionTraceProjectResult:
     """POST identical multi-hop aggregate once per req_id (primary last).
 
@@ -500,6 +501,7 @@ async def project_session_trace(
                 outcome=agg.outcome,
                 headers=headers,
                 mode=mode,
+                rewind=rewind,
             )
             if result.ok:
                 posts += 1

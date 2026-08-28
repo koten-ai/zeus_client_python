@@ -17,6 +17,8 @@ from zeus_client.adapters.zeus_http.headers import (
     merge_headers,
     product_stamp_headers,
     req_id_from_headers,
+    rewind_query_params,
+    verb_body_without_rewind,
 )
 from zeus_client.config.models import DataTarget, ZeusEndpointConfig
 from zeus_client.domain.errors import ErrorCode, ZeusToolError, ZeusTransportError
@@ -179,6 +181,8 @@ class HttpxZeusPort:
         status = 0
         body: dict[str, Any] = {}
         err: str | None = None
+        payload = verb_body_without_rewind(req.body)
+        params = rewind_query_params(bool(req.rewind))
         scope = (
             f"{req.target.bucket}/{req.target.scope}"
             if req.target.bucket and req.target.scope
@@ -188,13 +192,13 @@ class HttpxZeusPort:
         t0 = time.perf_counter()
         log = get_family_logger()
         try:
-            resp = await client.post(url, headers=headers, json=dict(req.body))
+            resp = await client.post(url, headers=headers, json=payload, params=params or None)
             if int(resp.status_code) == 401 and (hop_endpoint.auth_mode or "") == "basic":
                 auth = await self._auth_for(req, req.target, force=True)
                 headers = _headers(auth)
                 if req.pre_mint_req_id and not any(k.lower() == "x-zeus-req-id" for k in headers):
                     headers["X-Zeus-Req-Id"] = new_zeus_req_id()
-                resp = await client.post(url, headers=headers, json=dict(req.body))
+                resp = await client.post(url, headers=headers, json=payload, params=params or None)
             status = int(resp.status_code)
             req_id = req_id_from_headers(resp.headers)
             try:

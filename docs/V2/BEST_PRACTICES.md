@@ -34,7 +34,7 @@ This document is the engineering standard for implementing and evolving Zeus Cli
 | Public data APIs | `run_<zeus_verb>` or facade methods | `rt.data.find` |
 | Error codes | STABLE_SCREAMING | `ZEUS_BOUNDARY_MISCONFIG` |
 | Events | `domain.action` | `zeus.hop` |
-| Env vars | `ZEUS_CLIENT_*` | `ZEUS_CLIENT_FORCE_TRACE` |
+| Env vars | `ZEUS_CLIENT_*` | `ZEUS_CLIENT_FORCE_TRACE`, `ZEUS_REWIND` |
 
 **Do not** invent product nicknames for new public APIs (`run_fast_*`).
 

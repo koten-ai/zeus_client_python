@@ -17,6 +17,7 @@ from zeus_client.adapters.zeus_http.headers import (
     merge_headers,
     product_stamp_headers,
     req_id_from_headers,
+    rewind_query_params,
 )
 from zeus_client.config.models import ClientIdentity, DataTarget, ZeusEndpointConfig
 from zeus_client.domain.ids import new_zeus_req_id
@@ -113,6 +114,7 @@ class HttpxSessionClient:
         headers: Mapping[str, str] | None = None,
         mode: str = "",
         target: DataTarget | None = None,
+        rewind: bool = False,
     ) -> SessionHttpResult:
         url = f"{self._base()}/v2/session"
         payload = {
@@ -122,8 +124,12 @@ class HttpxSessionClient:
             "conversation": list(conversation or []),
             **self._sink_stamp(),
         }
+        if rewind:
+            payload["rewind"] = True
         h = await self._headers(mode=mode, extra=headers, target=target)
-        return await self._post(url, h, payload, ok_codes=(200, 201))
+        return await self._post(
+            url, h, payload, ok_codes=(200, 201), params=rewind_query_params(rewind)
+        )
 
     async def rehydrate(
         self,
@@ -176,6 +182,7 @@ class HttpxSessionClient:
         headers: Mapping[str, str] | None = None,
         mode: str = "",
         target: DataTarget | None = None,
+        rewind: bool = False,
     ) -> SessionHttpResult:
         sid = (session_id or "").strip()
         if not sid:
@@ -187,13 +194,17 @@ class HttpxSessionClient:
                 error="no session_id",
             )
         url = f"{self._base()}/v2/session/{sid}/turn"
-        payload = {
+        payload: dict[str, Any] = {
             "round": int(client_round),
             "chat_request": dict(chat_request or {}),
             "new_turns": list(new_turns or []),
         }
+        if rewind:
+            payload["rewind"] = True
         h = await self._headers(mode=mode, extra=headers, target=target)
-        return await self._post(url, h, payload, ok_codes=(200,))
+        return await self._post(
+            url, h, payload, ok_codes=(200,), params=rewind_query_params(rewind)
+        )
 
     async def post_trace(
         self,
@@ -210,6 +221,7 @@ class HttpxSessionClient:
         headers: Mapping[str, str] | None = None,
         mode: str = "",
         target: DataTarget | None = None,
+        rewind: bool = False,
     ) -> SessionHttpResult:
         sid = (session_id or "").strip()
         if not sid or int(client_round) <= 0:
@@ -237,8 +249,12 @@ class HttpxSessionClient:
             "outcome": outcome or "ok",
             **stamp,
         }
+        if rewind:
+            payload["rewind"] = True
         h = await self._headers(mode=mode, extra=headers, target=target)
-        return await self._post(url, h, payload, ok_codes=(200, 201))
+        return await self._post(
+            url, h, payload, ok_codes=(200, 201), params=rewind_query_params(rewind)
+        )
 
     async def _post(
         self,
@@ -247,10 +263,16 @@ class HttpxSessionClient:
         payload: Mapping[str, Any],
         *,
         ok_codes: tuple[int, ...],
+        params: Mapping[str, str] | None = None,
     ) -> SessionHttpResult:
         client = await self._ensure_client()
         try:
-            r = await client.post(url, headers=dict(headers), json=dict(payload))
+            r = await client.post(
+                url,
+                headers=dict(headers),
+                json=dict(payload),
+                params=dict(params) if params else None,
+            )
             req_id = req_id_from_headers(r.headers)
             self.last_req_id = req_id
             status = int(r.status_code)

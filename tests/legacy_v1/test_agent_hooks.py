@@ -61,7 +61,7 @@ async def _fake_llm(base_url, api_key, payload, extra_headers=None):
 
 
 async def _fake_dispatch(
-    api_version, zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None
+    api_version, zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None, rewind=False,
 ):
     return 200, '{"rows": "RAW data"}', "http://zeus/find", "req-1"
 

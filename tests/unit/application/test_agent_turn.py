@@ -19,7 +19,7 @@ from zeus_client.application.middleware import (
     NoopMiddleware,
     SecurityHooks,
 )
-from zeus_client.config.models import ClientSettings, DataTarget
+from zeus_client.config.models import ClientSettings, DataTarget, DebugPolicy
 from zeus_client.domain.journal import InMemoryJournal
 from zeus_client.domain.journal.events import EVENT_TURN_STARTED
 from zeus_client.domain.messages import TurnRequest, TurnStatus
@@ -506,6 +506,35 @@ async def test_tool_hop_stamps_rewind_correlation_headers() -> None:
     assert h["X-Zeus-Trace-Class"] == "agent"
     assert h["X-Zeus-Trace"] == "1"
     assert "X-Zeus-Req-Id" not in h
+    assert hop.rewind is False
+
+
+@pytest.mark.asyncio
+async def test_tool_hop_sends_rewind_when_debug_policy_on() -> None:
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(_tc("find", {"entity_type": "Beer", "rewind": True}, "c1"),),
+            ),
+            LlmResponse(content="ok", tool_calls=()),
+        ]
+    )
+    zeus = ScriptedZeus()
+    await run_agent_turn(
+        TurnRequest(
+            message="find beers",
+            chat_id="chat-rew",
+            tools=(FIND_TOOL,),
+            settings=ClientSettings(ai_process_result=True),
+        ),
+        llm=llm,
+        zeus=zeus,
+        debug_policy=DebugPolicy(rewind=True),
+    )
+    hop = zeus.calls[0]
+    assert hop.rewind is True
+    assert "rewind" not in dict(hop.body)
 
 
 PIPELINE_TOOL = {

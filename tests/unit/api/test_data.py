@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from zeus_client.adapters.zeus_http.headers import TRACE_CLASS_DIRECT_READ
-from zeus_client.config.models import DataTarget, RuntimeConfig
+from zeus_client.config.models import DataTarget, DebugPolicy, RuntimeConfig
 from zeus_client.ports import VerbHopResult, VerbRequest
 from zeus_client.runtime import ZeusRuntime
 
@@ -58,6 +58,25 @@ async def test_data_verb_forwards_rewind_chat_headers() -> None:
     assert headers["X-Zeus-Turn-Id"] == "unit_u1"
     assert headers["X-Zeus-Trace-Class"] == TRACE_CLASS_DIRECT_READ
     assert "X-Zeus-Req-Id" not in headers
+    assert zeus.reqs[0].rewind is False
+
+
+@pytest.mark.asyncio
+async def test_data_verb_forwards_debug_policy_rewind() -> None:
+    zeus = _RecordingZeus()
+    cfg = RuntimeConfig(debug=DebugPolicy(rewind=True))
+    async with ZeusRuntime(cfg, zeus=zeus) as rt:
+        await rt.data.find({"entity_type": "Beer"})
+    assert zeus.reqs[0].rewind is True
+    assert "rewind" not in dict(zeus.reqs[0].body)
+
+
+@pytest.mark.asyncio
+async def test_data_verb_per_call_rewind_override() -> None:
+    zeus = _RecordingZeus()
+    async with ZeusRuntime(RuntimeConfig(), zeus=zeus) as rt:
+        await rt.data.find({"entity_type": "Beer"}, rewind=True)
+    assert zeus.reqs[0].rewind is True
 
 
 @pytest.mark.asyncio

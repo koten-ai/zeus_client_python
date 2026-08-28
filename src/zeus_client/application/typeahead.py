@@ -212,6 +212,7 @@ async def run_typeahead_search(
     *,
     target: DataTarget,
     options: SuggestOptions | None = None,
+    rewind: bool = False,
 ) -> SuggestResult:
     """FTS typeahead via Direct ZeusPort. Empty query → empty hits (no agent)."""
     opts = options or SuggestOptions()
@@ -239,6 +240,7 @@ async def run_typeahead_search(
             target=target,
             mode_header=opts.mode_header,
             headers=correlation_headers(trace_class=TRACE_CLASS_DIRECT_INTERACTIVE),
+            rewind=rewind,
         )
     )
     if not hop.ok:

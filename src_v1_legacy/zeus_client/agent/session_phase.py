@@ -8,6 +8,7 @@ from zeus_client.contract_hash import (
 )
 from zeus_client.logging_setup import logger
 from zeus_client.zeus.contracts import resolve_contract_for_scope
+from zeus_client.agent.settings import effective_rewind
 from zeus_client.zeus.session import (
     continue_session_turn,
     create_zeus_session,
@@ -54,6 +55,7 @@ async def _create_durable_session(
     session_notes,
     *,
     recovered_from="",
+    rewind=False,
 ):
     """POST /v2/session and record create outcome on ``trace``.
 
@@ -74,7 +76,7 @@ async def _create_durable_session(
     )
     cstatus, cbody, c_url, creq = await create_zeus_session(
         zeus_url, bucket, scope, contract_id, contract_hash,
-        chat_req, init_conv, zeus_headers,
+        chat_req, init_conv, zeus_headers, rewind=rewind,
     )
     if cstatus in (200, 201) and isinstance(cbody, dict):
         sid = cbody.get("session_id") or ""
@@ -145,6 +147,7 @@ async def setup_contract_and_session(
     is established and turn commit does not 404 on the dead id.
     """
     enable_sessions = bool(zcfg.get("enable_durable_sessions", True))
+    rewind = effective_rewind(None, zcfg)
     contract_id, bound_contract_hash = resolve_contract_for_scope(zcfg, bucket, scope, mode)
     contract_hash = bound_contract_hash
     logger.debug(
@@ -246,6 +249,7 @@ async def setup_contract_and_session(
             sid, this_user_round = await _create_durable_session(
                 zeus_url, bucket, scope, contract_id, contract_hash,
                 chat_req, user_msg, zeus_headers, trace, session_notes,
+                rewind=rewind,
             )
         else:
             logger.debug(f"run_agent: existing sid -> rehydrating {sid[:12]}…")
@@ -292,6 +296,7 @@ async def setup_contract_and_session(
                     zeus_url, bucket, scope, contract_id, contract_hash,
                     chat_req, user_msg, zeus_headers, trace, session_notes,
                     recovered_from=dead_sid,
+                    rewind=rewind,
                 )
                 if not sid:
                     # Create also failed — leave no dead id for turn commit.
@@ -317,6 +322,7 @@ async def commit_session_turn(
     zeus_url, sid, enable_sessions, this_user_round, contract_id, contract_hash,
     chat_req, produced_delta, prior_turns, this_turn_reqs, trace, zeus_headers,
     layer_a=None,
+    rewind=False,
 ):
     """POST trace deltas and persist the turn shard.
 
@@ -386,6 +392,7 @@ async def commit_session_turn(
                     zeus_response=zeus_response,
                     outcome=outcome,
                     zeus_headers=zeus_headers,
+                    rewind=rewind,
                 )
                 if tr_status in (200, 201):
                     trace["notes"].append(f"trace {rid[:8]}… -> {tr_status}")
@@ -413,7 +420,7 @@ async def commit_session_turn(
             turn_turns = produced_delta
         if turn_turns:
             tu_status, _, tu_url, tu_req = await continue_session_turn(
-                zeus_url, sid, turn_round, chat_req, turn_turns, zeus_headers)
+                zeus_url, sid, turn_round, chat_req, turn_turns, zeus_headers, rewind=rewind)
             trace["session_turn"] = {
                 "status": tu_status, "round": turn_round, "url": tu_url,
                 "req_id": tu_req, "turns": len(turn_turns),
