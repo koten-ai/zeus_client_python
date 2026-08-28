@@ -27,7 +27,8 @@
 | `run_search` / `run_find` | `rt.data.search` / `rt.data.find` |
 | `trace["detective"]` | `result.debug.detective` |
 | Mutable `trace` dict | Execution journal + projectors (`rt.debug`, public_trace) |
-| `ZEUS_CLIENT_FORCE_TRACE` | `DebugPolicy` / settings `force_trace` / same env on loader |
+| `ZEUS_CLIENT_FORCE_TRACE` | `ClientSettings.force_trace` / same env on loader (keep, not verbose) |
+| `ZEUS_REWIND` | `DebugPolicy.rewind` (query `rewind=true`; default off) |
 | `ZEUS_CLIENT_DETECTIVE=0` | `DebugPolicy.detective_briefing=False` |
 
 ### Config keys

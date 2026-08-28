@@ -21,7 +21,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from zeus_client.adapters.zeus_http.headers import TRACE_CLASS_AGENT, correlation_headers
+from zeus_client.adapters.zeus_http.headers import (
+    TRACE_CLASS_AGENT,
+    correlation_headers,
+    verb_body_without_rewind,
+)
 from zeus_client.application.control_plane_inject import (
     InjectSettings,
     apply_control_plane_inject,
@@ -397,6 +401,7 @@ async def run_agent_turn(
                 mode=settings.mode,
                 enable_sessions=True,
                 force_trace=bool(settings.force_trace),
+                rewind=bool(dbg_pol.rewind),
             )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"session_setup_failed: {exc}")
@@ -602,11 +607,7 @@ async def run_agent_turn(
             tool_calls = list(llm_resp.tool_calls or ())
             if not tool_calls:
                 envelope = parse_pipeline_envelope(llm_resp.content)
-                if (
-                    envelope
-                    and zeus is not None
-                    and "pipeline" in _catalog_tool_names(tools)
-                ):
+                if envelope and zeus is not None and "pipeline" in _catalog_tool_names(tools):
                     tool_calls = [_synthetic_pipeline_call(envelope)]
                     notes.append(
                         "recovered pipeline envelope from model content as pipeline tool call"
@@ -655,6 +656,7 @@ async def run_agent_turn(
                 chat_id=chat_id,
                 turn_id=turn_id,
                 force_trace=bool(settings.force_trace),
+                rewind=bool(dbg_pol.rewind),
             )
             hops.extend(outcome.hops)
             for hop in outcome.hops:
@@ -847,6 +849,7 @@ async def run_agent_turn(
                 inject=inject_bag,
                 stamp=stamp,
                 mode=settings.mode,
+                rewind=bool(dbg_pol.rewind),
             )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"session_trace_failed: {exc}")
@@ -858,6 +861,7 @@ async def run_agent_turn(
                 mode=settings.mode,
                 turn_id=turn_id,
                 force_trace=bool(settings.force_trace),
+                rewind=bool(dbg_pol.rewind),
             )
             session_handle = commit.handle
         except Exception as exc:  # noqa: BLE001
@@ -1015,6 +1019,7 @@ async def _execute_tool_calls(
     chat_id: str = "",
     turn_id: str = "",
     force_trace: bool = False,
+    rewind: bool = False,
 ) -> ToolRoundOutcome:
     outcome = ToolRoundOutcome()
     final_summary: str | None = None
@@ -1026,6 +1031,8 @@ async def _execute_tool_calls(
         fn = tc.get("function") if isinstance(tc.get("function"), Mapping) else {}
         name = str((fn or {}).get("name") or "")
         tc_args = _parse_tool_args((fn or {}).get("arguments"))
+        if isinstance(tc_args, Mapping):
+            tc_args = verb_body_without_rewind(tc_args)
         call_id = str(tc.get("id") or "").strip() or new_zeus_req_id()
 
         if isinstance(tc_args.get("summary"), str) and tc_args["summary"].strip():
@@ -1081,6 +1088,7 @@ async def _execute_tool_calls(
                     trace_class=TRACE_CLASS_AGENT,
                 ),
                 allow_pipeline=True,
+                rewind=rewind,
             )
         )
         ms = int((time.perf_counter() - t_tool) * 1000)

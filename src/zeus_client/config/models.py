@@ -294,6 +294,11 @@ class DebugPolicy:
     capture_bodies: bool = False  # prod default off; dev may enable
     transport_replay: bool = True
     hub_base_url: str | None = None
+    # Opt-in Zeus verbose persist (query rewind=true). Default off: size + 30d TTL.
+    rewind: bool = False
+
+    def with_updates(self, **kwargs: Any) -> DebugPolicy:
+        return replace(self, **kwargs)
 
 
 @dataclass(frozen=True, slots=True)
@@ -422,6 +427,7 @@ class RuntimeConfig:
                 "detective_briefing": self.debug.detective_briefing,
                 "capture_bodies": self.debug.capture_bodies,
                 "transport_replay": self.debug.transport_replay,
+                "rewind": self.debug.rewind,
             },
             "rate_limit": {
                 "typeahead_enabled": self.rate_limit.typeahead_enabled,

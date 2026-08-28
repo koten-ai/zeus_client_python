@@ -35,7 +35,9 @@ V2_SCOPE_VERBS = {"describe", "analyze"}
 V2_BARE_VERBS = {"explain", "return"}
 
 
-async def dispatch_zeus_v2_verb(zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None):
+async def dispatch_zeus_v2_verb(
+    zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None, rewind=False,
+):
     """Dispatch an OpenAI function named as a V2 verb to the right V2 URL."""
     headers = {**zeus_headers, "Content-Type": "application/json"}
     if name in V2_BARE_VERBS:
@@ -58,9 +60,15 @@ async def dispatch_zeus_v2_verb(zeus_url, bucket, scope, collection, name, args,
     if corr_headers:
         for k, v in corr_headers.items():
             headers.setdefault(k, v)
-    logger.debug(f"dispatch_zeus_v2_verb: name={name} url={url} args_keys={list(args.keys()) if isinstance(args, dict) else type(args)}")
+    body = dict(args) if isinstance(args, dict) else args
+    if isinstance(body, dict) and "rewind" in body:
+        flag = body.pop("rewind")
+        if str(flag).strip().lower() in {"1", "true", "yes", "on"} or flag is True:
+            rewind = True
+    params = {"rewind": "true"} if rewind else None
+    logger.debug(f"dispatch_zeus_v2_verb: name={name} url={url} args_keys={list(body.keys()) if isinstance(body, dict) else type(body)}")
     try:
-        r = await client().post(url, headers=headers, json=args, timeout=TOOL_TIMEOUT)
+        r = await client().post(url, headers=headers, json=body, timeout=TOOL_TIMEOUT, params=params)
         req_id = r.headers.get("X-Zeus-Req-Id", "")
         body_preview = (r.text or "")[:300] if r.status_code >= 400 else ""
         logger.debug(f"dispatch_zeus_v2_verb: name={name} -> status={r.status_code} req_id={(req_id or '')[:12]}…")
@@ -72,9 +80,13 @@ async def dispatch_zeus_v2_verb(zeus_url, bucket, scope, collection, name, args,
         return 0, json.dumps({"error": "dispatch_failed", "message": str(e)}), url, ""
 
 
-async def dispatch_zeus_call(api_version, zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None):
+async def dispatch_zeus_call(
+    api_version, zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers=None, rewind=False,
+):
     if normalize_api_version(api_version) == "v2":
-        return await dispatch_zeus_v2_verb(zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers)
+        return await dispatch_zeus_v2_verb(
+            zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers, rewind=rewind,
+        )
     return await dispatch_zeus_tool(zeus_url, bucket, scope, collection, name, args, zeus_headers, corr_headers)
 
 

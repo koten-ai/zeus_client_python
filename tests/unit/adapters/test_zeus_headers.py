@@ -10,6 +10,8 @@ from zeus_client.adapters.zeus_http.headers import (
     apply_force_trace_header,
     apply_mode_header,
     correlation_headers,
+    rewind_query_params,
+    verb_body_without_rewind,
 )
 
 
@@ -51,3 +53,15 @@ def test_force_trace_false_does_not_set_header() -> None:
 def test_mode_header_does_not_overwrite() -> None:
     h = apply_mode_header({"X-Zeus-Mode": "research"}, "analytics")
     assert h["X-Zeus-Mode"] == "research"
+
+
+def test_rewind_query_params_off_by_default() -> None:
+    assert rewind_query_params(False) == {}
+    assert rewind_query_params(True) == {"rewind": "true"}
+
+
+def test_verb_body_without_rewind_strips_flag() -> None:
+    assert verb_body_without_rewind({"entity_type": "Beer", "rewind": True}) == {
+        "entity_type": "Beer"
+    }
+    assert verb_body_without_rewind(None) == {}

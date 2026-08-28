@@ -55,6 +55,8 @@ class VerbRequest:
     password_env: str | None = None
     token_env: str | None = None
     username: str | None = None
+    # Query ?rewind=true (never a verb JSON field). Default off.
+    rewind: bool = False
 
 
 @dataclass(frozen=True, slots=True)

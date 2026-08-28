@@ -41,6 +41,7 @@ class DataAPI:
         password_env: str | None = None,
         token_env: str | None = None,
         username: str | None = None,
+        rewind: bool | None = None,
     ) -> VerbResult:
         zeus = self._rt.services.zeus
         if zeus is None:
@@ -56,6 +57,7 @@ class DataAPI:
             target=target or self._rt.config.target,
             mode_header=mode_header or self._rt.config.settings.mode,
             force_trace=self._rt.config.settings.force_trace,
+            rewind=(bool(rewind) if rewind is not None else bool(self._rt.config.debug.rewind)),
             headers=headers,
             chat_id=chat_id,
             turn_id=turn_id,
@@ -123,6 +125,7 @@ class DataAPI:
             query,
             target=self._rt.config.target,
             options=options,
+            rewind=bool(self._rt.config.debug.rewind),
         )
         self._rt.services.metrics.incr(
             "zeus_client_typeahead_total",

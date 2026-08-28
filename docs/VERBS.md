@@ -50,6 +50,16 @@ on every `:8080` hop:
 Open the **tool** hop (`find`/`search`/`project`), never `POST /v2/session/{id}/turn`.
 Pipeline hops are often edge-only in Rewind (Zeus does not `AppendToolCall`).
 `X-Zeus-Trace: 1` is opt-in via `ClientSettings.force_trace` / `ZEUS_CLIENT_FORCE_TRACE`.
+It **keeps** the hop; it does **not** upgrade slim → verbose.
+
+Verbose persist is a separate opt-in (`DebugPolicy.rewind` / `ZEUS_REWIND=true` / `rt.data.find(..., rewind=True)`):
+
+| Surface | How the flag is sent |
+| --- | --- |
+| Direct / agent verbs | Query `?rewind=true` (never a field in the verb JSON body) |
+| `POST /v2/session`, `/session/{id}/turn`, `/session/trace` | Query **and** JSON `"rewind": true` |
+
+Default is **off** (30-day TTL + tool result bodies). Play Hub Rewind against the **tool** `req_id`. Zeus 0.7.29+ already persists verbose tapes when this flag is present.
 Never reuse `X-Zeus-Req-Id` across hops.
 
 ## E2E debug gather

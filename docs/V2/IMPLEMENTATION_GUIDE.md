@@ -857,7 +857,8 @@ Export only:
 | `(answer, trace, turns, session_meta)` | `TurnResult` |
 | `run_search` / `run_find` | `rt.data.search` / `rt.data.find` |
 | `trace["detective"]` | `result.debug.detective` |
-| `ZEUS_CLIENT_FORCE_TRACE` | `DebugPolicy.force_trace` / same env |
+| `ZEUS_CLIENT_FORCE_TRACE` | `ClientSettings.force_trace` / same env (keep, not verbose) |
+| `ZEUS_REWIND` | `DebugPolicy.rewind` / query `rewind=true` (default off) |
 
 Compat shim may accept V1 signature and return tuple **deprecated**.
 
@@ -980,7 +981,8 @@ Parallelism: A+B from Phase 1â€“5; C starts Phase 6 when ports stable; all on 7â
 | `default_mode` | `RuntimeConfig.defaults.mode` |
 | `default_api_version` | fixed v2 primary; v1 tools compat only |
 | `ZEUS_CLIENT_CONFIG_DIR` | same |
-| `ZEUS_CLIENT_FORCE_TRACE` | `DebugPolicy.force_trace` |
+| `ZEUS_CLIENT_FORCE_TRACE` | `ClientSettings.force_trace` (keep, not verbose) |
+| `ZEUS_REWIND` | `DebugPolicy.rewind` (query `rewind=true`; default off) |
 | `ZEUS_CLIENT_DETECTIVE` | `DebugPolicy.detective_briefing` |
 | `COUCHBASE_*` | `RuntimeConfig.couchbase` |
 
