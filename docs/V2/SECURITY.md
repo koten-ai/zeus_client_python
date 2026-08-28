@@ -1,6 +1,6 @@
 # Zeus Client V2 — Security
 
-**Companion to:** [DESIGN.md](./DESIGN.md)  
+**Companion to:** [DESIGN.md](./DESIGN.md) · [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md) · family [`JAILBREAK_ATTEMPTS_SECURITY.md`](https://github.com/koten-ai/zeus_client_design/blob/main/docs/JAILBREAK_ATTEMPTS_SECURITY.md)  
 **Scope:** Library security for `kotenai-zeus-client` V2 and its default adapters  
 **Non-scope:** Hardening the Zeus server itself (covered by Zeus platform docs)
 
@@ -269,7 +269,7 @@ Jailbreak scores, wish_i_knew, and refuse reasons:
 - **Never** concatenated into user-facing `answer`  
 - Not written to third-party analytics without policy review  
 
-Attempt shapes against these gates (regex hits vs paraphrase dump, clean Layer A, retrieval injection): [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md).  
+Attempt shapes against these gates (lexical dump, paraphrase, clean Layer A, retrieval injection, encoding): package [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md) · family [`JAILBREAK_ATTEMPTS_SECURITY.md`](https://github.com/koten-ai/zeus_client_design/blob/main/docs/JAILBREAK_ATTEMPTS_SECURITY.md).  
 
 ---
 
