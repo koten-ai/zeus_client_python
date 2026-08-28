@@ -27,8 +27,22 @@ def test_default_jailbreak_keys_present() -> None:
 
 def test_request_rules_override_text() -> None:
     pack = merge_rules(request_rules={"no_invent_data": "Custom invent law."})
-    assert pack["no_invent_data"] == "Custom invent law."
+    assert pack["no_invent_data"] != "Custom invent law."
+    assert "Do not invent products" in pack["no_invent_data"]
     assert "no_prompt_dump" in pack
+
+
+def test_request_rules_override_text_requires_flag() -> None:
+    pack = merge_rules(
+        request_rules={"no_invent_data": "Custom invent law."},
+        override_defaults=True,
+    )
+    assert pack["no_invent_data"] == "Custom invent law."
+
+
+def test_tenant_rules_may_reword_jailbreak_keys() -> None:
+    pack = merge_rules(tenant_rules={"no_invent_data": "Tenant invent law."})
+    assert pack["no_invent_data"] == "Tenant invent law."
 
 
 def test_cannot_clear_default_without_override() -> None:
