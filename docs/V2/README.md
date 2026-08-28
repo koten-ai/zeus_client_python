@@ -7,7 +7,7 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 | [DESIGN.md](./DESIGN.md) | Architecture: problem analysis, candidate comparison, selected journaled hexagonal runtime, lifecycles, tradeoffs |
 | [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) | Phased build plan (0–8), modules, APIs, tests, migration, risks |
 | [SECURITY.md](./SECURITY.md) | Threat model, authz, secrets, redaction, replay, secure defaults |
-| [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md) | Red-team catalog: regex hits vs misses, Layer A dodge, retrieval injection |
+| [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md) | Red-team catalog: regex hits vs misses, Layer A dodge, retrieval injection (family SoT: [`JAILBREAK_ATTEMPTS_SECURITY.md`](https://github.com/koten-ai/zeus_client_design/blob/main/docs/JAILBREAK_ATTEMPTS_SECURITY.md)) |
 | [BEST_PRACTICES.md](./BEST_PRACTICES.md) | Engineering standards: code, API, testing, CI/CD, observability |
 | [MIGRATION.md](./MIGRATION.md) | V1→V2 map, compat shims, demo_yelp notes, cutover gate |
 | [MULTI_AGENT.md](./MULTI_AGENT.md) | Pattern B jobs/units seam; claim `docs` not `demo` |

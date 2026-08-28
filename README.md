@@ -26,6 +26,7 @@ Family law and ship bar:
 - [HOW_TO_MAKE_A_CLIENT.md](https://github.com/koten-ai/zeus_client_design/blob/main/HOW_TO_MAKE_A_CLIENT.md)
 - [CHECKLIST.md](https://github.com/koten-ai/zeus_client_design/blob/main/CHECKLIST.md)
 - [MATRIX.md](https://github.com/koten-ai/zeus_client_design/blob/main/MATRIX.md)
+- [JAILBREAK_ATTEMPTS_SECURITY.md](https://github.com/koten-ai/zeus_client_design/blob/main/docs/JAILBREAK_ATTEMPTS_SECURITY.md) (floor-5 jailbreak catalog)
 - [COMPAT.md](https://github.com/koten-ai/zeus_chat_request/blob/main/COMPAT.md) (engine pack triples — not invented here)
 
 **Note on `ai_process_result`:** package default is **`false`** (cheap path). Use profile **`hub`** or `ClientSettings(ai_process_result=True)` for Hub Debug insight.
