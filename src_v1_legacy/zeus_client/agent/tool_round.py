@@ -11,7 +11,7 @@ import httpx
 
 from zeus_client.agent.enrichment import amplify_tool_content
 from zeus_client.agent.hooks import AgentHooks
-from zeus_client.agent.settings import effective_force_trace
+from zeus_client.agent.settings import effective_force_trace, effective_rewind
 from zeus_client.constants import MAX_TOOLCALLS_PER_ROUND
 from zeus_client.llm.client import cached_tokens_of, llm_chat_payload, llm_payload
 from zeus_client.logging_setup import logger
@@ -293,6 +293,10 @@ async def execute_tool_calls(
         ctx.get("settings") if isinstance(ctx, dict) else None,
         zcfg if isinstance(zcfg, dict) else None,
     )
+    rewind = effective_rewind(
+        ctx.get("settings") if isinstance(ctx, dict) else None,
+        zcfg if isinstance(zcfg, dict) else None,
+    )
 
     for tc in tool_calls[:MAX_TOOLCALLS_PER_ROUND]:
         fn = tc.get("function", {})
@@ -338,7 +342,7 @@ async def execute_tool_calls(
         sent_corr = {k: v for k, v in corr.items() if k.startswith("X-Zeus")}
         tstatus, ttext, dispatch_url, req_id = await dispatch_zeus_call(
             api_version, zeus_url, bucket, scope, collection, name, tc_args,
-            zeus_headers, corr_headers=corr)
+            zeus_headers, corr_headers=corr, rewind=rewind)
 
         if tstatus == 401 and zcfg.get("auth_mode") == "basic":
             logger.warning("run_agent: 401 on dispatch with basic auth -> forcing re-mint and retry")
@@ -353,7 +357,7 @@ async def execute_tool_calls(
                 trace["notes"].append(f"auth: re-minted after 401 ({auth_note})")
                 tstatus, ttext, dispatch_url, req_id = await dispatch_zeus_call(
                     api_version, zeus_url, bucket, scope, collection, name, tc_args,
-                    zeus_headers, corr_headers=corr)
+                    zeus_headers, corr_headers=corr, rewind=rewind)
             except (RuntimeError, httpx.HTTPError) as e:
                 trace["notes"].append(f"auth: re-mint after 401 failed ({e})")
 

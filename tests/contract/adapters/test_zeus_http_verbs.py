@@ -297,3 +297,57 @@ async def test_http_verb_forwards_rewind_headers() -> None:
     assert req.headers["X-Zeus-Trace-Class"] == "direct.read"
     assert req.headers["X-Zeus-Mode"] == "analytics"
     assert req.headers.get("X-Zeus-Req-Id") in (None, "")
+    assert "rewind=" not in str(req.url)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_http_verb_sends_rewind_query_not_body() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(url__startswith=f"{base}/v2/yelp-data/_default/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-rw"})
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=base, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Business", "rewind": True},
+            target=DataTarget(),
+            rewind=True,
+        )
+    finally:
+        await port.aclose()
+    req = route.calls.last.request
+    assert "rewind=true" in str(req.url)
+    body = json.loads(req.content)
+    assert "rewind" not in body
+    assert body["entity_type"] == "Business"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_http_verb_default_omits_rewind_query() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(f"{base}/v2/yelp-data/_default/_default/find").mock(
+        return_value=httpx.Response(200, json={"ok": True})
+    )
+    port = HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=base, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+    )
+    try:
+        await run_data_verb(
+            port,
+            "find",
+            {"entity_type": "Business"},
+            target=DataTarget(),
+        )
+    finally:
+        await port.aclose()
+    req = route.calls.last.request
+    assert "rewind=" not in str(req.url)
+    assert "rewind" not in json.loads(req.content)
