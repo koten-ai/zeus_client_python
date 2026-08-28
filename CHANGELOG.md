@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Security (ZCP-101)
+
+- Floor-5 jailbreak control plane: multi-surface scorer (`zeus_client.security.jailbreak`) covering catalog families R–H (paraphrase dump, clean terminate, commercial invent, retrieval injection, multi-turn grooming, encoding, summary leak).
+- `SecurityHooks` scores user text + prior turns + decoded payloads + Zeus tool JSON + terminate/cheap-path summaries. Hard refuse (`>= 0.85`) skips the LLM/Zeus loop; poisoned tool bodies are replaced with `untrusted_tool_payload`.
+- Catalog tool allowlist denies unknown verbs (except `return`). Request overlay cannot reword default jailbreak rule text unless `override_defaults=True` (I1).
+- Tests: `tests/unit/security/test_jailbreak.py`, `tests/unit/application/test_jailbreak_turns.py`.
 ### Added (ZCP-112)
 
 - Opt-in Zeus verbose persist: `DebugPolicy.rewind` / `ZEUS_REWIND=true` sends query `rewind=true` on V2 verbs and query+body on session create/turn/trace. Default **off**. `X-Zeus-Trace: 1` still only force-keeps; it does not upgrade slim → verbose. Verb JSON never forwards a `rewind` argument.

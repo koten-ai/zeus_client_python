@@ -40,7 +40,12 @@ from zeus_client.application.detective.extract import (
     system_prompt_of,
     tool_payload_shape,
 )
-from zeus_client.application.middleware import MiddlewareChain, MiddlewareContext, SecurityHooks
+from zeus_client.application.middleware import (
+    MiddlewareChain,
+    MiddlewareContext,
+    SecurityHooks,
+    inspect_jailbreak,
+)
 from zeus_client.application.projectors.public_trace import build_public_trace
 from zeus_client.application.projectors.session_trace import (
     TRACE_SNIPPET_MAX,
@@ -516,9 +521,17 @@ async def run_agent_turn(
                 **finish_kw,
             )
 
+    mw_ctx.data["catalog_tool_names"] = _catalog_tool_names(tools)
+    mw_ctx.data["prior_user_texts"] = [
+        str(pm.get("content") or "")
+        for pm in req.prior_messages
+        if isinstance(pm, Mapping) and str(pm.get("role") or "") == "user"
+    ]
     await mw.on_turn_start(mw_ctx)
     notes.extend(mw_ctx.notes)
     mw_ctx.notes.clear()
+    if mw_ctx.data.get("jailbreak_hits"):
+        notes.append("jailbreak.hits=" + ",".join(str(h) for h in mw_ctx.data["jailbreak_hits"]))
 
     answer: str | None = None
     exit_kind: str | None = None
@@ -526,9 +539,16 @@ async def run_agent_turn(
     last_terminate_via: str = "client_terminate"
     rounds_done = 0
     trail: list[dict[str, Any]] = []
+    skip_loop = bool(mw_ctx.data.get("hooks_must_refuse"))
+    if skip_loop:
+        notes.append("jailbreak.pre_llm_refuse")
+        answer = ""
+        exit_kind = "hooks_refuse"
 
     try:
         for rnd in range(1, max_rounds + 1):
+            if skip_loop:
+                break
             rounds_done = rnd
             mw_ctx.round = rnd
             force_left = settings.force_return_rounds_left
@@ -607,7 +627,12 @@ async def run_agent_turn(
             tool_calls = list(llm_resp.tool_calls or ())
             if not tool_calls:
                 envelope = parse_pipeline_envelope(llm_resp.content)
-                if envelope and zeus is not None and "pipeline" in _catalog_tool_names(tools):
+                if (
+                    envelope
+                    and zeus is not None
+                    and "pipeline" in _catalog_tool_names(tools)
+                    and not mw_ctx.data.get("hooks_must_refuse")
+                ):
                     tool_calls = [_synthetic_pipeline_call(envelope)]
                     notes.append(
                         "recovered pipeline envelope from model content as pipeline tool call"
@@ -669,6 +694,10 @@ async def run_agent_turn(
                 last_return_args = outcome.return_args
             if outcome.terminate_via:
                 last_terminate_via = outcome.terminate_via
+            if mw_ctx.data.get("jailbreak_hits"):
+                note = "jailbreak.hits=" + ",".join(str(h) for h in mw_ctx.data["jailbreak_hits"])
+                if note not in notes:
+                    notes.append(note)
 
             if outcome.return_seen:
                 terminal = (outcome.terminal_summary or "").strip()
@@ -696,13 +725,25 @@ async def run_agent_turn(
                 break
 
             if not ai_process and outcome.tools_with_payload > 0:
-                answer = (outcome.tool_arg_summary or "").strip() or CHEAP_FINAL_STATIC_ANSWER
+                candidate = (outcome.tool_arg_summary or "").strip()
+                inspect_jailbreak(mw_ctx, candidate, surface="tool_arg_summary")
+                if mw_ctx.data.get("hooks_must_refuse"):
+                    notes.append("jailbreak.cheap_path_leak")
+                    answer = ""
+                    exit_kind = "hooks_refuse"
+                    break
+                answer = candidate or CHEAP_FINAL_STATIC_ANSWER
                 if not _recent_assistant_has(messages, answer):
                     messages.append({"role": "assistant", "content": answer})
                 exit_kind = "cheap_final"
                 notes.append(
                     "ai_process_result=false after Zeus data; thin final without second LLM hop"
                 )
+                break
+            if mw_ctx.data.get("hooks_must_refuse"):
+                notes.append("jailbreak.abort_turn")
+                answer = answer or ""
+                exit_kind = "hooks_refuse"
                 break
             # continue multi-round
         else:
@@ -761,6 +802,19 @@ async def run_agent_turn(
                 "zeus_client.layer_a.invalid",
                 **{"result": "fail", "error.type": "parse", "missing": missing},
             )
+        inspect_jailbreak(mw_ctx, layer.summary, surface="summary")
+    raw_answer = answer or ""
+    # Insight/model may echo a full Layer A dump — peel summary first so G2
+    # never lands in chat; bag summary is fallback, not preferred over peel.
+    peeled = peel_layer_a_summary(raw_answer)
+    if peeled:
+        pre_policy_answer = peeled
+    else:
+        pre_policy_answer = user_facing_answer(
+            raw_answer,
+            layer_summary=layer.summary if layer else None,
+        )
+    inspect_jailbreak(mw_ctx, pre_policy_answer, surface="answer")
     hooks_score = float(mw_ctx.data.get("hooks_jailbreak_score") or 0.0)
     finish_kw["hooks_score"] = hooks_score
     hooks_refuse = bool(mw_ctx.data.get("hooks_must_refuse"))
@@ -783,17 +837,7 @@ async def run_agent_turn(
             **{"policy_action": decision.policy, "result": "ok"},
         )
 
-    raw_answer = answer or ""
-    # Insight/model may echo a full Layer A dump — peel summary first so G2
-    # never lands in chat; bag summary is fallback, not preferred over peel.
-    peeled = peel_layer_a_summary(raw_answer)
-    if peeled:
-        final_answer = peeled
-    else:
-        final_answer = user_facing_answer(
-            raw_answer,
-            layer_summary=layer.summary if layer else None,
-        )
+    final_answer = pre_policy_answer
     if decision is not None:
         if (
             decision.forced
@@ -1072,6 +1116,20 @@ async def _execute_tool_calls(
             )
             continue
 
+        if mw_ctx.data.get("hooks_must_refuse"):
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "name": name,
+                    "content": json.dumps({"error": "turn_refused", "verb": name}),
+                }
+            )
+            outcome.steps.append(
+                {"round": round_n, "type": "refused", "name": name, "args": tc_args}
+            )
+            continue
+
         t_tool = time.perf_counter()
         hop = await zeus.call_verb(
             VerbRequest(
@@ -1095,6 +1153,14 @@ async def _execute_tool_calls(
         body = hop.body if isinstance(hop.body, Mapping) else {}
         text = json.dumps(body) if body else (hop.error or "")
         await middleware.after_zeus(mw_ctx, name, hop.status_code, body or text)
+        override = mw_ctx.data.pop("tool_body_override", None)
+        if isinstance(override, str) and override.strip():
+            text = override
+            try:
+                parsed = json.loads(override)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                parsed = {"error": "untrusted_tool_payload"}
+            body = parsed if isinstance(parsed, Mapping) else {"error": "untrusted_tool_payload"}
         shape = tool_payload_shape(body)
         get_family_logger().trace(
             "zeus_client.tool.result_shape",

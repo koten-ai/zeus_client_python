@@ -530,6 +530,7 @@ Reviewer verifies:
 | Artifacts | scores / wish_i_knew stay out of chat UI |
 | Tool JSON | untrusted |
 | Jailbreak dual scores | Do not overwrite each other |
+| Jailbreak catalog | Lock families R/A–H from [JAILBREAK_ATTEMPTS.md](./JAILBREAK_ATTEMPTS.md) (family: [`JAILBREAK_ATTEMPTS_SECURITY.md`](https://github.com/koten-ai/zeus_client_design/blob/main/docs/JAILBREAK_ATTEMPTS_SECURITY.md)) |
 
 ---
 
