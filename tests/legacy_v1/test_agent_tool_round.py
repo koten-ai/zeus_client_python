@@ -470,6 +470,7 @@ async def test_basic_auth_401_retry_success(monkeypatch, reset_auth_cache, http_
         args,
         zeus_headers,
         corr_headers=None,
+        rewind=False,
     ):
         calls.append(zeus_headers.get("X-Zeus-Session", ""))
         if len(calls) == 1:
@@ -647,6 +648,7 @@ async def test_force_trace_header_from_zcfg(monkeypatch):
         args,
         zeus_headers,
         corr_headers=None,
+        rewind=False,
     ):
         captured["corr"] = corr_headers
         return 200, "{}", "http://z/find", "r1"

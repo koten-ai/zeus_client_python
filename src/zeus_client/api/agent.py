@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from zeus_client.application.agent_turn import AgentTurnUseCase, run_agent_turn
@@ -45,6 +46,7 @@ class AgentAPI:
         base_id: str | None = None,
         llm: Any = None,
         zeus: Any = None,
+        rewind: bool | None = None,
     ) -> TurnResult:
         llm = self._rt.services.llm if llm is None else llm
         if llm is None:
@@ -96,7 +98,11 @@ class AgentAPI:
             journal=self._rt.journal,
             middleware=self._middleware,
             default_settings=self._rt.config.settings,
-            debug_policy=self._rt.config.debug,
+            debug_policy=(
+                replace(self._rt.config.debug, rewind=bool(rewind))
+                if rewind is not None
+                else self._rt.config.debug
+            ),
             hub_base_url=self._rt.config.debug.hub_base_url,
             session_lifecycle=getattr(self._rt.services, "session_lifecycle", None),
             zeus_url=self._rt.config.zeus.url,

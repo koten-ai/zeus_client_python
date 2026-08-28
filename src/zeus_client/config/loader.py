@@ -349,6 +349,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             detective_briefing=_as_bool(debug.get("detective_briefing"), True),
             capture_bodies=_as_bool(debug.get("capture_bodies"), False),
             transport_replay=_as_bool(debug.get("transport_replay"), True),
+            rewind=_as_bool(debug.get("rewind"), _as_bool(settings.get("rewind"), False)),
         ),
         rate_limit=RateLimitPolicy(
             typeahead_enabled=_as_bool(rate_limit.get("typeahead_enabled"), True),
@@ -542,6 +543,11 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             enabled=_as_bool(env.get("ZEUS_CLIENT_SEMANTIC_CACHE"), False)
         )
 
+    debug = cfg.debug
+    if "ZEUS_REWIND" in env or "ZEUS_CLIENT_REWIND" in env:
+        raw = env["ZEUS_REWIND"] if "ZEUS_REWIND" in env else env.get("ZEUS_CLIENT_REWIND")
+        debug = debug.with_updates(rewind=_as_bool(raw, debug.rewind))
+
     out = cfg.with_overrides(
         profile=profile,
         zeus=z,
@@ -549,6 +555,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
         llm=llm,
         settings=settings,
         logging=log_pol,
+        debug=debug,
         client=ident,
         chat_requests_dir=chat_dir,
         jobs=jobs,

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from zeus_client.config.models import (
-    DebugPolicy,
     LoggingPolicy,
     RedactionPolicy,
     RuntimeConfig,
@@ -50,7 +51,8 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
         return base.with_overrides(
             profile="development",
             redaction=RedactionPolicy(enabled=True, preview_max_chars=16_384),
-            debug=DebugPolicy(
+            debug=replace(
+                base.debug,
                 detective_briefing=True,
                 capture_bodies=True,
                 transport_replay=True,
@@ -68,7 +70,8 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
         out = base.with_overrides(
             profile="production",
             redaction=RedactionPolicy(enabled=True, preview_max_chars=2_048),
-            debug=DebugPolicy(
+            debug=replace(
+                base.debug,
                 detective_briefing=True,
                 capture_bodies=False,
                 transport_replay=True,
@@ -93,7 +96,8 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
         return base.with_overrides(
             profile="ci",
             redaction=RedactionPolicy(enabled=True, preview_max_chars=4_096),
-            debug=DebugPolicy(
+            debug=replace(
+                base.debug,
                 detective_briefing=True,
                 capture_bodies=False,
                 transport_replay=True,
@@ -104,7 +108,8 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
         return base.with_overrides(
             profile="hub",
             redaction=RedactionPolicy(enabled=True, preview_max_chars=16_384),
-            debug=DebugPolicy(
+            debug=replace(
+                base.debug,
                 detective_briefing=True,
                 capture_bodies=True,
                 transport_replay=True,
@@ -115,7 +120,8 @@ def apply_profile(base: RuntimeConfig, profile: str) -> RuntimeConfig:
     return base.with_overrides(
         profile=name,
         redaction=RedactionPolicy(enabled=True, preview_max_chars=16_384),
-        debug=DebugPolicy(
+        debug=replace(
+            base.debug,
             detective_briefing=True,
             capture_bodies=True,
             transport_replay=True,

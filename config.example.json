@@ -97,7 +97,8 @@
   "debug": {
     "detective_briefing": true,
     "capture_bodies": false,
-    "transport_replay": true
+    "transport_replay": true,
+    "rewind": false
   },
   "chat_requests_dir": null
 }
