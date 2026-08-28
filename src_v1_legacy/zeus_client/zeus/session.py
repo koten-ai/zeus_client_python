@@ -8,7 +8,7 @@ from zeus_client.http_client import client
 from zeus_client.logging_setup import logger
 
 async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_hash,
-                              chat_request, initial_conversation, zeus_headers):
+                              chat_request, initial_conversation, zeus_headers, rewind=False):
     """Phase C: open a durable session (round 1 head + shard). Returns
     (status, body_or_text, url, req_id). On success body contains
     session_id, round, hash, contract_status, max_rounds."""
@@ -20,10 +20,15 @@ async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_has
         "chat_request": chat_request or {},
         "conversation": initial_conversation or [],
     }
+    if rewind:
+        payload["rewind"] = True
     headers = {**zeus_headers, "Content-Type": "application/json"}
     logger.debug(f"create_zeus_session: url={url} contract_id={contract_id} hash={(contract_hash or '')[:18]}… conv_len={len(initial_conversation or [])}")
     try:
-        r = await client().post(url, headers=headers, json=payload, timeout=TOOL_TIMEOUT)
+        r = await client().post(
+            url, headers=headers, json=payload, timeout=TOOL_TIMEOUT,
+            params={"rewind": "true"} if rewind else None,
+        )
         req_id = r.headers.get("X-Zeus-Req-Id", "")
         logger.debug(f"create_zeus_session: -> {r.status_code} req_id={(req_id or '')[:12]}…")
         if r.status_code in (200, 201):
@@ -42,7 +47,7 @@ async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_has
 
 
 async def continue_session_turn(zeus_url, session_id, client_round, chat_request,
-                                new_turns, zeus_headers):
+                                new_turns, zeus_headers, rewind=False):
     """Phase D4: persist a round shard (client_round must be server+1).
     new_turns are the delta turns (user + assistant/tool) for this user question."""
     if not session_id:
@@ -54,10 +59,15 @@ async def continue_session_turn(zeus_url, session_id, client_round, chat_request
         "chat_request": chat_request or {},
         "new_turns": new_turns or [],
     }
+    if rewind:
+        payload["rewind"] = True
     headers = {**zeus_headers, "Content-Type": "application/json"}
     logger.debug(f"continue_session_turn: sid={(session_id or '')[:12]}… round={client_round} new_turns={len(new_turns or [])}")
     try:
-        r = await client().post(url, headers=headers, json=payload, timeout=TOOL_TIMEOUT)
+        r = await client().post(
+            url, headers=headers, json=payload, timeout=TOOL_TIMEOUT,
+            params={"rewind": "true"} if rewind else None,
+        )
         req_id = r.headers.get("X-Zeus-Req-Id", "")
         logger.debug(f"continue_session_turn: -> {r.status_code} req={(req_id or '')[:12]}…")
         if r.status_code == 200:
@@ -77,7 +87,7 @@ async def continue_session_turn(zeus_url, session_id, client_round, chat_request
 
 async def post_session_trace(zeus_url, session_id, client_round, req_id,
                              contract_id, contract_hash, chat_request,
-                             turns, zeus_response, outcome, zeus_headers):
+                             turns, zeus_response, outcome, zeus_headers, rewind=False):
     """Phase D5: post a per-round (or per-req) trace delta joined to req_id.
     Enables Detective /admin/debug/req/{req_id} to show external session
     panel + contract_status attribution (drift vs zeus_fault)."""
@@ -96,10 +106,15 @@ async def post_session_trace(zeus_url, session_id, client_round, req_id,
         "zeus_response": zeus_response or {},
         "outcome": outcome or "ok",
     }
+    if rewind:
+        payload["rewind"] = True
     headers = {**zeus_headers, "Content-Type": "application/json"}
     logger.debug(f"post_session_trace: sid={(session_id or '')[:12]}… round={client_round} join_req={(req_id or '')[:12]}…")
     try:
-        r = await client().post(url, headers=headers, json=payload, timeout=TOOL_TIMEOUT)
+        r = await client().post(
+            url, headers=headers, json=payload, timeout=TOOL_TIMEOUT,
+            params={"rewind": "true"} if rewind else None,
+        )
         trace_req_id = r.headers.get("X-Zeus-Req-Id", "")
         logger.debug(f"post_session_trace: -> {r.status_code} trace_req={(trace_req_id or '')[:12]}…")
         if r.status_code in (200, 201):

@@ -60,6 +60,8 @@ class ClientSettings:
     # Stamp X-Zeus-Trace: 1 on tool dispatches (sampler force-keep). Lab/debug.
     # Also honoured via env ZEUS_CLIENT_FORCE_TRACE=1 (see effective_force_trace).
     force_trace: bool = False
+    # Opt-in Zeus verbose persist (?rewind=true). Also honoured via ZEUS_REWIND.
+    rewind: bool = False
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any] | None) -> "ClientSettings":
@@ -232,6 +234,7 @@ def prepare_settings(settings: ClientSettings | Mapping | None) -> ClientSetting
         s.company_context, _ = truncate_company_context(s.company_context)
     s.ai_process_result = bool(s.ai_process_result)
     s.force_trace = bool(s.force_trace)
+    s.rewind = bool(s.rewind)
     return s
 
 
@@ -278,5 +281,38 @@ def effective_force_trace(
     if isinstance(zcfg, Mapping):
         nested = zcfg.get("zeus")
         if isinstance(nested, Mapping) and nested.get("force_trace"):
+            return True
+    return False
+
+
+def effective_rewind(
+    settings: ClientSettings | Mapping | None = None,
+    zcfg: Mapping[str, Any] | None = None,
+) -> bool:
+    """Resolve Zeus rewind=true: env → settings → zcfg → False.
+
+    Env ``ZEUS_REWIND`` / ``ZEUS_CLIENT_REWIND`` = ``1|true|yes|on`` wins.
+    """
+    import os
+
+    for key in ("ZEUS_REWIND", "ZEUS_CLIENT_REWIND"):
+        env = (os.environ.get(key) or "").strip().lower()
+        if env in {"1", "true", "yes", "on"}:
+            return True
+        if env in {"0", "false", "no", "off"}:
+            return False
+    if isinstance(settings, ClientSettings):
+        if settings.rewind:
+            return True
+    elif isinstance(settings, Mapping) and settings.get("rewind"):
+        return True
+    if isinstance(zcfg, Mapping) and zcfg.get("rewind"):
+        return True
+    if isinstance(zcfg, Mapping):
+        nested = zcfg.get("zeus")
+        debug = zcfg.get("debug")
+        if isinstance(nested, Mapping) and nested.get("rewind"):
+            return True
+        if isinstance(debug, Mapping) and debug.get("rewind"):
             return True
     return False

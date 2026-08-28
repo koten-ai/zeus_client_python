@@ -36,5 +36,6 @@ error `details` and support packs. Product stamp is `debug.stamp.user = zeus_cli
 - Reuse `X-Zeus-Req-Id`
 - Invent `contract_hash`
 - Put G2 (`wish_i_knew`, jail scores) in `answer` or compact `layer_a`
+- Treat `X-Zeus-Trace: 1` as verbose — that only **keeps** the hop. Zeus stores tool `result` bodies when the client sends `rewind=true` (`DebugPolicy.rewind` / `ZEUS_REWIND`). Default is off.
 
 See also `docs/VERBS.md` § Hub Rewind.

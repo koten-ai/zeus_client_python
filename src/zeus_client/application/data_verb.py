@@ -10,6 +10,7 @@ from zeus_client.adapters.zeus_http.headers import (
     TRACE_CLASS_DIRECT_READ,
     correlation_headers,
     merge_headers,
+    verb_body_without_rewind,
 )
 from zeus_client.adapters.zeus_http.verbs import EXPOSED_V2_VERB_SET, EXPOSED_V2_VERBS
 from zeus_client.config.models import DataTarget
@@ -61,6 +62,7 @@ async def run_data_verb(
     mode_header: str = "analytics",
     headers: Mapping[str, str] | None = None,
     force_trace: bool = False,
+    rewind: bool = False,
     chat_id: str | None = None,
     turn_id: str | None = None,
     base_url: str | None = None,
@@ -87,7 +89,7 @@ async def run_data_verb(
     hop = await zeus.call_verb(
         VerbRequest(
             verb=name,
-            body=dict(body or {}),
+            body=verb_body_without_rewind(body),
             target=target,
             mode_header=mode_header,
             headers=merge_headers(
@@ -104,6 +106,7 @@ async def run_data_verb(
             password_env=password_env,
             token_env=token_env,
             username=username,
+            rewind=rewind,
         )
     )
     return VerbResult(

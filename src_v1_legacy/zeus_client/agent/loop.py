@@ -16,6 +16,7 @@ from zeus_client.agent.settings import (
     ClientSettings,
     effective_ai_process_result,
     effective_force_trace,
+    effective_rewind,
     prepare_settings,
 )
 from zeus_client.agent.tool_round import (
@@ -502,6 +503,7 @@ async def run_agent(
         zeus_url, tc.sid, tc.enable_sessions, tc.this_user_round,
         tc.contract_id, tc.contract_hash, tc.chat_req, produced_delta,
         prior_turns, tc.this_turn_reqs, tc.trace, tc.zeus_headers,
+        rewind=effective_rewind(tc.settings, zcfg),
     )
     # Helios cheap spine on session_meta / trace
     if tc.settings:

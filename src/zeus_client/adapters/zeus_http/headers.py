@@ -1,8 +1,9 @@
-"""V2 Zeus HTTP header helpers — mode, correlation, product stamp."""
+"""V2 Zeus HTTP header helpers — mode, correlation, product stamp, rewind."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 from zeus_client._version import __version__ as PACKAGE_VERSION
 
@@ -18,6 +19,8 @@ __all__ = [
     "product_stamp_headers",
     "merge_headers",
     "req_id_from_headers",
+    "rewind_query_params",
+    "verb_body_without_rewind",
 ]
 
 TRACE_CLASS_AGENT = "agent"
@@ -96,4 +99,16 @@ def merge_headers(*parts: Mapping[str, str] | None) -> dict[str, str]:
     for p in parts:
         if p:
             out.update(dict(p))
+    return out
+
+
+def rewind_query_params(rewind: bool) -> dict[str, str]:
+    """Query ``rewind=true`` so Zeus persists a verbose tape (ZCP-112). Empty when off."""
+    return {"rewind": "true"} if rewind else {}
+
+
+def verb_body_without_rewind(body: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Drop ``rewind`` from verb JSON — it is a query/session flag, not a Zeus arg."""
+    out = dict(body or {})
+    out.pop("rewind", None)
     return out
