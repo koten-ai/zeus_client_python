@@ -5,7 +5,7 @@ from zeus_client.agent.layer_a import LayerA, parse_layer_a, normalize_triggers,
 from zeus_client.agent.loop import run_agent
 from zeus_client.agent.policy import PolicyDecision, decide_policy
 from zeus_client.agent.response import StructuredAgentResponse, extract_structured_response, layer_a_for_session_trace
-from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings, effective_ai_process_result, effective_force_trace
+from zeus_client.agent.settings import ClientSettings, freeze_session_rules, merge_rules, prepare_settings, effective_ai_process_result, effective_force_trace, effective_rewind
 from zeus_client.config import (
     load_config,
     resolve_llm_provider_config,
@@ -120,6 +120,7 @@ __all__ = [
     "decide_policy",
     "effective_ai_process_result",
     "effective_force_trace",
+    "effective_rewind",
     "extract_structured_response",
     "layer_a_for_session_trace",
     "freeze_session_rules",

@@ -122,6 +122,7 @@ async def run_verb(
     zcfg: Mapping[str, Any] | None = None,
     corr_headers: Mapping[str, str] | None = None,
     mode_header: str = "analytics",
+    rewind: bool | None = None,
 ) -> VerbResult:
     """POST one Zeus V2 verb (no LLM).
 
@@ -207,6 +208,9 @@ async def run_verb(
             zeus_url=zeus_url,
         )
 
+    from zeus_client.agent.settings import effective_rewind
+
+    flag = bool(rewind) if rewind is not None else effective_rewind(None, zcfg)
     status, text, url, req_id = await dispatch_zeus_v2_verb(
         zeus_url,
         bucket,
@@ -216,6 +220,7 @@ async def run_verb(
         payload,
         headers,
         corr_headers=dict(corr_headers) if corr_headers else None,
+        rewind=flag,
     )
     body = _parse_body(text)
     error = ""
@@ -244,6 +249,7 @@ async def run_verb_from_config(
     sample: str | None = None,
     corr_headers: Mapping[str, str] | None = None,
     mode_header: str = "analytics",
+    rewind: bool | None = None,
 ) -> VerbResult:
     """Resolve sample triple + zeus auth from client config.json, then :func:`run_verb`."""
     from zeus_client.config import resolve_zeus_config
@@ -268,6 +274,7 @@ async def run_verb_from_config(
         zcfg=zcfg,
         corr_headers=corr_headers,
         mode_header=mode_header,
+        rewind=rewind,
     )
 
 
@@ -283,6 +290,7 @@ def _make_run_verb(verb_name: str):
         zcfg: Mapping[str, Any] | None = None,
         corr_headers: Mapping[str, str] | None = None,
         mode_header: str = "analytics",
+        rewind: bool | None = None,
     ) -> VerbResult:
         return await run_verb(
             verb_name,
@@ -295,6 +303,7 @@ def _make_run_verb(verb_name: str):
             zcfg=zcfg,
             corr_headers=corr_headers,
             mode_header=mode_header,
+            rewind=rewind,
         )
 
     _runner.__name__ = f"run_{verb_name}"

@@ -104,6 +104,7 @@ class SessionLifecycle:
         headers: Mapping[str, str] | None = None,
         turn_id: str = "",
         force_trace: bool = False,
+        rewind: bool = False,
     ) -> SessionHandle:
         """Create or rehydrate a session; dead sid → recreate same turn."""
         chat_req = dict(chat_request or {})
@@ -147,6 +148,7 @@ class SessionLifecycle:
                 chat_id=chat_id or (prior.chat_id if prior else ""),
                 headers=hop_headers,
                 recovered_from="",
+                rewind=rewind,
             )
 
         if prior_sid:
@@ -193,6 +195,7 @@ class SessionLifecycle:
                 chat_id=chat_id or (prior.chat_id if prior else ""),
                 headers=hop_headers,
                 recovered_from=prior_sid,
+                rewind=rewind,
             )
 
         return await self._create(
@@ -203,6 +206,7 @@ class SessionLifecycle:
             mode=mode,
             chat_id=chat_id,
             headers=hop_headers,
+            rewind=rewind,
         )
 
     async def _create(
@@ -216,6 +220,7 @@ class SessionLifecycle:
         chat_id: str,
         headers: Mapping[str, str] | None,
         recovered_from: str = "",
+        rewind: bool = False,
     ) -> SessionHandle:
         init_conv = [{"role": "user", "content": user_message}] if user_message else []
         result = await self.client.create(
@@ -226,6 +231,7 @@ class SessionLifecycle:
             headers=headers,
             mode=mode,
             target=self.target,
+            rewind=rewind,
         )
         if result.ok and isinstance(result.body, Mapping):
             body = result.body
@@ -297,6 +303,7 @@ class SessionLifecycle:
         headers: Mapping[str, str] | None = None,
         turn_id: str = "",
         force_trace: bool = False,
+        rewind: bool = False,
     ) -> CommitResult:
         """POST ``/v2/session/{id}/turn`` for this user question's delta.
 
@@ -333,6 +340,7 @@ class SessionLifecycle:
             ),
             mode=mode,
             target=self.target,
+            rewind=rewind,
         )
         if result.ok:
             get_family_logger().info(

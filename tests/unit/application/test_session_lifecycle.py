@@ -6,6 +6,8 @@ Wire shapes aligned with design wire/v2_session_*.json.
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -417,6 +419,41 @@ async def test_lifecycle_create_stamps_session_rewind_headers() -> None:
     assert h["X-Zeus-Trace"] == "1"
     assert "X-Zeus-Call-Id" not in h
     assert route.calls.last.request.headers.get("X-Zeus-Req-Id") in (None, "")
+    body = json.loads(route.calls.last.request.content)
+    assert "rewind" not in body
+    assert "rewind=" not in str(route.calls.last.request.url)
+    await http.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_lifecycle_create_sends_rewind_query_and_body() -> None:
+    route = respx.post(url__startswith=f"{ZEUS}/v2/session").mock(
+        return_value=httpx.Response(
+            201,
+            json={"session_id": "sid-rw", "round": 1, "contract_status": "match"},
+            headers={"X-Zeus-Req-Id": "req-create-rw"},
+        )
+    )
+    http = HttpxSessionClient(
+        endpoint=ZeusEndpointConfig(url=ZEUS),
+        secrets=EnvSecretStore({}),
+    )
+    life = SessionLifecycle(http)
+    await life.setup(
+        chat_request={"messages": [{"role": "system", "content": "x"}]},
+        user_message="hello",
+        prior=None,
+        contract_id="c1",
+        mode="analytics",
+        chat_id="chat-rew",
+        turn_id="turn_abc",
+        rewind=True,
+    )
+    req = route.calls.last.request
+    assert "rewind=true" in str(req.url)
+    body = json.loads(req.content)
+    assert body["rewind"] is True
     await http.aclose()
 
 
