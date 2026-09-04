@@ -335,6 +335,9 @@ async def test_lifecycle_commit_continue_turn_just_created() -> None:
         chat_request={},
         produced_delta=delta,
         mode="analytics",
+        turn_id="turn_join",
+        brief_sha12="briefsha12ab",
+        mini_sha12="minisha12abc",
     )
     assert out.ok
     assert out.handle.round == 2
@@ -345,6 +348,12 @@ async def test_lifecycle_commit_continue_turn_just_created() -> None:
     body = json.loads(route.calls.last.request.content)
     assert body["round"] == 2
     assert all(t.get("role") != "user" for t in body["new_turns"])
+    h = route.calls.last.request.headers
+    assert h["X-Zeus-Chat-Session-Id"] == sid
+    assert h["X-Zeus-Brief-Sha12"] == "briefsha12ab"
+    assert h["X-Zeus-Mini-Sha12"] == "minisha12abc"
+    assert h["X-Zeus-Turn-Id"] == "turn_join"
+    assert "X-Zeus-Session" not in h or h.get("X-Zeus-Session") != sid
     await http.aclose()
 
 
@@ -418,6 +427,7 @@ async def test_lifecycle_create_stamps_session_rewind_headers() -> None:
     assert h["X-Zeus-Trace-Class"] == "session"
     assert h["X-Zeus-Trace"] == "1"
     assert "X-Zeus-Call-Id" not in h
+    assert "X-Zeus-Chat-Session-Id" not in h
     assert route.calls.last.request.headers.get("X-Zeus-Req-Id") in (None, "")
     body = json.loads(route.calls.last.request.content)
     assert "rewind" not in body

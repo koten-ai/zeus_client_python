@@ -31,6 +31,21 @@ def test_correlation_headers_full_agent() -> None:
     assert h["X-Zeus-Trace"] == "1"
     assert h["X-Zeus-Trace-Class"] == "agent"
     assert "X-Zeus-Req-Id" not in h
+    assert "X-Zeus-Session" not in h
+    assert "X-Zeus-Chat-Session-Id" not in h
+
+
+def test_correlation_headers_chat_session_and_sha12() -> None:
+    h = correlation_headers(
+        chat_session_id="sess_20260903T120000_000001",
+        brief_sha12="3e77b8258d09",
+        mini_sha12="5b4692baf06f",
+    )
+    assert h["X-Zeus-Chat-Session-Id"] == "sess_20260903T120000_000001"
+    assert h["X-Zeus-Brief-Sha12"] == "3e77b8258d09"
+    assert h["X-Zeus-Mini-Sha12"] == "5b4692baf06f"
+    assert "X-Zeus-Session" not in h
+    assert "X-Zeus-Req-Id" not in h
 
 
 def test_correlation_headers_omits_empty() -> None:

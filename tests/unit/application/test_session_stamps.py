@@ -66,9 +66,12 @@ async def test_post_trace_stamps_and_keeps_dispatch_req_id() -> None:
         chat_request={},
         turns=[],
         zeus_response={"status": 200},
+        turn_id="turn-join-1",
     )
     body = json.loads(route.calls.last.request.content)
     assert body["req_id"] == dispatch
+    assert body["session_id"] == "sess_1"
+    assert body["turn_id"] == "turn-join-1"
     assert body["user"] == PRODUCT_USER
     assert body["zeus_response"]["user"] == PRODUCT_USER
     await client.aclose()

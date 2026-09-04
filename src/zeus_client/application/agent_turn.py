@@ -23,6 +23,7 @@ from typing import Any
 
 from zeus_client.adapters.zeus_http.headers import (
     TRACE_CLASS_AGENT,
+    TRACE_CLASS_SESSION,
     correlation_headers,
     verb_body_without_rewind,
 )
@@ -37,6 +38,7 @@ from zeus_client.application.detective.extract import (
     catalog_flags_of,
     collect_req_ids,
     inject_for_session_trace,
+    inject_slice_sha12s,
     system_prompt_of,
     tool_payload_shape,
 )
@@ -395,6 +397,11 @@ async def run_agent_turn(
     )
 
     session_handle = req.session
+    setup_sys = system_prompt_of(
+        catalog=req.chat_request if isinstance(req.chat_request, Mapping) else None,
+        system_prompt=req.system_prompt,
+    )
+    setup_brief, setup_mini = inject_slice_sha12s(inject_for_session_trace(system=setup_sys))
     if req.enable_sessions and session_lifecycle is not None:
         try:
             session_handle = await session_lifecycle.setup(
@@ -407,6 +414,8 @@ async def run_agent_turn(
                 enable_sessions=True,
                 force_trace=bool(settings.force_trace),
                 rewind=bool(dbg_pol.rewind),
+                brief_sha12=setup_brief,
+                mini_sha12=setup_mini,
             )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"session_setup_failed: {exc}")
@@ -545,6 +554,19 @@ async def run_agent_turn(
         answer = ""
         exit_kind = "hooks_refuse"
 
+    hop_inject = inject_for_session_trace(
+        system=system_prompt_of(
+            messages=messages,
+            catalog=req.chat_request if isinstance(req.chat_request, Mapping) else None,
+        ),
+        catalog=req.chat_request if isinstance(req.chat_request, Mapping) else None,
+        rewind=bool(dbg_pol.rewind),
+    )
+    brief_sha12, mini_sha12 = inject_slice_sha12s(hop_inject)
+    chat_session_id = ""
+    if session_handle and session_handle.enabled and session_handle.session_id:
+        chat_session_id = str(session_handle.session_id)
+
     try:
         for rnd in range(1, max_rounds + 1):
             if skip_loop:
@@ -632,6 +654,16 @@ async def run_agent_turn(
                             stamp=stamp,
                             mode=settings.mode,
                             rewind=bool(dbg_pol.rewind),
+                            turn_id=turn_id,
+                            headers=correlation_headers(
+                                chat_id=chat_id,
+                                turn_id=turn_id,
+                                force_trace=bool(settings.force_trace),
+                                trace_class=TRACE_CLASS_SESSION,
+                                chat_session_id=chat_session_id,
+                                brief_sha12=brief_sha12,
+                                mini_sha12=mini_sha12,
+                            ),
                         )
                     except Exception as join_exc:  # noqa: BLE001
                         notes.append(f"session_trace_failed: {join_exc}")
@@ -725,6 +757,9 @@ async def run_agent_turn(
                 turn_id=turn_id,
                 force_trace=bool(settings.force_trace),
                 rewind=bool(dbg_pol.rewind),
+                chat_session_id=chat_session_id,
+                brief_sha12=brief_sha12,
+                mini_sha12=mini_sha12,
             )
             hops.extend(outcome.hops)
             for hop in outcome.hops:
@@ -917,6 +952,7 @@ async def run_agent_turn(
         catalog=req.chat_request if isinstance(req.chat_request, Mapping) else None,
         rewind=bool(dbg_pol.rewind),
     )
+    post_brief, post_mini = inject_slice_sha12s(inject_bag)
 
     if (
         req.enable_sessions
@@ -939,6 +975,16 @@ async def run_agent_turn(
                 stamp=stamp,
                 mode=settings.mode,
                 rewind=bool(dbg_pol.rewind),
+                turn_id=turn_id,
+                headers=correlation_headers(
+                    chat_id=chat_id,
+                    turn_id=turn_id,
+                    force_trace=bool(settings.force_trace),
+                    trace_class=TRACE_CLASS_SESSION,
+                    chat_session_id=chat_session_id,
+                    brief_sha12=post_brief,
+                    mini_sha12=post_mini,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"session_trace_failed: {exc}")
@@ -951,6 +997,8 @@ async def run_agent_turn(
                 turn_id=turn_id,
                 force_trace=bool(settings.force_trace),
                 rewind=bool(dbg_pol.rewind),
+                brief_sha12=post_brief,
+                mini_sha12=post_mini,
             )
             session_handle = commit.handle
         except Exception as exc:  # noqa: BLE001
@@ -1109,6 +1157,9 @@ async def _execute_tool_calls(
     turn_id: str = "",
     force_trace: bool = False,
     rewind: bool = False,
+    chat_session_id: str = "",
+    brief_sha12: str = "",
+    mini_sha12: str = "",
 ) -> ToolRoundOutcome:
     outcome = ToolRoundOutcome()
     final_summary: str | None = None
@@ -1189,6 +1240,9 @@ async def _execute_tool_calls(
                     mode=mode or "analytics",
                     force_trace=force_trace,
                     trace_class=TRACE_CLASS_AGENT,
+                    chat_session_id=chat_session_id,
+                    brief_sha12=brief_sha12,
+                    mini_sha12=mini_sha12,
                 ),
                 allow_pipeline=True,
                 rewind=rewind,
