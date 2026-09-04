@@ -147,9 +147,12 @@ def test_inject_for_session_trace_omits_previews_and_matches_slice() -> None:
 
     system = "You are helpful.\n\n## SCOPE BRIEF\nAAA\n\n## MINI-SCHEMA\nBBB\n"
     inj = inject_for_session_trace(system=system, source="borrowed")
-    assert inj["brief_sha12"] == sha12(slice_block(system, "brief"))
-    assert inj["mini_sha12"] == sha12(slice_block(system, "mini"))
     assert inj["source"] == "borrowed"
+    assert inj["scope_brief"]["sha12"] == sha12(slice_block(system, "brief"))
+    assert inj["mini_schema"]["sha12"] == sha12(slice_block(system, "mini"))
+    assert "text" not in inj["scope_brief"]
+    assert "text" not in inj["mini_schema"]
     assert "brief_preview" not in inj
     assert "mini_preview" not in inj
     assert "system_message" not in inj
+    assert "has_scope_brief" not in inj

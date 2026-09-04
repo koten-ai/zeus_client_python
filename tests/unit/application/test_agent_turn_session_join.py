@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,7 +12,7 @@ import pytest
 from zeus_client.adapters.zeus_http.session import SessionHttpResult
 from zeus_client.application.agent_turn import run_agent_turn
 from zeus_client.application.session_lifecycle import CommitResult
-from zeus_client.config.models import ClientSettings
+from zeus_client.config.models import ClientSettings, DebugPolicy
 from zeus_client.domain.messages import TurnRequest, TurnStatus
 from zeus_client.domain.session import SessionHandle
 from zeus_client.ports import LlmRequest, LlmResponse, VerbHopResult, VerbRequest
@@ -256,3 +257,82 @@ async def test_agent_api_enable_sessions_uses_injected_lifecycle() -> None:
     assert life.setups
     assert result.session is not None
     assert result.session.session_id == "sess_join_1"
+
+
+_SYSTEM_FIXTURE = (
+    Path(__file__).resolve().parents[2] / "fixtures" / "system_with_brief_mini.txt"
+).read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_session_trace_posts_hub_inject_bag_on_rewind() -> None:
+    """ZCP-114: every tool-hop join has Hub-shaped inject; Direct body has no mini."""
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(
+                    _tc(
+                        "find",
+                        {"entity_type": "hotel", "where": {"city": "Paris"}},
+                        "c1",
+                    ),
+                    _tc("return", _return_args(), "c2"),
+                ),
+            ),
+        ]
+    )
+    zeus = ScriptedZeus(
+        results={
+            "find": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-find-hotel",
+                body={"result": {"items": [{"name": "Hotel"}], "returned_count": 1}},
+            )
+        }
+    )
+    client = FakeSessionClient()
+    life = FakeLifecycle(client=client)
+
+    result = await run_agent_turn(
+        TurnRequest(
+            message="hotels in Paris",
+            tools=(FIND_TOOL, RETURN_TOOL),
+            chat_id="chat_hotels",
+            chat_request={"messages": [{"role": "system", "content": _SYSTEM_FIXTURE}]},
+            settings=ClientSettings(ai_process_result=False, durable_sessions=True),
+            enable_sessions=True,
+        ),
+        llm=llm,
+        zeus=zeus,
+        session_lifecycle=life,
+        debug_policy=DebugPolicy(rewind=True),
+    )
+
+    assert result.status is TurnStatus.OK
+    assert client.posts, "expected POST /v2/session/trace"
+    for post in client.posts:
+        inj = post["zeus_response"]["inject"]
+        assert inj["source"] == "client_llm"
+        assert inj["mini_schema"]["present"] is True
+        assert len(inj["mini_schema"]["sha12"]) == 12
+        int(inj["mini_schema"]["sha12"], 16)
+        assert "hotel" in inj["mini_schema"]["entity_types"]
+        assert inj["mini_schema"]["text"].startswith("## MINI-SCHEMA")
+        assert "text" in inj["scope_brief"]
+        assert post["rewind"] is True
+
+    public_inj = (result.debug.public_trace or {}).get("inject") or {}
+    assert public_inj["mini_schema"]["present"] is True
+    assert (
+        public_inj["mini_schema"]["sha12"]
+        == client.posts[0]["zeus_response"]["inject"]["mini_schema"]["sha12"]
+    )
+
+    assert zeus.calls, "expected Direct find hop"
+    for call in zeus.calls:
+        dumped = json.dumps(call.body)
+        assert "## MINI-SCHEMA" not in dumped
+        assert "## SCOPE BRIEF" not in dumped
+        assert "rewind" not in call.body
