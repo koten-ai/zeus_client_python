@@ -202,7 +202,17 @@ async def test_enable_sessions_posts_trace_join_then_commits_turn() -> None:
     assert la["decomposition"]["predicates"]["country"] == "United States"
     assert la["confidence"] == "high"
     assert la["policy_action"] == "answer"
-    assert la.get("via") == "client_terminate"
+    assert la.get("via") == "return"
+    cat = zresp["catalog"]
+    assert cat["tool_count"] == 2
+    assert cat["tool_names"] == ["find", "return"]
+    assert cat["has_return_verb"] is True
+    assert cat["has_pipeline_verb"] is False
+    term = zresp["terminate"]
+    assert term["has_terminate"] is True
+    assert term["terminate_via"] == "return"
+    assert term["cheap_final"] is False
+    assert "wish_i_knew" not in la
 
     assert life.commits, "expected SessionLifecycle.commit"
     assert result.session is not None
@@ -347,6 +357,50 @@ async def test_session_trace_posts_hub_inject_bag_on_rewind() -> None:
         assert "## MINI-SCHEMA" not in dumped
         assert "## SCOPE BRIEF" not in dumped
         assert "rewind" not in call.body
+
+
+@pytest.mark.asyncio
+async def test_session_trace_omits_layer_a_on_cheap_final() -> None:
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(_tc("find", {"entity_type": "Airport"}, "c1"),),
+            ),
+        ]
+    )
+    zeus = ScriptedZeus(
+        results={
+            "find": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-find-airports",
+                body={"result": {"items": [{"name": "X"}], "returned_count": 1}},
+            )
+        }
+    )
+    client = FakeSessionClient()
+    life = FakeLifecycle(client=client)
+    result = await run_agent_turn(
+        TurnRequest(
+            message="airports",
+            tools=(FIND_TOOL,),
+            settings=ClientSettings(ai_process_result=False, durable_sessions=True),
+            enable_sessions=True,
+        ),
+        llm=llm,
+        zeus=zeus,
+        session_lifecycle=life,
+    )
+    assert result.debug.ai_process_result_exit == "cheap_final"
+    assert client.posts
+    zresp = client.posts[0]["zeus_response"]
+    assert "layer_a" not in zresp
+    assert zresp["catalog"]["tool_count"] == 1
+    assert zresp["catalog"]["has_return_verb"] is False
+    assert zresp["terminate"]["cheap_final"] is True
+    assert zresp["terminate"]["has_terminate"] is True
+    assert zresp["terminate"]["ai_process_result"] is False
 
 
 _USAGE_R1 = {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}
