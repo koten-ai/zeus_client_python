@@ -872,6 +872,7 @@ async def run_agent_turn(
             catalog=req.chat_request if isinstance(req.chat_request, Mapping) else None,
         ),
         catalog=req.chat_request if isinstance(req.chat_request, Mapping) else None,
+        rewind=bool(dbg_pol.rewind),
     )
 
     if (
@@ -1326,6 +1327,7 @@ def _finish(
     inject_bag = inject_for_session_trace(
         system=system_prompt_of(messages=messages, catalog=chat_request),
         catalog=chat_request,
+        rewind=bool((debug_policy or DebugPolicy()).rewind),
     )
 
     stamp_map = dict(stamp or {})
