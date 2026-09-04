@@ -265,6 +265,7 @@ def build_aggregate_trace_payload(
     *,
     layer_a: Mapping[str, Any] | None = None,
     inject: Mapping[str, Any] | None = None,
+    tokens: Mapping[str, Any] | None = None,
     stamp: Mapping[str, Any] | None = None,
 ) -> AggregateTracePayload:
     """Build typed aggregate for one round (identical body for every hop post)."""
@@ -275,6 +276,8 @@ def build_aggregate_trace_payload(
             z["layer_a"] = dict(layer_a)
         if inject:
             z["inject"] = dict(inject)
+        if tokens:
+            z["tokens"] = dict(tokens)
         if stamp:
             z.update({k: v for k, v in dict(stamp).items() if v is not None})
         return AggregateTracePayload(
@@ -341,6 +344,8 @@ def build_aggregate_trace_payload(
         zeus_response["layer_a"] = dict(layer_a)
     if inject:
         zeus_response["inject"] = dict(inject)
+    if tokens:
+        zeus_response["tokens"] = dict(tokens)
     if stamp:
         for k, v in dict(stamp).items():
             if v is not None:
@@ -450,6 +455,7 @@ async def project_session_trace(
     chat_request: Mapping[str, Any] | None = None,
     layer_a: Mapping[str, Any] | None = None,
     inject: Mapping[str, Any] | None = None,
+    tokens: Mapping[str, Any] | None = None,
     stamp: Mapping[str, Any] | None = None,
     mode: str = "analytics",
     headers: Mapping[str, str] | None = None,
@@ -469,7 +475,9 @@ async def project_session_trace(
             posts=0,
         )
 
-    agg = build_aggregate_trace_payload(hops, layer_a=layer_a, inject=inject, stamp=stamp)
+    agg = build_aggregate_trace_payload(
+        hops, layer_a=layer_a, inject=inject, tokens=tokens, stamp=stamp
+    )
     post_order = ordered_req_ids_for_trace_posts(hops)
     if not post_order:
         return SessionTraceProjectResult(

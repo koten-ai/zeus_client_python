@@ -202,6 +202,24 @@ def test_build_aggregate_empty() -> None:
     assert agg2.zeus_response["layer_a"]["intent"] == "List"
 
 
+def test_build_aggregate_includes_tokens_and_omits_when_absent() -> None:
+    hops = [{"req_id": "r1", "name": "find", "status": 200, "snippet": "ok"}]
+    bag = {
+        "prompt": 30,
+        "completion": 3,
+        "total": 33,
+        "rounds": 2,
+        "ok": True,
+    }
+    with_tok = build_aggregate_trace_payload(hops, tokens=bag)
+    assert with_tok.zeus_response["tokens"]["prompt"] == 30
+    assert with_tok.zeus_response["tokens"]["rounds"] == 2
+    without = build_aggregate_trace_payload(hops)
+    assert "tokens" not in without.zeus_response
+    empty = build_aggregate_trace_payload([], tokens=bag)
+    assert empty.zeus_response["tokens"]["prompt"] == 30
+
+
 def test_build_aggregate_includes_layer_a() -> None:
     hops = [{"req_id": "r1", "name": "pipeline", "status": 200, "snippet": "ok"}]
     la = {
