@@ -24,21 +24,142 @@ __all__ = [
     "tool_payload_shape",
 ]
 
-_SLICE_SCOPE = re.compile(r"(?ms)^##\s+SCOPE\s+BRIEF\b.*?(?=^##\s|\Z)")
-_SLICE_MINI = re.compile(r"(?ms)^##\s+MINI-SCHEMA\b.*?(?=^##\s|\Z)")
+# Cap returned markdown on rewind (~96 KiB). Matches Hub inject_inspect.go.
+INJECT_SECTION_MAX_BYTES = 96 << 10
+_PREVIEW_MAX = 400
+
+
+def _extract_markdown_section(text: str, heading_prefix: str) -> str:
+    """Pull ``## HEADING…`` until the next top-level ``## `` or EOF.
+
+    Port of Hub ``extractMarkdownSection`` (inject_inspect.go). ``###`` entity
+    headings stay inside MINI-SCHEMA.
+    """
+    if not text or not heading_prefix:
+        return ""
+    idx = text.find(heading_prefix)
+    if idx < 0:
+        return ""
+    lines = text[idx:].split("\n")
+    kept = [lines[0]]
+    for ln in lines[1:]:
+        if ln.startswith("## ") and not ln.startswith(heading_prefix):
+            break
+        kept.append(ln)
+    return "\n".join(kept).rstrip("\n")
 
 
 def slice_block(text: str, kind: str) -> str:
-    """Return the marked BRIEF or MINI block (empty if absent)."""
-    pat = _SLICE_SCOPE if kind == "brief" else _SLICE_MINI
-    m = pat.search(text or "")
-    return m.group(0).strip() if m else ""
+    """Return the marked BRIEF or MINI block (empty if absent).
+
+    Brief stops at ``## MINI-SCHEMA`` or the next H2; mini keeps ``###`` lines.
+    Result is stripped so sha12 matches Hub ``sectionFromText``.
+    """
+    src = text or ""
+    if kind == "brief":
+        full = _extract_markdown_section(src, "## SCOPE BRIEF")
+        if not full:
+            return ""
+        i = full.find("## MINI-SCHEMA")
+        if i > 0:
+            full = full[:i].rstrip("\n")
+        return full.strip()
+    full = _extract_markdown_section(src, "## MINI-SCHEMA")
+    return full.strip() if full else ""
 
 
 def sha12(text: str | None) -> str | None:
     if not text:
         return None
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
+def _utf8_len(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def parse_brief_scope_mode(section: str) -> tuple[str, str]:
+    """First field after ``scope:`` / ``mode:`` in the brief slice (Hub parity)."""
+    scope_line = ""
+    mode_line = ""
+    for ln in (section or "").split("\n"):
+        t = ln.strip()
+        low = t.lower()
+        if low.startswith("scope:"):
+            rest = t[len("scope:") :].strip()
+            fields = rest.split()
+            if fields:
+                scope_line = fields[0]
+            if scope_line == "(unscoped)":
+                scope_line = ""
+        if low.startswith("mode:"):
+            rest = t[len("mode:") :].strip()
+            fields = rest.split()
+            if fields:
+                mode_line = fields[0]
+    return scope_line, mode_line
+
+
+def parse_mini_entity_types(section: str) -> list[str]:
+    """``### Name`` / ``### Name (fields: N)`` → first token before space or ``(``."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for ln in (section or "").split("\n"):
+        t = ln.strip()
+        if not t.startswith("### "):
+            continue
+        rest = t[4:].strip()
+        name = rest
+        cut = -1
+        for i, ch in enumerate(rest):
+            if ch in " \t(":
+                cut = i
+                break
+        if cut > 0:
+            name = rest[:cut]
+        name = name.strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+    return out
+
+
+def _cap_section_text(text: str, max_bytes: int | None = None) -> tuple[str, bool]:
+    cap = INJECT_SECTION_MAX_BYTES if max_bytes is None else max_bytes
+    raw = text.encode("utf-8")
+    if len(raw) <= cap:
+        return text, False
+    clipped = raw[:cap].decode("utf-8", errors="ignore")
+    return clipped + "\n…[truncated]", True
+
+
+def _inject_section(slice_text: str, *, kind: str, include_text: bool) -> dict[str, Any]:
+    text = (slice_text or "").strip()
+    if not text:
+        return {"present": False, "chars": 0}
+    out: dict[str, Any] = {
+        "present": True,
+        "chars": _utf8_len(text),
+        "sha12": sha12(text),
+        "preview": text[:_PREVIEW_MAX],
+    }
+    if kind == "brief":
+        scope_line, mode_line = parse_brief_scope_mode(text)
+        if scope_line:
+            out["scope_line"] = scope_line
+        if mode_line:
+            out["mode_line"] = mode_line
+    elif kind == "mini":
+        types = parse_mini_entity_types(text)
+        if types:
+            out["entity_types"] = types
+    if include_text:
+        capped, truncated = _cap_section_text(text)
+        out["text"] = capped
+        if truncated:
+            out["truncated"] = True
+    return out
 
 
 def collect_req_ids(hops: Sequence[Mapping[str, Any]] | None) -> tuple[str, ...]:
@@ -157,21 +278,28 @@ def inject_for_session_trace(
     system: str = "",
     catalog: Mapping[str, Any] | None = None,
     source: str | None = None,
+    rewind: bool = False,
 ) -> dict[str, Any]:
-    """Compact zr.inject / public_trace.inject — slice shas, no prompt body."""
-    flags = catalog_flags_of(system=system, catalog=catalog)
-    out: dict[str, Any] = {
-        "has_scope_brief": flags["has_scope_brief"],
-        "has_mini_schema": flags["has_mini_schema"],
-        "brief_sha12": flags.get("brief_sha12"),
-        "mini_sha12": flags.get("mini_sha12"),
+    """Hub-shaped ``zeus_response.inject`` / ``public_trace.inject``.
+
+    Parses SCOPE BRIEF / MINI-SCHEMA **slices** from the system prompt actually
+    sent to the LLM. Entity types come from ``###`` headings in the mini text,
+    never ``catalog.mini_entity_types``. Slim omits ``text``; rewind includes
+    full slice text capped at ``INJECT_SECTION_MAX_BYTES``.
+    """
+    del catalog  # Hub bag is slice-only; do not read catalog.mini_entity_types.
+    sys = system or ""
+    include_text = bool(rewind)
+    return {
+        "source": source or "client_llm",
+        "system_chars": _utf8_len(sys),
+        "scope_brief": _inject_section(
+            slice_block(sys, "brief"), kind="brief", include_text=include_text
+        ),
+        "mini_schema": _inject_section(
+            slice_block(sys, "mini"), kind="mini", include_text=include_text
+        ),
     }
-    types = flags.get("mini_entity_types") or []
-    if types:
-        out["entity_types"] = list(types)
-    if source:
-        out["source"] = source
-    return out
 
 
 def notes_blob(notes: Sequence[str] | None) -> str:

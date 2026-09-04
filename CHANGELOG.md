@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (ZCP-114)
+
+- Hub-shaped `zeus_response.inject` on `POST /v2/session/trace` and `public_trace.inject`: nested `scope_brief` / `mini_schema` with `present`, UTF-8 `chars`, slice `sha12`, `preview`, `entity_types` / `scope_line` / `mode_line`. `rewind=true` adds capped `text` (96 KiB). Entity types parse from `###` headings in the mini slice, not `catalog.mini_entity_types`. Direct verb JSON still does not carry `## MINI-SCHEMA`.
+
 ### Security (ZCP-101)
 
 - Floor-5 jailbreak control plane: multi-surface scorer (`zeus_client.security.jailbreak`) covering catalog families R–H (paraphrase dump, clean terminate, commercial invent, retrieval injection, multi-turn grooming, encoding, summary leak).

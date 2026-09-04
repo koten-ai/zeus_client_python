@@ -8,6 +8,16 @@ from typing import Any
 __all__ = ["build_support_pack"]
 
 
+def _inject_sha(inj: Mapping[str, Any], kind: str) -> str:
+    """Read sha12 from legacy top-level keys or Hub nested sections."""
+    nested_key = "scope_brief" if kind == "brief" else "mini_schema"
+    nested = inj.get(nested_key)
+    if isinstance(nested, Mapping) and nested.get("sha12"):
+        return str(nested["sha12"])
+    top = inj.get("brief_sha12" if kind == "brief" else "mini_sha12")
+    return str(top) if top else "-"
+
+
 def _hop_line(h: Mapping[str, Any]) -> str:
     name = h.get("name") or h.get("path_class") or "?"
     status = h.get("status")
@@ -87,8 +97,8 @@ def build_support_pack(
             f"- contract_status: `{contract_status or '-'}`",
             "",
             "## 5. Inject proof",
-            f"- brief_sha12: `{inj.get('brief_sha12') or '-'}`",
-            f"- mini_sha12: `{inj.get('mini_sha12') or '-'}`",
+            f"- brief_sha12: `{_inject_sha(inj, 'brief')}`",
+            f"- mini_sha12: `{_inject_sha(inj, 'mini')}`",
             "",
             "## 6. Hop errors / rows",
         ]

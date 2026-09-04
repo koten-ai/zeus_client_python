@@ -8,7 +8,7 @@ import warnings
 def test_default_import_is_runtime_tree() -> None:
     import zeus_client as zc
 
-    assert zc.__version__ == "2.3.0"
+    assert zc.__version__ == "2.3.1"
     from zeus_client import ZeusRuntime
 
     assert ZeusRuntime is not None
@@ -35,7 +35,7 @@ def test_zeus_client_v2_alias_warns() -> None:
         warnings.simplefilter("always", DeprecationWarning)
         import zeus_client_v2 as alias
 
-        assert alias.__version__ == "2.3.0"
+        assert alias.__version__ == "2.3.1"
         from zeus_client_v2 import ZeusRuntime
 
         assert ZeusRuntime is not None
