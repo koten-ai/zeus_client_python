@@ -14,9 +14,11 @@ __all__ = [
     "usage_from_ai_response",
     "sum_provider_tokens",
     "attach_trace_tokens",
+    "tokens_for_session_trace",
 ]
 
 _LLM_STEP_TYPES = frozenset({"llm", "force_final"})
+_LLM_ERROR_TYPE = "llm_error"
 
 
 def _as_int(v: Any) -> int:
@@ -123,3 +125,47 @@ def attach_trace_tokens(trace: MutableMapping[str, Any]) -> dict[str, Any]:
     tokens = sum_provider_tokens(steps=steps, ai_responses=ai_responses)
     trace["tokens"] = tokens
     return tokens
+
+
+def _usage_reports_cached(usage: Mapping[str, Any] | None) -> bool:
+    if not isinstance(usage, Mapping):
+        return False
+    if "cached_tokens" in usage:
+        return True
+    details = usage.get("prompt_tokens_details")
+    return isinstance(details, Mapping) and "cached_tokens" in details
+
+
+def tokens_for_session_trace(
+    *,
+    steps: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """Hub join ``zeus_response.tokens``. None when the LLM was never called.
+
+    Omits the object (does not send ``0``) when usage is unknown. Omits
+    ``cached`` unless a provider usage blob reported the field. ``ok`` is
+    false when any ``llm_error`` step is present.
+    """
+    recs = [s for s in (steps or ()) if isinstance(s, Mapping)]
+    returned = [s for s in recs if s.get("type") in _LLM_STEP_TYPES]
+    errored = [s for s in recs if s.get("type") == _LLM_ERROR_TYPE]
+    if not returned and not errored:
+        return None
+    summed = sum_provider_tokens(steps=returned)
+    has_usage = bool(summed.get("prompt") or summed.get("completion") or summed.get("total"))
+    if not has_usage:
+        # Hub treats 0 as fake; omit when the provider never billed this turn.
+        return None
+    out: dict[str, Any] = {
+        "prompt": int(summed["prompt"]),
+        "completion": int(summed["completion"]),
+        "total": int(summed["total"]),
+        "rounds": len(returned),
+        "ok": not bool(errored),
+    }
+    if any(
+        _usage_reports_cached(s.get("usage") if isinstance(s.get("usage"), Mapping) else None)
+        for s in returned
+    ):
+        out["cached"] = int(summed["cached"])
+    return out

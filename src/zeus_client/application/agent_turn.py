@@ -59,7 +59,7 @@ from zeus_client.application.semantic_cache import (
     recall_and_inject,
     write_memory_block,
 )
-from zeus_client.application.tokens import sum_provider_tokens
+from zeus_client.application.tokens import sum_provider_tokens, tokens_for_session_trace
 from zeus_client.config.models import (
     ClientSettings,
     DataTarget,
@@ -592,6 +592,49 @@ async def run_agent_turn(
                     details=dict(exc.details),
                 )
                 notes.append(f"llm_error: {exc.code.value}")
+                steps.append(
+                    {
+                        "round": rnd,
+                        "type": "llm_error",
+                        "code": exc.code.value,
+                    }
+                )
+                if (
+                    hops
+                    and req.enable_sessions
+                    and session_lifecycle is not None
+                    and session_handle
+                    and session_handle.session_id
+                ):
+                    try:
+                        await project_session_trace(
+                            session_lifecycle.client,
+                            handle=session_handle,
+                            hops=hops,
+                            chat_request=req.chat_request or {},
+                            inject=inject_for_session_trace(
+                                system=system_prompt_of(
+                                    messages=messages,
+                                    catalog=(
+                                        req.chat_request
+                                        if isinstance(req.chat_request, Mapping)
+                                        else None
+                                    ),
+                                ),
+                                catalog=(
+                                    req.chat_request
+                                    if isinstance(req.chat_request, Mapping)
+                                    else None
+                                ),
+                                rewind=bool(dbg_pol.rewind),
+                            ),
+                            tokens=tokens_for_session_trace(steps=steps),
+                            stamp=stamp,
+                            mode=settings.mode,
+                            rewind=bool(dbg_pol.rewind),
+                        )
+                    except Exception as join_exc:  # noqa: BLE001
+                        notes.append(f"session_trace_failed: {join_exc}")
                 return _finish(
                     answer=f"LLM error: {exc.public_message}",
                     status=TurnStatus.ERROR,
@@ -892,6 +935,7 @@ async def run_agent_turn(
                 chat_request=req.chat_request or {},
                 layer_a=compact,
                 inject=inject_bag,
+                tokens=tokens_for_session_trace(steps=steps),
                 stamp=stamp,
                 mode=settings.mode,
                 rewind=bool(dbg_pol.rewind),

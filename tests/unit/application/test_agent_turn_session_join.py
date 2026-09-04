@@ -13,6 +13,7 @@ from zeus_client.adapters.zeus_http.session import SessionHttpResult
 from zeus_client.application.agent_turn import run_agent_turn
 from zeus_client.application.session_lifecycle import CommitResult
 from zeus_client.config.models import ClientSettings, DebugPolicy
+from zeus_client.domain.errors import ErrorCode, LlmError
 from zeus_client.domain.messages import TurnRequest, TurnStatus
 from zeus_client.domain.session import SessionHandle
 from zeus_client.ports import LlmRequest, LlmResponse, VerbHopResult, VerbRequest
@@ -336,3 +337,144 @@ async def test_session_trace_posts_hub_inject_bag_on_rewind() -> None:
         assert "## MINI-SCHEMA" not in dumped
         assert "## SCOPE BRIEF" not in dumped
         assert "rewind" not in call.body
+
+
+_USAGE_R1 = {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}
+
+
+@pytest.mark.asyncio
+async def test_session_trace_tokens_match_debug_bundle() -> None:
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(
+                    _tc("find", {"entity_type": "Airport"}, "c1"),
+                    _tc("return", _return_args(), "c2"),
+                ),
+                usage=_USAGE_R1,
+            ),
+        ]
+    )
+    zeus = ScriptedZeus(
+        results={
+            "find": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-find-airports",
+                body={"result": {"items": [{"name": "Sleetmute Airport"}], "returned_count": 1}},
+            )
+        }
+    )
+    client = FakeSessionClient()
+    life = FakeLifecycle(client=client)
+    result = await run_agent_turn(
+        TurnRequest(
+            message="airports",
+            tools=(FIND_TOOL, RETURN_TOOL),
+            chat_id="chat_tok",
+            settings=ClientSettings(ai_process_result=False, durable_sessions=True),
+            enable_sessions=True,
+        ),
+        llm=llm,
+        zeus=zeus,
+        session_lifecycle=life,
+    )
+    assert result.status is TurnStatus.OK
+    assert client.posts
+    tok = client.posts[0]["zeus_response"]["tokens"]
+    assert tok["prompt"] == result.debug.tokens["prompt"] == 10
+    assert tok["completion"] == result.debug.tokens["completion"] == 1
+    assert tok["total"] == result.debug.tokens["total"] == 11
+    assert tok["rounds"] == 1
+    assert tok["ok"] is True
+    assert "cached" not in tok
+    assert "extra" not in tok
+
+
+@pytest.mark.asyncio
+async def test_session_trace_omits_tokens_when_llm_usage_unknown() -> None:
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(
+                    _tc("find", {"entity_type": "Airport"}, "c1"),
+                    _tc("return", _return_args(), "c2"),
+                ),
+            ),
+        ]
+    )
+    zeus = ScriptedZeus(
+        results={
+            "find": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-find-airports",
+                body={"result": {"items": [{"name": "X"}], "returned_count": 1}},
+            )
+        }
+    )
+    client = FakeSessionClient()
+    life = FakeLifecycle(client=client)
+    await run_agent_turn(
+        TurnRequest(
+            message="airports",
+            tools=(FIND_TOOL, RETURN_TOOL),
+            settings=ClientSettings(ai_process_result=False, durable_sessions=True),
+            enable_sessions=True,
+        ),
+        llm=llm,
+        zeus=zeus,
+        session_lifecycle=life,
+    )
+    assert client.posts
+    assert "tokens" not in client.posts[0]["zeus_response"]
+
+
+@pytest.mark.asyncio
+async def test_session_trace_ok_false_when_later_llm_round_fails() -> None:
+    llm = ScriptedLlm(
+        script=[
+            LlmResponse(
+                content=None,
+                tool_calls=(_tc("find", {"entity_type": "Airport"}, "c1"),),
+                usage=_USAGE_R1,
+            ),
+            LlmError(
+                code=ErrorCode.AGENT_LLM_REQUEST_FAILED,
+                component="llm",
+                public_message="boom",
+            ),
+        ]
+    )
+    zeus = ScriptedZeus(
+        results={
+            "find": VerbHopResult(
+                ok=True,
+                status_code=200,
+                req_id="req-find-airports",
+                body={"result": {"items": [{"name": "X"}], "returned_count": 1}},
+            )
+        }
+    )
+    client = FakeSessionClient()
+    life = FakeLifecycle(client=client)
+    result = await run_agent_turn(
+        TurnRequest(
+            message="airports",
+            tools=(FIND_TOOL, RETURN_TOOL),
+            settings=ClientSettings(ai_process_result=True, durable_sessions=True, max_rounds=3),
+            enable_sessions=True,
+        ),
+        llm=llm,
+        zeus=zeus,
+        session_lifecycle=life,
+    )
+    assert result.status is TurnStatus.ERROR
+    assert client.posts, "expected join even after later LLM failure"
+    tok = client.posts[0]["zeus_response"]["tokens"]
+    assert tok["prompt"] == 10
+    assert tok["rounds"] == 1
+    assert tok["ok"] is False
+    assert client.posts[0]["req_id"] == "req-find-airports"
