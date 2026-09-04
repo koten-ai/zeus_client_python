@@ -114,7 +114,7 @@ async def test_finish_stamps_req_ids_from_find_hop() -> None:
     assert hop.get("result_size") == 1
     la = result.debug.public_trace["layer_a"]
     assert la["query_decomposition"]["entity"] == "Airport"
-    assert la["via"] == "client_terminate"
+    assert la["via"] == "return"
     assert "wish_i_knew" not in la
     assert "wish_i_knew" not in result.answer
     sess = result.debug.public_trace["session"]

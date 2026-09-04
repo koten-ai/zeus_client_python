@@ -202,6 +202,28 @@ def test_build_aggregate_empty() -> None:
     assert agg2.zeus_response["layer_a"]["intent"] == "List"
 
 
+def test_build_aggregate_includes_catalog_and_terminate() -> None:
+    hops = [{"req_id": "r1", "name": "find", "status": 200, "snippet": "ok"}]
+    cat = {
+        "tool_count": 2,
+        "tool_names": ["find", "return"],
+        "has_return_verb": True,
+        "has_pipeline_verb": False,
+    }
+    term = {
+        "has_terminate": True,
+        "terminate_via": "return",
+        "ai_process_result": False,
+        "cheap_final": False,
+    }
+    agg = build_aggregate_trace_payload(hops, catalog=cat, terminate=term)
+    assert agg.zeus_response["catalog"]["tool_count"] == 2
+    assert agg.zeus_response["terminate"]["terminate_via"] == "return"
+    bare = build_aggregate_trace_payload(hops)
+    assert "catalog" not in bare.zeus_response
+    assert "terminate" not in bare.zeus_response
+
+
 def test_build_aggregate_includes_tokens_and_omits_when_absent() -> None:
     hops = [{"req_id": "r1", "name": "find", "status": 200, "snippet": "ok"}]
     bag = {

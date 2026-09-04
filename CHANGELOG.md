@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (ZCP-117)
+
+- `POST /v2/session/trace` aggregate now includes `zeus_response.catalog` (tool_count / tool_names / has_return_verb / has_pipeline_verb), compact `layer_a` when a terminate bag parsed, and `terminate` flags. G2 fields stay off `layer_a`. Names come from the LLM tool list only (do not invent `return`/`pipeline`).
+
 ### Added (ZCP-116)
 
 - Stamp `turn_id` on `POST /v2/session/trace`. Agent/Direct/session hops send `X-Zeus-Chat-Session-Id` (durable chat session, not auth `X-Zeus-Session`) plus `X-Zeus-Brief-Sha12` / `X-Zeus-Mini-Sha12` matching the inject-bag slice hashes. Never sets `X-Zeus-Req-Id`.

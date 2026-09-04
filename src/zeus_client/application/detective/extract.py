@@ -20,6 +20,8 @@ __all__ = [
     "catalog_flags_of",
     "inject_for_session_trace",
     "inject_slice_sha12s",
+    "catalog_for_session_trace",
+    "terminate_for_session_trace",
     "notes_blob",
     "hop_error_blob",
     "tool_payload_shape",
@@ -309,6 +311,99 @@ def inject_slice_sha12s(bag: Mapping[str, Any] | None) -> tuple[str, str]:
     brief = inj.get("scope_brief") if isinstance(inj.get("scope_brief"), Mapping) else {}
     mini = inj.get("mini_schema") if isinstance(inj.get("mini_schema"), Mapping) else {}
     return str(brief.get("sha12") or ""), str(mini.get("sha12") or "")
+
+
+def _tool_names_ordered(tools: Sequence[Mapping[str, Any]] | None) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    for t in tools or ():
+        if not isinstance(t, Mapping):
+            continue
+        fn = t.get("function") if isinstance(t.get("function"), Mapping) else t
+        name = str(fn.get("name") or "") if isinstance(fn, Mapping) else ""
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    return names
+
+
+def catalog_for_session_trace(
+    *,
+    tools: Sequence[Mapping[str, Any]] | None = None,
+    chat_request: Mapping[str, Any] | None = None,
+    base_id: str | None = None,
+    contract_id: str | None = None,
+    contract_hash: str | None = None,
+    scope: str | None = None,
+) -> dict[str, Any]:
+    """Hub join ``zeus_response.catalog`` — names given to the LLM, unique order."""
+    names = _tool_names_ordered(tools)
+    cr = chat_request if isinstance(chat_request, Mapping) else {}
+    if not names and cr:
+        cr_tools = cr.get("tools")
+        if isinstance(cr_tools, list):
+            names = _tool_names_ordered([t for t in cr_tools if isinstance(t, Mapping)])
+        if not names:
+            cr_verbs = cr.get("verbs")
+            if isinstance(cr_verbs, list):
+                names = _tool_names_ordered([t for t in cr_verbs if isinstance(t, Mapping)])
+    seen = set(names)
+    lineage = cr.get("_lineage") if isinstance(cr.get("_lineage"), Mapping) else {}
+    bid = base_id or lineage.get("base_id")
+    custom_id = lineage.get("custom_id")
+    out: dict[str, Any] = {
+        "tool_count": len(names),
+        "tool_names": names,
+        "has_return_verb": "return" in seen or "return_result" in seen,
+        "has_pipeline_verb": "pipeline" in seen,
+    }
+    if bid:
+        out["base_id"] = str(bid)
+    if custom_id:
+        out["custom_label"] = f"custom {{{custom_id}}}"
+    elif scope:
+        out["custom_label"] = f"custom {{{scope}}}"
+    if contract_id:
+        out["contract_id"] = str(contract_id)
+    if contract_hash:
+        out["contract_hash"] = str(contract_hash)
+    return out
+
+
+def hub_terminate_via(via: str | None, *, exit_kind: str | None = None) -> str:
+    """Map client terminate tags to Hub join vocabulary."""
+    if (exit_kind or "") == "cheap_final":
+        return "cheap_final"
+    v = (via or "").strip()
+    if v in {"return", "return_result"}:
+        return "return"
+    if v in {"pipeline", "pipeline_turn_complete"}:
+        return "pipeline"
+    if v == "cheap_final":
+        return "cheap_final"
+    if v == "client_terminate":
+        return "client_terminate"
+    return v or "client_terminate"
+
+
+def terminate_for_session_trace(
+    *,
+    terminate_via: str | None = None,
+    exit_kind: str | None = None,
+    ai_process_result: bool = False,
+    layer_parsed: bool = False,
+) -> dict[str, Any]:
+    """Hub join ``zeus_response.terminate`` flags."""
+    via = hub_terminate_via(terminate_via, exit_kind=exit_kind)
+    cheap = via == "cheap_final"
+    has = bool(layer_parsed) or via in {"return", "pipeline", "cheap_final"}
+    return {
+        "has_terminate": has,
+        "terminate_via": via,
+        "ai_process_result": bool(ai_process_result),
+        "cheap_final": cheap,
+    }
 
 
 def notes_blob(notes: Sequence[str] | None) -> str:
