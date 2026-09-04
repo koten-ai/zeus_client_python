@@ -36,10 +36,12 @@ from zeus_client.application.control_plane_inject import (
 from zeus_client.application.detective import safe_build_detective_briefing
 from zeus_client.application.detective.extract import (
     catalog_flags_of,
+    catalog_for_session_trace,
     collect_req_ids,
     inject_for_session_trace,
     inject_slice_sha12s,
     system_prompt_of,
+    terminate_for_session_trace,
     tool_payload_shape,
 )
 from zeus_client.application.middleware import (
@@ -651,6 +653,32 @@ async def run_agent_turn(
                                 rewind=bool(dbg_pol.rewind),
                             ),
                             tokens=tokens_for_session_trace(steps=steps),
+                            catalog=catalog_for_session_trace(
+                                tools=tools,
+                                chat_request=(
+                                    req.chat_request
+                                    if isinstance(req.chat_request, Mapping)
+                                    else None
+                                ),
+                                base_id=req.base_id,
+                                contract_id=(
+                                    session_handle.contract_id if session_handle else None
+                                ),
+                                contract_hash=(
+                                    session_handle.contract_hash if session_handle else None
+                                ),
+                                scope=(
+                                    f"{req.target.bucket}/{req.target.scope}"
+                                    if req.target.bucket
+                                    else None
+                                ),
+                            ),
+                            terminate=terminate_for_session_trace(
+                                terminate_via=last_terminate_via,
+                                exit_kind=exit_kind,
+                                ai_process_result=bool(settings.ai_process_result),
+                                layer_parsed=False,
+                            ),
                             stamp=stamp,
                             mode=settings.mode,
                             rewind=bool(dbg_pol.rewind),
@@ -814,6 +842,7 @@ async def run_agent_turn(
                 if not _recent_assistant_has(messages, answer):
                     messages.append({"role": "assistant", "content": answer})
                 exit_kind = "cheap_final"
+                last_terminate_via = "cheap_final"
                 notes.append(
                     "ai_process_result=false after Zeus data; thin final without second LLM hop"
                 )
@@ -972,6 +1001,24 @@ async def run_agent_turn(
                 layer_a=compact,
                 inject=inject_bag,
                 tokens=tokens_for_session_trace(steps=steps),
+                catalog=catalog_for_session_trace(
+                    tools=tools,
+                    chat_request=(
+                        req.chat_request if isinstance(req.chat_request, Mapping) else None
+                    ),
+                    base_id=req.base_id,
+                    contract_id=session_handle.contract_id if session_handle else None,
+                    contract_hash=session_handle.contract_hash if session_handle else None,
+                    scope=(
+                        f"{req.target.bucket}/{req.target.scope}" if req.target.bucket else None
+                    ),
+                ),
+                terminate=terminate_for_session_trace(
+                    terminate_via=last_terminate_via,
+                    exit_kind=exit_kind,
+                    ai_process_result=bool(settings.ai_process_result),
+                    layer_parsed=layer is not None,
+                ),
                 stamp=stamp,
                 mode=settings.mode,
                 rewind=bool(dbg_pol.rewind),
@@ -1182,7 +1229,7 @@ async def _execute_tool_calls(
             final_summary = str(tc_args.get("summary") or "")
             return_seen = True
             outcome.return_args = dict(tc_args)
-            outcome.terminate_via = "client_terminate"
+            outcome.terminate_via = "return"
             messages.append(
                 {
                     "role": "tool",
@@ -1343,7 +1390,7 @@ async def _execute_tool_calls(
                 and isinstance(cand.get("confidence"), str)
             ):
                 outcome.return_args = cand
-                outcome.terminate_via = "pipeline_turn_complete"
+                outcome.terminate_via = "pipeline"
 
     outcome.return_seen = return_seen
     outcome.terminal_summary = final_summary if return_seen else None
