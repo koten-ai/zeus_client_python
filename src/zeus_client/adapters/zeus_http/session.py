@@ -222,6 +222,7 @@ class HttpxSessionClient:
         mode: str = "",
         target: DataTarget | None = None,
         rewind: bool = False,
+        turn_id: str = "",
     ) -> SessionHttpResult:
         sid = (session_id or "").strip()
         if not sid or int(client_round) <= 0:
@@ -249,6 +250,9 @@ class HttpxSessionClient:
             "outcome": outcome or "ok",
             **stamp,
         }
+        tid = (turn_id or "").strip()
+        if tid:
+            payload["turn_id"] = tid
         if rewind:
             payload["rewind"] = True
         h = await self._headers(mode=mode, extra=headers, target=target)
