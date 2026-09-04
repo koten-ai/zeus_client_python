@@ -52,12 +52,19 @@ async def test_data_verb_forwards_rewind_chat_headers() -> None:
             {"entity_type": "Beer"},
             chat_id="job_1",
             turn_id="unit_u1",
+            chat_session_id="sess_direct_1",
+            brief_sha12="aaa111bbb222",
+            mini_sha12="ccc333ddd444",
         )
     headers = zeus.reqs[0].headers
     assert headers["X-Zeus-Chat-Id"] == "job_1"
     assert headers["X-Zeus-Turn-Id"] == "unit_u1"
     assert headers["X-Zeus-Trace-Class"] == TRACE_CLASS_DIRECT_READ
+    assert headers["X-Zeus-Chat-Session-Id"] == "sess_direct_1"
+    assert headers["X-Zeus-Brief-Sha12"] == "aaa111bbb222"
+    assert headers["X-Zeus-Mini-Sha12"] == "ccc333ddd444"
     assert "X-Zeus-Req-Id" not in headers
+    assert "X-Zeus-Session" not in headers
     assert zeus.reqs[0].rewind is False
 
 

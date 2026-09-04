@@ -19,6 +19,7 @@ __all__ = [
     "system_prompt_of",
     "catalog_flags_of",
     "inject_for_session_trace",
+    "inject_slice_sha12s",
     "notes_blob",
     "hop_error_blob",
     "tool_payload_shape",
@@ -300,6 +301,14 @@ def inject_for_session_trace(
             slice_block(sys, "mini"), kind="mini", include_text=include_text
         ),
     }
+
+
+def inject_slice_sha12s(bag: Mapping[str, Any] | None) -> tuple[str, str]:
+    """``(brief_sha12, mini_sha12)`` from a Hub inject bag; empty when absent."""
+    inj = bag or {}
+    brief = inj.get("scope_brief") if isinstance(inj.get("scope_brief"), Mapping) else {}
+    mini = inj.get("mini_schema") if isinstance(inj.get("mini_schema"), Mapping) else {}
+    return str(brief.get("sha12") or ""), str(mini.get("sha12") or "")
 
 
 def notes_blob(notes: Sequence[str] | None) -> str:

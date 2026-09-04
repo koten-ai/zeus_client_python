@@ -189,6 +189,7 @@ async def test_enable_sessions_posts_trace_join_then_commits_turn() -> None:
     assert client.posts, "expected POST /v2/session/trace"
     post = client.posts[0]
     assert post["session_id"] == "sess_join_1"
+    assert post["turn_id"] == result.debug.turn_id
     assert post["req_id"] == "req-find-airports"
     assert post["client_round"] == 1
     zresp = post["zeus_response"]
@@ -323,6 +324,15 @@ async def test_session_trace_posts_hub_inject_bag_on_rewind() -> None:
         assert inj["mini_schema"]["text"].startswith("## MINI-SCHEMA")
         assert "text" in inj["scope_brief"]
         assert post["rewind"] is True
+        assert post["turn_id"] == result.debug.turn_id
+
+    hop_headers = dict(zeus.calls[0].headers)
+    posted_inj = client.posts[0]["zeus_response"]["inject"]
+    assert hop_headers["X-Zeus-Chat-Session-Id"] == "sess_join_1"
+    assert hop_headers["X-Zeus-Mini-Sha12"] == posted_inj["mini_schema"]["sha12"]
+    assert hop_headers["X-Zeus-Brief-Sha12"] == posted_inj["scope_brief"]["sha12"]
+    assert "X-Zeus-Session" not in hop_headers
+    assert "X-Zeus-Req-Id" not in hop_headers
 
     public_inj = (result.debug.public_trace or {}).get("inject") or {}
     assert public_inj["mini_schema"]["present"] is True

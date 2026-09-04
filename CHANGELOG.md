@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (ZCP-116)
+
+- Stamp `turn_id` on `POST /v2/session/trace`. Agent/Direct/session hops send `X-Zeus-Chat-Session-Id` (durable chat session, not auth `X-Zeus-Session`) plus `X-Zeus-Brief-Sha12` / `X-Zeus-Mini-Sha12` matching the inject-bag slice hashes. Never sets `X-Zeus-Req-Id`.
+
 ### Added (ZCP-115)
 
 - `POST /v2/session/trace` aggregate `zeus_response.tokens` (`prompt` / `completion` / `total` / `rounds` / `ok`, optional `cached`) from `sum_provider_tokens`. Omitted when the turn never called the LLM or usage is unknown (Hub treats `0` as fake). `ok=false` when a later LLM round errors but tool hops still join.
