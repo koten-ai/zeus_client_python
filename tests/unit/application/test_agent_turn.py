@@ -506,6 +506,8 @@ async def test_tool_hop_stamps_rewind_correlation_headers() -> None:
     assert h["X-Zeus-Trace-Class"] == "agent"
     assert h["X-Zeus-Trace"] == "1"
     assert "X-Zeus-Req-Id" not in h
+    assert "X-Zeus-Session" not in h
+    assert "X-Zeus-Chat-Session-Id" not in h
     assert hop.rewind is False
 
 

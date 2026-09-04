@@ -38,7 +38,15 @@ Same as the rest of the client: pass minted `zeus_headers` **or** `zcfg` → `re
 
 Rewind plays a retained TraceBundle for one `req_id` (`#/debug/rewind?req_id=`).
 This client stamps `X-Zeus-Chat-Id` / `X-Zeus-Turn-Id` / `X-Zeus-Trace-Class`
-on every `:8080` hop:
+on every `:8080` hop. Hub-join identity extras (ZCP-116):
+
+| Header | When |
+| --- | --- |
+| `X-Zeus-Chat-Session-Id` | durable `/v2/session` id known (not auth `X-Zeus-Session`) |
+| `X-Zeus-Brief-Sha12` | SCOPE BRIEF slice present; equals `zeus_response.inject.scope_brief.sha12` |
+| `X-Zeus-Mini-Sha12` | MINI-SCHEMA slice present; equals `zeus_response.inject.mini_schema.sha12` |
+
+`POST /v2/session/trace` JSON also includes `turn_id` (same value as `X-Zeus-Turn-Id`). Never set `X-Zeus-Req-Id` (Zeus mints per hop). Never reuse `X-Zeus-Session` (auth `POST /v1/.../auth/session` only).
 
 | Surface | `X-Zeus-Trace-Class` |
 | --- | --- |

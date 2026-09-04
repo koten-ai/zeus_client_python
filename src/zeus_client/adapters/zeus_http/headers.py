@@ -57,7 +57,11 @@ def correlation_headers(
     mode: str = "",
     force_trace: bool = False,
     trace_class: str = "",
+    chat_session_id: str = "",
+    brief_sha12: str = "",
+    mini_sha12: str = "",
 ) -> dict[str, str]:
+    """Rewind / join correlation. Never sets ``X-Zeus-Session`` or ``X-Zeus-Req-Id``."""
     h: dict[str, str] = {}
     if chat_id:
         h["X-Zeus-Chat-Id"] = str(chat_id)
@@ -72,6 +76,15 @@ def correlation_headers(
     tc = (trace_class or "").strip()
     if tc:
         h["X-Zeus-Trace-Class"] = tc
+    sid = (chat_session_id or "").strip()
+    if sid:
+        h["X-Zeus-Chat-Session-Id"] = sid
+    brief = (brief_sha12 or "").strip()
+    if brief:
+        h["X-Zeus-Brief-Sha12"] = brief
+    mini = (mini_sha12 or "").strip()
+    if mini:
+        h["X-Zeus-Mini-Sha12"] = mini
     return h
 
 

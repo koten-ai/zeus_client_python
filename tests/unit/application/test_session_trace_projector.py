@@ -315,6 +315,7 @@ async def test_project_session_trace_posts_identical_body_primary_last() -> None
         chat_request={"messages": []},
         inject={"has_scope_brief": True, "brief_sha12": "slicehash12"},
         mode="analytics",
+        turn_id="turn-agg-1",
     )
     assert result.ok
     assert result.primary_req_id == "s1"
@@ -324,6 +325,7 @@ async def test_project_session_trace_posts_identical_body_primary_last() -> None
     # Identical multi-hop body (except req_id join key)
     for p in posts:
         assert p["session_id"] == "sid-1"
+        assert p["turn_id"] == "turn-agg-1"
         assert p["round"] == 2
         assert p["zeus_response"]["aggregate"] is True
         assert p["zeus_response"]["primary_req_id"] == "s1"

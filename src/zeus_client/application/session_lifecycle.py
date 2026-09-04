@@ -72,6 +72,9 @@ def _session_hop_headers(
     turn_id: str = "",
     force_trace: bool = False,
     extra: Mapping[str, str] | None = None,
+    chat_session_id: str = "",
+    brief_sha12: str = "",
+    mini_sha12: str = "",
 ) -> dict[str, str]:
     """Correlation for /v2/session* hops. Caller keys win. No Call-Id / Req-Id."""
     base = correlation_headers(
@@ -79,6 +82,9 @@ def _session_hop_headers(
         turn_id=turn_id,
         force_trace=force_trace,
         trace_class=TRACE_CLASS_SESSION,
+        chat_session_id=chat_session_id,
+        brief_sha12=brief_sha12,
+        mini_sha12=mini_sha12,
     )
     return merge_headers(base, extra)
 
@@ -105,6 +111,8 @@ class SessionLifecycle:
         turn_id: str = "",
         force_trace: bool = False,
         rewind: bool = False,
+        brief_sha12: str = "",
+        mini_sha12: str = "",
     ) -> SessionHandle:
         """Create or rehydrate a session; dead sid → recreate same turn."""
         chat_req = dict(chat_request or {})
@@ -116,11 +124,15 @@ class SessionLifecycle:
             payload_h = ""
         choice = resolve_session_contract_hash(bound_contract_hash, stamped, payload_h)
         session_hash = choice.hash
+        prior_sid = ((prior.session_id if prior else "") or "").strip()
         hop_headers = _session_hop_headers(
             chat_id=chat_id,
             turn_id=turn_id,
             force_trace=force_trace,
             extra=headers,
+            chat_session_id=prior_sid,
+            brief_sha12=brief_sha12,
+            mini_sha12=mini_sha12,
         )
 
         if not enable_sessions:
@@ -135,7 +147,6 @@ class SessionLifecycle:
                 mode=mode,
             )
 
-        prior_sid = ((prior.session_id if prior else "") or "").strip()
         prior_mode = ((prior.mode if prior else "") or "").strip()
         if prior_sid and prior_mode and prior_mode != (mode or "").strip():
             # Mode switch = new session (CHECKLIST B).
@@ -304,6 +315,8 @@ class SessionLifecycle:
         turn_id: str = "",
         force_trace: bool = False,
         rewind: bool = False,
+        brief_sha12: str = "",
+        mini_sha12: str = "",
     ) -> CommitResult:
         """POST ``/v2/session/{id}/turn`` for this user question's delta.
 
@@ -337,6 +350,9 @@ class SessionLifecycle:
                 turn_id=turn_id,
                 force_trace=force_trace,
                 extra=headers,
+                chat_session_id=handle.session_id or "",
+                brief_sha12=brief_sha12,
+                mini_sha12=mini_sha12,
             ),
             mode=mode,
             target=self.target,
