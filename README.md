@@ -2,13 +2,13 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
-> **2.3.1** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
+> **2.4.0** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
 
 ## Claim (family honesty)
 
 | Field | Value |
 | --- | --- |
-| **package** | `kotenai-zeus-client` **2.3.1** |
+| **package** | `kotenai-zeus-client` **2.4.0** |
 | **claim_level** | **candidate** (not `supported`) |
 | **client_floor** | `client-floor-5` |
 | **modes** | `agent`, `direct` (optional Mode 3 `jobs`/`units` seam) |
