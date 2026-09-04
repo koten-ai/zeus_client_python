@@ -266,6 +266,8 @@ def build_aggregate_trace_payload(
     layer_a: Mapping[str, Any] | None = None,
     inject: Mapping[str, Any] | None = None,
     tokens: Mapping[str, Any] | None = None,
+    catalog: Mapping[str, Any] | None = None,
+    terminate: Mapping[str, Any] | None = None,
     stamp: Mapping[str, Any] | None = None,
 ) -> AggregateTracePayload:
     """Build typed aggregate for one round (identical body for every hop post)."""
@@ -278,6 +280,10 @@ def build_aggregate_trace_payload(
             z["inject"] = dict(inject)
         if tokens:
             z["tokens"] = dict(tokens)
+        if catalog:
+            z["catalog"] = dict(catalog)
+        if terminate:
+            z["terminate"] = dict(terminate)
         if stamp:
             z.update({k: v for k, v in dict(stamp).items() if v is not None})
         return AggregateTracePayload(
@@ -346,6 +352,10 @@ def build_aggregate_trace_payload(
         zeus_response["inject"] = dict(inject)
     if tokens:
         zeus_response["tokens"] = dict(tokens)
+    if catalog:
+        zeus_response["catalog"] = dict(catalog)
+    if terminate:
+        zeus_response["terminate"] = dict(terminate)
     if stamp:
         for k, v in dict(stamp).items():
             if v is not None:
@@ -456,6 +466,8 @@ async def project_session_trace(
     layer_a: Mapping[str, Any] | None = None,
     inject: Mapping[str, Any] | None = None,
     tokens: Mapping[str, Any] | None = None,
+    catalog: Mapping[str, Any] | None = None,
+    terminate: Mapping[str, Any] | None = None,
     stamp: Mapping[str, Any] | None = None,
     mode: str = "analytics",
     headers: Mapping[str, str] | None = None,
@@ -477,7 +489,13 @@ async def project_session_trace(
         )
 
     agg = build_aggregate_trace_payload(
-        hops, layer_a=layer_a, inject=inject, tokens=tokens, stamp=stamp
+        hops,
+        layer_a=layer_a,
+        inject=inject,
+        tokens=tokens,
+        catalog=catalog,
+        terminate=terminate,
+        stamp=stamp,
     )
     post_order = ordered_req_ids_for_trace_posts(hops)
     if not post_order:
