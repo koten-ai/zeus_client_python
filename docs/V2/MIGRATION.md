@@ -1,7 +1,7 @@
 # Zeus Client V2 — Migration Guide
 
-**Status:** **GA cutover landed** — package **2.3.0**, claim still **`candidate`** until human MATRIX  
-**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.3.0**)  
+**Status:** **GA cutover landed** — package **2.4.0**, claim still **`candidate`** until human MATRIX  
+**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.4.0**)  
 **Deprecated alias:** `import zeus_client_v2` → re-exports `zeus_client` with `DeprecationWarning` (removal still deferred)  
 **V1 archive:** `src_v1_legacy/` (not installed); free functions via `zeus_client.compat.v1` only
 
@@ -11,8 +11,8 @@
 
 | Package | Path | Version clock |
 | --- | --- | --- |
-| `zeus_client` | `src/zeus_client/` | **2.3.0** (default) |
-| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.3.0** (deprecated alias; remove ≤2.3.0) |
+| `zeus_client` | `src/zeus_client/` | **2.4.0** (default) |
+| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.4.0** (deprecated alias; remove ≤2.3.0) |
 | V1 free functions | `src_v1_legacy/` | archive only |
 
 ---

@@ -2,31 +2,41 @@
 
 ## Unreleased
 
-### Added (ZCP-117)
+---
 
-- `POST /v2/session/trace` aggregate now includes `zeus_response.catalog` (tool_count / tool_names / has_return_verb / has_pipeline_verb), compact `layer_a` when a terminate bag parsed, and `terminate` flags. G2 fields stay off `layer_a`. Names come from the LLM tool list only (do not invent `return`/`pipeline`).
+## 2.4.0 — 2026-09-04
 
-### Added (ZCP-116)
+### Pins (ZCF-WISH-030)
 
-- Stamp `turn_id` on `POST /v2/session/trace`. Agent/Direct/session hops send `X-Zeus-Chat-Session-Id` (durable chat session, not auth `X-Zeus-Session`) plus `X-Zeus-Brief-Sha12` / `X-Zeus-Mini-Sha12` matching the inject-bag slice hashes. Never sets `X-Zeus-Req-Id`.
+```text
+suite_version: conformance-0.2-dev
+client_floor: client-floor-5
+claim_level: candidate
+semantic_cache: flag (CHECKLIST E2 / ZF-WISH-001; default enabled=false)
+BASE packs tested: offline mock base-5-mock; pack fixtures base-5.3; pin-shaped base-1 (not a COMPAT triple)
+zeus_engine: 0.6.x offline tapes; live agent_memory requires Zeus ≥ 0.7.6 (cosine_scan MVP)
+zeus_client_design: 4ba1df97fcc56b9f1627561a8d1047195980b5ee
+compat_row: none — do not invent; see chat_request COMPAT.md
+multi_agent: docs
+hub_join: v1 (ZCP-113 client half)
+```
 
-### Added (ZCP-115)
+### Added (hub-join-v1 · ZCP-113)
 
-- `POST /v2/session/trace` aggregate `zeus_response.tokens` (`prompt` / `completion` / `total` / `rounds` / `ok`, optional `cached`) from `sum_provider_tokens`. Omitted when the turn never called the LLM or usage is unknown (Hub treats `0` as fake). `ok=false` when a later LLM round errors but tool hops still join.
+- Hub-shaped `zeus_response.inject` on `POST /v2/session/trace` and `public_trace.inject`: nested `scope_brief` / `mini_schema` with `present`, UTF-8 `chars`, slice `sha12`, `preview`, `entity_types` / `scope_line` / `mode_line`. `rewind=true` adds capped `text` (96 KiB). Entity types parse from `###` headings in the mini slice, not `catalog.mini_entity_types`. Direct verb JSON still does not carry `## MINI-SCHEMA`. (ZCP-114)
+- Aggregate `zeus_response.tokens` (`prompt` / `completion` / `total` / `rounds` / `ok`, optional `cached`) from `sum_provider_tokens`. Omitted when the turn never called the LLM or usage is unknown. (ZCP-115)
+- Stamp `turn_id` on `POST /v2/session/trace`. Agent/Direct/session hops send `X-Zeus-Chat-Session-Id` (durable chat session, not auth `X-Zeus-Session`) plus `X-Zeus-Brief-Sha12` / `X-Zeus-Mini-Sha12` matching the inject-bag slice hashes. Never sets `X-Zeus-Req-Id`. (ZCP-116)
+- `zeus_response.catalog` (tool_count / tool_names / has_return_verb / has_pipeline_verb), compact `layer_a` when a terminate bag parsed, and `terminate` flags. G2 fields stay off `layer_a`. (ZCP-117)
 
-### Added (ZCP-114)
+### Added
 
-- Hub-shaped `zeus_response.inject` on `POST /v2/session/trace` and `public_trace.inject`: nested `scope_brief` / `mini_schema` with `present`, UTF-8 `chars`, slice `sha12`, `preview`, `entity_types` / `scope_line` / `mode_line`. `rewind=true` adds capped `text` (96 KiB). Entity types parse from `###` headings in the mini slice, not `catalog.mini_entity_types`. Direct verb JSON still does not carry `## MINI-SCHEMA`.
+- Opt-in Zeus verbose persist: `DebugPolicy.rewind` / `ZEUS_REWIND=true` sends query `rewind=true` on V2 verbs and query+body on session create/turn/trace. Default **off**. `X-Zeus-Trace: 1` still only force-keeps; it does not upgrade slim → verbose. Verb JSON never forwards a `rewind` argument. (ZCP-112)
+- Recover HTML pipeline envelopes as tool calls.
 
-### Security (ZCP-101)
+### Security
 
 - Floor-5 jailbreak control plane: multi-surface scorer (`zeus_client.security.jailbreak`) covering catalog families R–H (paraphrase dump, clean terminate, commercial invent, retrieval injection, multi-turn grooming, encoding, summary leak).
-- `SecurityHooks` scores user text + prior turns + decoded payloads + Zeus tool JSON + terminate/cheap-path summaries. Hard refuse (`>= 0.85`) skips the LLM/Zeus loop; poisoned tool bodies are replaced with `untrusted_tool_payload`.
-- Catalog tool allowlist denies unknown verbs (except `return`). Request overlay cannot reword default jailbreak rule text unless `override_defaults=True` (I1).
-- Tests: `tests/unit/security/test_jailbreak.py`, `tests/unit/application/test_jailbreak_turns.py`.
-### Added (ZCP-112)
-
-- Opt-in Zeus verbose persist: `DebugPolicy.rewind` / `ZEUS_REWIND=true` sends query `rewind=true` on V2 verbs and query+body on session create/turn/trace. Default **off**. `X-Zeus-Trace: 1` still only force-keeps; it does not upgrade slim → verbose. Verb JSON never forwards a `rewind` argument.
+- `SecurityHooks` scores those surfaces, allowlists catalog verbs, and replaces poisoned Zeus bodies with `untrusted_tool_payload`. Hard refuse (`>= 0.85`) skips the LLM/Zeus loop. (ZCP-101)
 
 ---
 

@@ -26,7 +26,7 @@ from zeus_client.observability.rate_limit import TokenBucket
 
 
 def test_package_version_is_2_0_0() -> None:
-    assert __version__ == "2.3.1"
+    assert __version__ == "2.4.0"
 
 
 def test_public_exports() -> None:
