@@ -14,7 +14,7 @@ read `result.debug` (typed `DebugBundle`). Optional Hub URLs are links only.
 | 5 | Inject proof | `debug.catalog.brief_sha12` / `mini_sha12` (local flags). Hub join uses Hub-shaped `public_trace.inject` / Writer B `zr.inject`: `scope_brief` / `mini_schema` with `present` / `chars` (UTF-8 bytes) / `sha12` / `preview`; `rewind=true` adds capped `text`. Slice hashes, not whole system. |
 | 6 | Hop table | `debug.hops[]` — verb, status, ms, error, url, snippet (≤2000), step_costs |
 | 7 | Layer A + peeled answer | `result.answer` (peeled); compact bag on `debug.public_trace.layer_a` |
-| 8 | Tokens | `debug.tokens` = `{prompt,completion,total,cached,extra,ok}` |
+| 8 | Tokens | `debug.tokens` = `{prompt,completion,total,cached,extra,ok}`. Hub join posts the same prompt/completion/total on `zeus_response.tokens` plus `rounds` / `ok`; omits `cached` unless the provider reported it; omits the object on DataAPI-only / no-LLM turns (never fake `0`). |
 | 9 | Journal export | `rt.debug.export_journal(turn_id=result.debug.export_ref)` |
 
 Ticket paste: `result.debug.detective["diagnosis"]["support_pack"]["markdown"]`.

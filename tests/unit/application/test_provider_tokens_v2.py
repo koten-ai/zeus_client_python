@@ -6,6 +6,7 @@ from zeus_client.application.tokens import (
     attach_trace_tokens,
     normalize_usage,
     sum_provider_tokens,
+    tokens_for_session_trace,
 )
 
 
@@ -159,3 +160,73 @@ def test_attach_trace_tokens_sets_hub_shape():
     assert out is trace["tokens"]
     assert trace["tokens"]["prompt"] == 15
     assert trace["tokens"]["total"] == 22
+
+
+def test_tokens_for_session_trace_sums_two_rounds() -> None:
+    steps = [
+        {
+            "type": "llm",
+            "round": 1,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11},
+        },
+        {"type": "tool", "round": 1},
+        {
+            "type": "llm",
+            "round": 2,
+            "usage": {"prompt_tokens": 20, "completion_tokens": 2, "total_tokens": 22},
+        },
+    ]
+    bag = tokens_for_session_trace(steps=steps)
+    assert bag is not None
+    assert bag["prompt"] == 30
+    assert bag["completion"] == 3
+    assert bag["total"] == 33
+    assert bag["rounds"] == 2
+    assert bag["ok"] is True
+    assert "cached" not in bag
+    assert "extra" not in bag
+
+
+def test_tokens_for_session_trace_omits_when_no_llm() -> None:
+    assert tokens_for_session_trace(steps=[{"type": "tool"}]) is None
+    assert tokens_for_session_trace(steps=[]) is None
+    assert tokens_for_session_trace(steps=None) is None
+
+
+def test_tokens_for_session_trace_omits_unknown_zero_usage() -> None:
+    steps = [{"type": "llm", "usage": {}}]
+    assert tokens_for_session_trace(steps=steps) is None
+
+
+def test_tokens_for_session_trace_omits_cached_unless_reported() -> None:
+    with_cache = [
+        {
+            "type": "llm",
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 1,
+                "total_tokens": 11,
+                "prompt_tokens_details": {"cached_tokens": 4},
+            },
+        }
+    ]
+    bag = tokens_for_session_trace(steps=with_cache)
+    assert bag is not None
+    assert bag["cached"] == 4
+
+
+def test_tokens_for_session_trace_ok_false_on_llm_error() -> None:
+    steps = [
+        {
+            "type": "llm",
+            "round": 1,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11},
+        },
+        {"type": "tool", "round": 1},
+        {"type": "llm_error", "round": 2, "code": "050001"},
+    ]
+    bag = tokens_for_session_trace(steps=steps)
+    assert bag is not None
+    assert bag["prompt"] == 10
+    assert bag["rounds"] == 1
+    assert bag["ok"] is False

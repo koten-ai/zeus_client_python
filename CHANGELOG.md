@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (ZCP-115)
+
+- `POST /v2/session/trace` aggregate `zeus_response.tokens` (`prompt` / `completion` / `total` / `rounds` / `ok`, optional `cached`) from `sum_provider_tokens`. Omitted when the turn never called the LLM or usage is unknown (Hub treats `0` as fake). `ok=false` when a later LLM round errors but tool hops still join.
+
 ### Added (ZCP-114)
 
 - Hub-shaped `zeus_response.inject` on `POST /v2/session/trace` and `public_trace.inject`: nested `scope_brief` / `mini_schema` with `present`, UTF-8 `chars`, slice `sha12`, `preview`, `entity_types` / `scope_line` / `mode_line`. `rewind=true` adds capped `text` (96 KiB). Entity types parse from `###` headings in the mini slice, not `catalog.mini_entity_types`. Direct verb JSON still does not carry `## MINI-SCHEMA`.
