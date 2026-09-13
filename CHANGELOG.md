@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Zeus HTTP `RetryBudget` on idempotent read verbs (`find`/`get`/`search`/`describe`/`explain`/`traverse`) for transport + HTTP 5xx only (API_ZEUS §6.6). Never 4xx/409/429, never `set`/`pipeline`. Same budget as LLM adapters. Claim stays **candidate**. Not V1 job replan.
+
 ---
 
 ## 2.4.0 — 2026-09-04

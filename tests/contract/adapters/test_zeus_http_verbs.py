@@ -14,10 +14,12 @@ from zeus_client.adapters.zeus_http.headers import apply_mode_header
 from zeus_client.adapters.zeus_http.verbs import (
     EXPOSED_V2_VERBS,
     HttpxZeusPort,
+    verb_allows_sdk_retry,
     verb_url,
+    zeus_hop_retryable,
 )
 from zeus_client.application.data_verb import run_data_verb
-from zeus_client.config.models import DataTarget, RuntimeConfig, ZeusEndpointConfig
+from zeus_client.config.models import DataTarget, RetryPolicy, RuntimeConfig, ZeusEndpointConfig
 from zeus_client.domain.errors import ErrorCode, ZeusToolError
 from zeus_client.domain.journal import InMemoryJournal
 from zeus_client.domain.journal.events import EVENT_ZEUS_HOP
@@ -351,3 +353,111 @@ async def test_http_verb_default_omits_rewind_query() -> None:
     req = route.calls.last.request
     assert "rewind=" not in str(req.url)
     assert "rewind" not in json.loads(req.content)
+
+
+def test_verb_sdk_retry_matrix() -> None:
+    for v in ("find", "get", "search", "describe", "explain", "traverse"):
+        assert verb_allows_sdk_retry(v)
+    for v in ("set", "pipeline", "return", "order", "enrich", "project", "analyze"):
+        assert not verb_allows_sdk_retry(v)
+    assert zeus_hop_retryable("find", status=503, transport_err=False)
+    assert zeus_hop_retryable("find", status=0, transport_err=True)
+    assert not zeus_hop_retryable("find", status=409, transport_err=False)
+    assert not zeus_hop_retryable("find", status=429, transport_err=False)
+    assert not zeus_hop_retryable("set", status=503, transport_err=False)
+
+
+def _retry_port(base: str) -> HttpxZeusPort:
+    return HttpxZeusPort(
+        endpoint=ZeusEndpointConfig(url=base, auth_mode="none"),
+        secrets=EnvSecretStore(environ={}),
+        retry=RetryPolicy(max_attempts=3, base_delay_ms=0, jitter=False),
+    )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_find_retries_503_then_ok() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(url__startswith=f"{base}/v2/").mock(
+        side_effect=[
+            httpx.Response(503, json={"error": "busy"}),
+            httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-ok"}),
+        ]
+    )
+    port = _retry_port(base)
+    try:
+        r = await run_data_verb(port, "find", {}, target=DataTarget())
+    finally:
+        await port.aclose()
+    assert route.call_count == 2
+    assert r.ok is True
+    assert r.req_id == "r-ok"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_find_no_retry_409() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(url__startswith=f"{base}/v2/").mock(
+        return_value=httpx.Response(409, json={"error": "contract"}, headers={"X-Zeus-Req-Id": "r-409"})
+    )
+    port = _retry_port(base)
+    try:
+        r = await run_data_verb(port, "find", {}, target=DataTarget())
+    finally:
+        await port.aclose()
+    assert route.call_count == 1
+    assert r.ok is False
+    assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_find_no_retry_429() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(url__startswith=f"{base}/v2/").mock(
+        return_value=httpx.Response(429, json={"error": "slow"})
+    )
+    port = _retry_port(base)
+    try:
+        r = await run_data_verb(port, "find", {}, target=DataTarget())
+    finally:
+        await port.aclose()
+    assert route.call_count == 1
+    assert r.status_code == 429
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_find_retries_transport_then_ok() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(url__startswith=f"{base}/v2/").mock(
+        side_effect=[
+            httpx.ConnectError("connection reset"),
+            httpx.Response(200, json={"ok": True}, headers={"X-Zeus-Req-Id": "r-t"}),
+        ]
+    )
+    port = _retry_port(base)
+    try:
+        r = await run_data_verb(port, "find", {}, target=DataTarget())
+    finally:
+        await port.aclose()
+    assert route.call_count == 2
+    assert r.ok is True
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_set_no_retry_503() -> None:
+    base = "http://zeus.test:8080"
+    route = respx.post(url__startswith=f"{base}/v2/").mock(
+        return_value=httpx.Response(503, json={"error": "busy"})
+    )
+    port = _retry_port(base)
+    try:
+        r = await run_data_verb(port, "set", {"doc_key": "x"}, target=DataTarget())
+    finally:
+        await port.aclose()
+    assert route.call_count == 1
+    assert r.status_code == 503
