@@ -24,10 +24,10 @@ from zeus_client.adapters.zeus_http.headers import (
 )
 from zeus_client.config.models import DataTarget, RetryPolicy, ZeusEndpointConfig
 from zeus_client.domain.errors import ErrorCode, ZeusToolError, ZeusTransportError
-from zeus_client.domain.llm_classify import RetryBudget
 from zeus_client.domain.ids import new_zeus_req_id
 from zeus_client.domain.journal.events import EVENT_ZEUS_HOP, JournalEvent
 from zeus_client.domain.journal.journal import InMemoryJournal
+from zeus_client.domain.llm_classify import RetryBudget
 from zeus_client.observability.logging import get_family_logger
 from zeus_client.ports import AuthContext, VerbHopResult, VerbRequest
 from zeus_client.ports.secrets import SecretStorePort
