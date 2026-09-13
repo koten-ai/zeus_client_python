@@ -400,7 +400,9 @@ async def test_find_retries_503_then_ok() -> None:
 async def test_find_no_retry_409() -> None:
     base = "http://zeus.test:8080"
     route = respx.post(url__startswith=f"{base}/v2/").mock(
-        return_value=httpx.Response(409, json={"error": "contract"}, headers={"X-Zeus-Req-Id": "r-409"})
+        return_value=httpx.Response(
+            409, json={"error": "contract"}, headers={"X-Zeus-Req-Id": "r-409"}
+        )
     )
     port = _retry_port(base)
     try:

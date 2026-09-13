@@ -65,9 +65,7 @@ EXPOSED_V2_VERBS: tuple[str, ...] = tuple(v for v in _V2_ORDER if v != "pipeline
 EXPOSED_V2_VERB_SET = frozenset(EXPOSED_V2_VERBS)
 V2_BARE_VERBS = frozenset({"explain", "return"})
 V2_SCOPE_VERBS = frozenset({"describe", "analyze"})
-IDEMPOTENT_READ_VERBS = frozenset(
-    {"describe", "explain", "get", "find", "search", "traverse"}
-)
+IDEMPOTENT_READ_VERBS = frozenset({"describe", "explain", "get", "find", "search", "traverse"})
 
 
 def verb_allows_sdk_retry(verb: str) -> bool:
@@ -235,9 +233,13 @@ class HttpxZeusPort:
                 if int(resp.status_code) == 401 and (hop_endpoint.auth_mode or "") == "basic":
                     auth = await self._auth_for(req, req.target, force=True)
                     headers = _headers(auth)
-                    if req.pre_mint_req_id and not any(k.lower() == "x-zeus-req-id" for k in headers):
+                    if req.pre_mint_req_id and not any(
+                        k.lower() == "x-zeus-req-id" for k in headers
+                    ):
                         headers["X-Zeus-Req-Id"] = new_zeus_req_id()
-                    resp = await client.post(url, headers=headers, json=payload, params=params or None)
+                    resp = await client.post(
+                        url, headers=headers, json=payload, params=params or None
+                    )
                 status = int(resp.status_code)
                 req_id = req_id_from_headers(resp.headers)
                 try:
