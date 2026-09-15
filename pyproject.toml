@@ -8,7 +8,7 @@ name = "kotenai-zeus-client"
 version = "2.4.0"
 description = "Python client library for Zeus AI data servers"
 readme = "README.md"
-license = "MIT"
+license = "BSD-3-Clause"
 requires-python = ">=3.11"
 authors = [
     {name = "Koten AI"},
