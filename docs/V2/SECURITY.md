@@ -484,6 +484,13 @@ If a secret may have entered logs/journals:
 
 Library maintainers: security contact in README; private disclosure window before CVE details.
 
+If a history rewrite is required to purge sensitive blobs from this repo:
+
+1. Prefer rewriting and force-pushing **`main` + tags only**.  
+2. Do **not** `git push --force --all` — that resurrects “recent pushes” on merged feature branches and confuses operators.  
+3. Delete merged/stale remote branches afterward (or before) so GitHub stops advertising them.  
+4. Discard any worktrees/clones that still hold pre-purge working trees (they can reintroduce catalog blobs).
+
 ---
 
 ## 21. Control mapping summary
