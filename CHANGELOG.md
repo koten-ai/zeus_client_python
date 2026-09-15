@@ -2,9 +2,21 @@
 
 ## Unreleased
 
+---
+
+## 2.4.1 — 2026-09-15
+
 ### Added
 
 - Zeus HTTP `RetryBudget` on idempotent read verbs (`find`/`get`/`search`/`describe`/`explain`/`traverse`) for transport + HTTP 5xx only (API_ZEUS §6.6). Never 4xx/409/429, never `set`/`pipeline`. Same budget as LLM adapters. Claim stays **candidate**. Not V1 job replan.
+
+### Changed
+
+- Relicense package to **BSD-3-Clause** (ZCP-119).
+
+### Security
+
+- Remove Zeus engine catalogs from the tree; scrub docs and restore a redacted legacy `chat_requests` README after history purge.
 
 ---
 
