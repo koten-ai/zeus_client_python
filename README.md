@@ -623,4 +623,4 @@ Do not self-award MATRIX / claim `supported` from CI green alone. `pip-audit` is
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+BSD-3-Clause — see [LICENSE](LICENSE).
