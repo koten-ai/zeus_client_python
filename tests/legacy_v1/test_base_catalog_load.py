@@ -10,7 +10,7 @@ from zeus_client.zeus.base_catalog import (
     parse_catalog_filename,
 )
 
-FIX = Path(__file__).parent / "fixtures" / "base-5.3"
+FIX = Path(__file__).resolve().parents[1] / "fixtures" / "base-5.3"
 
 
 def test_parse_catalog_filename_base_53():

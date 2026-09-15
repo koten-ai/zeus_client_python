@@ -18,7 +18,7 @@ _None for G0 pins + dual-tree scaffold._
 ## Later CHECKLIST sections
 
 - **D** stamps / OTel / UUID mint — residual vs family LOGGING bar
-- **E2** semantic cache — runtime **`flag`** (default off). Not **`supported`**: Zeus [redacted-recall-impl] MVP (no Vector Index), no design-suite flag-off/on cases, live Zeus ≥ 0.7.6 required to use the flag (0.6 fail-open / no-op).
+- **E2** semantic cache — runtime **`flag`** (default off). Not **`supported`**: no shared design-suite flag-off/on cases yet; live Zeus with agent_memory required to use the flag (older engines fail-open / no-op).
 - **F** multi-agent — `docs` (CHECKLIST F closeout). Not `demo` / `supported` until a live sidecar RunJob + distinct orch vs worker model ids.
 - **G** PyPI Trusted Publishing; `zeus_client_v2` alias still present
 

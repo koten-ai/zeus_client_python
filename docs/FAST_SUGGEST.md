@@ -38,12 +38,15 @@ Google-like suggestions while the user types, against a Zeus scope
 ```text
 query (len >= 2)
   ├─ POST /v2/{b}/{s}/{c}/search  {strategy:fts, query_text, entity_type, limit, timeout_ms}
-  │     └─ result.src_keys  (often biz:… on yelp-data)
+  │     └─ result.src_keys
   │           └─ optional N1QL USE KEYS hydrate → card fields
-  ├─ POST /v2/.../pipeline  find(name=q) → project(fields)
-  └─ POST /v2/.../pipeline  find(city=guess) → project(fields)
+  ├─ exact name path:  find → project
+  └─ exact city path:  find → project
         └─ merge_hits (FTS order first, dedupe id/name)
 ```
+
+Exact name/city paths may use a server-side multi-step composition when available;
+integrators should prefer `run_search` rather than hand-authoring those hops.
 
 ## Auth
 

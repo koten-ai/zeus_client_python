@@ -34,41 +34,27 @@ Constant: `EXPOSED_V2_VERBS` (tuple, pipeline stripped from `V2_DOCS_VERB_ORDER`
 
 Same as the rest of the client: pass minted `zeus_headers` **or** `zcfg` → `resolve_zeus_auth`. Default `X-Zeus-Mode: analytics` when unset.
 
-## Hub Rewind (external hops)
+## Correlation headers (external hops)
 
-Rewind plays a retained debug hop record for one `req_id` (`#/debug/rewind?req_id=`).
-This client stamps `X-Zeus-Chat-Id` / `X-Zeus-Turn-Id` / `X-Zeus-Trace-Class`
-on every `:8080` hop. Hub-join identity extras (ZCP-116):
+This client stamps correlation headers on every Zeus data-plane hop so operators
+can join client turns to Hub debug views:
 
-| Header | When |
+| Header | Role |
 | --- | --- |
-| `X-Zeus-Chat-Session-Id` | durable `/v2/session` id known (not auth `X-Zeus-Session`) |
-| `X-Zeus-Brief-Sha12` | SCOPE BRIEF slice present; equals `zeus_response.inject.scope_brief.sha12` |
-| `X-Zeus-Mini-Sha12` | MINI-SCHEMA slice present; equals `zeus_response.inject.mini_schema.sha12` |
+| `X-Zeus-Chat-Id` / `X-Zeus-Turn-Id` | Product chat / turn correlation |
+| `X-Zeus-Trace-Class` | Surface class (`agent`, `session`, `direct.interactive`, `direct.read`) |
+| `X-Zeus-Chat-Session-Id` | Durable `/v2/session` id when known (not auth `X-Zeus-Session`) |
+| `X-Zeus-Brief-Sha12` / `X-Zeus-Mini-Sha12` | Optional inject-slice proofs when brief/mini text is present |
 
-`POST /v2/session/trace` JSON also includes `turn_id` (same value as `X-Zeus-Turn-Id`). Never set `X-Zeus-Req-Id` (Zeus mints per hop). Never reuse `X-Zeus-Session` (auth `POST /v1/.../auth/session` only).
+`POST /v2/session/trace` JSON also includes `turn_id` (same value as `X-Zeus-Turn-Id`).
+Never set `X-Zeus-Req-Id` (Zeus mints per hop). Never reuse auth `X-Zeus-Session`
+outside `POST /v1/.../auth/session`.
 
-| Surface | `X-Zeus-Trace-Class` |
-| --- | --- |
-| Agent verb hops | `agent` |
-| `/v2/session*` | `session` |
-| Typeahead `search` | `direct.interactive` |
-| Direct `rt.data.*` | `direct.read` |
+Debug tips:
 
-Open the **tool** hop (`find`/`search`/`project`), never `POST /v2/session/{id}/turn`.
-Pipeline hops are often edge-only in Rewind (Zeus does not `[redacted]`).
-`X-Zeus-Trace: 1` is opt-in via `ClientSettings.force_trace` / `ZEUS_CLIENT_FORCE_TRACE`.
-It **keeps** the hop; it does **not** upgrade slim → verbose.
-
-Verbose persist is a separate opt-in (`DebugPolicy.rewind` / `ZEUS_REWIND=true` / `rt.data.find(..., rewind=True)`):
-
-| Surface | How the flag is sent |
-| --- | --- |
-| Direct / agent verbs | Query `?rewind=true` (never a field in the verb JSON body) |
-| `POST /v2/session`, `/session/{id}/turn`, `/session/trace` | Query **and** JSON `"rewind": true` |
-
-Default is **off** (30-day TTL + tool result bodies). Play Hub Rewind against the **tool** `req_id`. Zeus 0.7.29+ already persists verbose tapes when this flag is present.
-Never reuse `X-Zeus-Req-Id` across hops.
+- Open the **tool** hop (`find` / `search` / `project`), not `POST /v2/session/{id}/turn`.
+- `X-Zeus-Trace: 1` (`ClientSettings.force_trace` / `ZEUS_CLIENT_FORCE_TRACE`) keeps the hop; it does not upgrade slim → verbose.
+- Verbose persist is a separate opt-in (`DebugPolicy.rewind` / `ZEUS_REWIND=true` / per-call `rewind=True`): query `?rewind=true` on verbs; query **and** JSON body on session create/turn/trace. Default **off**.
 
 ## E2E debug gather
 

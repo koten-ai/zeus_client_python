@@ -46,7 +46,7 @@ See also IG Appendix A.
 
 ### Semantic agent cache (2.3.0)
 
-L0 `session.semantic_cache.enabled` defaults **false** (zero `/v2/agent_memory` traffic). When on, Mode 1 `agent.run_turn` recalls before the first LLM round and injects bag B key `semantic_memory` (fail-open on timeout/5xx). Writes are explicit-only unless knobs flip `write_explicit_only`. Zeus owns embed/store (`POST /v2/agent_memory/recall|blocks`). Not Direct typeahead. Zeus **≥ 0.7.6** to use; older engines treat memory as off. MATRIX honesty: **`flag`**, not `supported`.
+L0 `session.semantic_cache.enabled` defaults **false** (zero `/v2/agent_memory` traffic). When on, Mode 1 `agent.run_turn` recalls before the first LLM round and injects bag B key `semantic_memory` (fail-open on timeout/5xx). Writes are explicit-only unless knobs flip `write_explicit_only`. Zeus owns embed/store (`POST /v2/agent_memory/recall|blocks`). Not Direct typeahead. Requires a Zeus build that exposes agent_memory; older engines treat memory as off. MATRIX honesty: **`flag`**, not `supported`.
 
 ---
 

@@ -3,7 +3,7 @@
 **Status:** Design (not implemented)  
 **Audience:** Implementers, integrators, platform engineers  
 **Package target:** `kotenai-zeus-client` major version 2  
-**Primary mandate:** First-class integration with the Zeus Engine Debug Tool (Detective / session timeline / debug hop record)
+**Primary mandate:** First-class integration with the Zeus Engine Debug Tool (Detective / session timeline / hop replay)
 
 ---
 
@@ -37,7 +37,7 @@ Planes:
 | **Agent plane** | External LLM loop, tool selection, Layer A / terminate, insight vs cheap path |
 | **Observability plane** | Correlation IDs, spans, payloads, Detective briefing, Hub join, replay |
 
-Zeus Engine (server) owns graph storage, FTS/ANN, debug hop record per HTTP hop, and Hub Detective. The client owns everything that never hits Zeus as a single in-process ReAct turn — especially the **LLM** and the **multi-hop glue**.
+Zeus Engine (server) owns graph storage, search indexes, per-hop debug retention, and Hub Detective. The client owns everything that never hits Zeus as a single in-process ReAct turn — especially the **LLM** and the **multi-hop glue**.
 
 ### 1.2 Questions developers must answer
 
@@ -57,14 +57,14 @@ These are **product requirements**, not nice-to-haves. V2 designs observability 
 
 These are laws of the surrounding system; the client cannot wish them away:
 
-1. **One HTTP hop → one `req_id` → one debug hop record.** No parent merge id on the server.
-2. **External LLM is off-box.** Tool-hop Detective often has empty `ai.requests`; SCOPE BRIEF tiles on tool hops are frequently false negatives for external clients.
-3. **Session timeline is one row per conversation round.** Multi-tool turns must be represented by client-posted aggregate session-trace bodies joined on each hop’s `req_id`.
-4. **Pipeline hops may be mid-rich** (spans + storage, thin `tool_usage`) until Zeus instruments them.
+1. **One HTTP hop → one `req_id`.** The client must not invent parent merge ids.
+2. **External LLM is off-box.** Tool-hop debug views may omit LLM request tiles for external clients.
+3. **Session timeline is one row per conversation round.** Multi-tool turns need client-posted aggregate session-trace bodies joined on each hop’s `req_id`.
+4. **Some multi-step hops are thinner in debug** than single-verb hops — prefer tool `req_id`s and session join.
 5. **Contract hashes are Hub-stamped.** Clients must never invent production stamps.
 6. **Three clocks must never conflate:** Zeus engine semver, chat_request `base-N`, client package semver.
 
-V2 must **cooperate** with these constraints and make the external multi-hop story as rich as Hub in-process chat for operators.
+V2 must **cooperate** with these constraints and make the external multi-hop story as operable as in-process Hub chat.
 
 ### 1.4 Stakeholder goals
 
@@ -497,8 +497,8 @@ flowchart TB
 | --- | --- | --- |
 | **Turn** | `turn_id` (client ULID/UUIDv7) | Local journal root |
 | **Chat** | `chat_id` | Product conversation; correlation header |
-| **Zeus session** | `session_id` | Hub `/hub/debug/session/{sid}` |
-| **Hop** | `req_id` (server) | Hub `/hub/debug/req/{req_id}` |
+| **Zeus session** | `session_id` | Hub session debug entry (URL from `debug.hub.session_url`) |
+| **Hop** | `req_id` (server) | Hub hop debug entry (URL from `debug.hub.preferred_req_url`) |
 | **Span** | `span_id` | Timeline visualization |
 
 Primary operator entry for external clients: **session page**, then drill hops. Client always returns:
@@ -788,7 +788,7 @@ See [SECURITY.md](./SECURITY.md). Design hooks:
 
 **Future improvement candidates (post-2.0):**
 
-1. Server-side multi-hop debug hop record merge (eliminates identical multi-POST join).  
+1. Server-side multi-hop debug merge (eliminates identical multi-POST join).  
 2. Client-side OpenTelemetry context propagation as default.  
 3. Declarative agent graphs (plan → execute) for constrained enterprise modes.  
 4. Built-in **compare two turns** diff in `api.debug`.  

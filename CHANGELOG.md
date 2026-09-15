@@ -18,7 +18,7 @@ client_floor: client-floor-5
 claim_level: candidate
 semantic_cache: flag (CHECKLIST E2 / ZF-WISH-001; default enabled=false)
 BASE packs tested: offline mock base-5-mock; pack fixtures base-5.3; pin-shaped base-1 (not a COMPAT triple)
-zeus_engine: 0.6.x offline tapes; live agent_memory requires Zeus ≥ 0.7.6 ([redacted-recall-impl] MVP)
+zeus_engine: 0.6.x offline tapes; live agent_memory requires a Zeus build that exposes it
 zeus_client_design: 4ba1df97fcc56b9f1627561a8d1047195980b5ee
 compat_row: none — do not invent; see chat_request COMPAT.md
 multi_agent: docs
@@ -54,7 +54,7 @@ client_floor: client-floor-5
 claim_level: candidate
 semantic_cache: flag (CHECKLIST E2 / ZF-WISH-001; default enabled=false)
 BASE packs tested: offline mock base-5-mock; pack fixtures base-5.3; pin-shaped base-1 (not a COMPAT triple)
-zeus_engine: 0.6.x offline tapes; live agent_memory requires Zeus ≥ 0.7.6 ([redacted-recall-impl] MVP)
+zeus_engine: 0.6.x offline tapes; live agent_memory requires a Zeus build that exposes it
 zeus_client_design: 4ba1df97fcc56b9f1627561a8d1047195980b5ee
 compat_row: none — do not invent; see chat_request COMPAT.md
 multi_agent: docs
@@ -71,7 +71,7 @@ multi_agent: docs
 
 ### Not claimed
 
-- MATRIX `semantic_cache=supported` (Zeus recall is [redacted-recall-impl] / no Search Vector Index ops bar; no shared suite cases yet). Honest value is **`flag`**.
+- MATRIX `semantic_cache=supported` (Zeus recall MVP; no shared suite cases yet). Honest value is **`flag`**.
 - Family `supported` / new COMPAT triple / `multi_agent=demo`.
 
 ---

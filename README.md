@@ -31,7 +31,7 @@ Family law and ship bar:
 
 **Note on `ai_process_result`:** package default is **`false`** (cheap path). Use profile **`hub`** or `ClientSettings(ai_process_result=True)` for Hub Debug insight.
 
-**Note on `session.semantic_cache`:** capability ships (CHECKLIST E2) with master **`enabled=false`**. Opt in via config; recall injects bag B `semantic_memory`; writes are **explicit-only** by default (`rt.session.semantic_cache.write(...)`). Zeus embeds/stores (`POST /v2/agent_memory/*`). Direct typeahead is never included. Using the flag needs Zeus **≥ 0.7.6**; 0.6.x fail-open (no inject). Not MATRIX `supported` ([redacted-recall-impl] MVP).
+**Note on `session.semantic_cache`:** capability ships (CHECKLIST E2) with master **`enabled=false`**. Opt in via config; recall injects bag B `semantic_memory`; writes are **explicit-only** by default (`rt.session.semantic_cache.write(...)`). Zeus owns store/recall (`POST /v2/agent_memory/*`). Direct typeahead is never included. Requires a Zeus build that exposes agent_memory; older engines fail-open (no inject). MATRIX honesty: **`flag`**, not `supported`.
 
 ## Install
 
@@ -499,10 +499,10 @@ Inspect `trace` after `run_agent` for session drift, auth re-mint notes, and the
 | `session mode selected but session_id is empty` | `auth_mode` is `session` with no id | Set `zeus.session_id` to a valid Zeus session |
 | `basic mode needs a bucket+scope` | `resolve_zeus_auth` called without bucket/scope in basic mode | Pass bucket and scope from your sample; basic login is per-scope (`POST /v1/{bucket}/{scope}/auth/session`) |
 | `no credentials for scope {bucket}/{scope}` | No username for that scope | Add `zeus.scope_credentials["{bucket}/{scope}"]` or global `zeus.username` / `zeus.password` |
-| `proxy_auth credentials differ from Zeus username/password` | nginx and Zeus need different Basic credentials but share one `Authorization` header | Use identical htpasswd + `zeus_users` credentials, or configure nginx to skip `auth_basic` on `/v1/*/auth/session` and `/readyz` |
+| `proxy_auth credentials differ from Zeus username/password` | Edge proxy and Zeus Basic credentials differ but share one `Authorization` header | Use the same Basic credentials on both sides, or terminate proxy auth only on non-Zeus routes |
 | `Zeus unreachable at {url}: …` | DNS, firewall, or Zeus down; `httpx` connect/timeout error | Verify host, port, and that Zeus Engine is running |
-| `HTTP 401 from an nginx reverse proxy …` | nginx rejected the request before it reached Zeus | Add `zeus.proxy_auth` (or `proxy_auth_username` / `proxy_auth_password`) for the nginx gate |
-| `Zeus login failed ({status}): …` | Wrong username/password, scope mismatch, or Zeus auth error | Confirm credentials exist in `Zeus scope user store`; check Zeus logs and response body |
+| `HTTP 401 from an nginx reverse proxy …` | Reverse proxy rejected the request before it reached Zeus | Add `zeus.proxy_auth` (or `proxy_auth_username` / `proxy_auth_password`) for the proxy gate |
+| `Zeus login failed ({status}): …` | Wrong username/password, scope mismatch, or Zeus auth error | Confirm scope credentials in Zeus; check Zeus logs and response body |
 | `Zeus login returned no session_id` | Login returned 200 but body lacked `session_id` | Inspect Zeus `/v1/{bucket}/{scope}/auth/session` response; upgrade or repair Zeus |
 | `unknown auth mode: {mode}` | Invalid `zeus.auth_mode` | Use `none`, `basic`, `bearer`, or `session` |
 
@@ -537,10 +537,10 @@ Returned as JSON when `httpx` fails (status `0`). Zeus HTTP `4xx`/`5xx` return t
 
 | `error` code / message | Likely cause | Fix |
 |------------------------|--------------|-----|
-| `session_create_failed` | Transport error on `POST /v2/session` | Check Zeus URL, auth, and session collections (`[redacted-server-script]` on server) |
+| `session_create_failed` | Transport error on `POST /v2/session` | Check Zeus URL, auth, and that durable sessions are enabled on the server |
 | `session_turn_failed` | Transport error on `POST /v2/session/{id}/turn` | Same; confirm `session_id` is valid |
 | `session_trace_failed` | Transport error on `POST /v2/session/trace` | Same; trace posting is best-effort |
-| Hub Detective thin on `/pipeline` only | External multi-hop + Zeus pipeline debug hop record gap | Prefer `/hub/debug/session/{sid}`; open `trace.session.preferred_req_id` / `req_ids[]`. Session-trace body is multi-hop aggregate (`zeus_response.tool_hops`) from client 0.3.1+ |
+| Hub Detective thin on multi-hop / pipeline turns | External client multi-hop join is incomplete for some hops | Prefer `result.debug.detective` / support pack; open `preferred_req_id` / `req_ids[]` on the tool hop (not the `/turn` hop) |
 | `no session_id` | `continue_session_turn` called with empty id | Ensure session create succeeded or pass `zeus_session_id` from prior `session_meta` |
 | `bad trace params` | Missing session id or `round <= 0` for trace post | Fix session state before commit |
 | HTTP `409` + `payload_hash` in body | Client `contract_hash` does not match Zeus-computed hash | Re-verify catalog in Zeus UI, sync stamped file, align `scope_contracts` hash with stamped `contract.hash` |

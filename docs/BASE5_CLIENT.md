@@ -163,7 +163,7 @@ Claim remains **`candidate`**. Do not treat this section as MATRIX `supported`.
 - [x] Recall → bag B `semantic_memory` inject; fail-open timeout
 - [x] Explicit write (`rt.session.semantic_cache.write`); Zeus embeds; no CB SDK
 - [x] Not Direct typeahead (`apply_to_modes=["agent"]`)
-- [x] MATRIX honesty **`flag`** (not `supported` — [redacted-recall-impl] / no suite cases)
+- [x] MATRIX honesty **`flag`** (not `supported` — no shared suite cases yet)
 - [x] Deny-list: secrets, full system/catalog dumps, G2 fields are not written
 
 ### F. Multi-agent readiness (`docs` only)

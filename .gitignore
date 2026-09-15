@@ -22,6 +22,10 @@ chats.jsonl
 src/data/chat_requests/*
 !src/data/chat_requests/.gitkeep
 
+# Local Hub/Detective dumps and session exports (may contain engine internals)
+detective-session-data.json
+*-session-data.json
+
 # Grok artifacts
 terminals/
 mcps/
