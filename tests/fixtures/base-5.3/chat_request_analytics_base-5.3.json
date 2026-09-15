@@ -1,0 +1,84 @@
+{
+  "_format": "zeus.chat_request.v2",
+  "_version": "fixture-redacted",
+  "_note": "Minimal offline fixture for client tests. Not a Zeus Hub production catalog. Do not expand with engine system prompts or cost models.",
+  "_hash": "md5:fixture000000000000000000000001",
+  "_hash_policy": {
+    "version": 1,
+    "excluded": [
+      "guidance",
+      "contract",
+      "metadata",
+      "_.*"
+    ],
+    "pointers": [
+      "/messages/*/content",
+      "/verbs"
+    ]
+  },
+  "_lineage": {
+    "base_id": "base-5.3",
+    "custom_id": null,
+    "mode": "analytics",
+    "profile": "v2_min",
+    "kind": "base",
+    "parent_base_id": "base-5.2",
+    "prototype": false,
+    "file_stem": "chat_request_analytics_base-5.3.json",
+    "status": "current_candidate"
+  },
+  "_base_meta": {
+    "base_id": "base-5.3",
+    "status": "current_candidate",
+    "mode": "analytics",
+    "audience": "client-tests",
+    "prototype": false
+  },
+  "contract": {
+    "id": "analytics_v4",
+    "hash": "md5:fixture000000000000000000000001",
+    "name": "test fixture analytics",
+    "scope": "fixture/_default"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "Test fixture catalog for kotenai-zeus-client unit tests.\nPrefer V2 verbs. This text is intentionally minimal.\n\n## SCOPE BRIEF (authoritative \u2014 DO NOT call get_stats ...)\n\nscope:           beer-sample/_default\nmode:            auto\nnodes_total:     7303      edges_total: 24500      entities_total: 0\n\n## MINI-SCHEMA (per entity_type \u2014 derived from the scope's EntityMap)\nrule: `find_nodes` `where` is equality-only on these paths.\nrule: an `ex:` trailer shows a NON-EXHAUSTIVE sample of that field's stored values.\n\n### Beer  (fields: 8)\n  - abv                    number       [gsi]\n  - category               display      [none]  -- result-only, NOT filterable\n  - ibu                    number       [gsi]\n  - description            text_fts     [fts]   -- use fts_search / hybrid_search\n  - brewery_id             entity_fk    [gsi]   fk_to=Brewery  ex: coopers_brewery\n  - name                   scalar_ent   [gsi]   fk_to=Beer  ex: Coopers Sparkling Ale\n\n### Brewery  (fields: 9)\n  - website                display      [none]  -- result-only, NOT filterable\n  - city                   scalar_ent   [gsi]   fk_to=City  ex: Arena\n  - state                  scalar_ent   [gsi]   fk_to=State  ex: Maine\n  inverse_fks:\n    \u2190 Beer.brewery_id  (entity_fk)  -- back-walk: find_nodes(entity_type:\"Beer\", where:{brewery_id:\"<this.doc_key>\"})\n\n## WALK_PATHS (pre-validated FK chains)\n  - Beer \u2192 Brewery                   path=[brewery_id]                             hops=1\n"
+    }
+  ],
+  "verbs": [
+    {
+      "type": "function",
+      "function": {
+        "name": "describe",
+        "description": "fixture stub",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "find",
+        "description": "fixture stub",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "return",
+        "description": "fixture stub",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
+  ]
+}
