@@ -681,6 +681,7 @@ async def run_agent_turn(
                             ),
                             stamp=stamp,
                             mode=settings.mode,
+                            target=req.target,
                             rewind=bool(dbg_pol.rewind),
                             turn_id=turn_id,
                             headers=correlation_headers(
@@ -1021,6 +1022,7 @@ async def run_agent_turn(
                 ),
                 stamp=stamp,
                 mode=settings.mode,
+                target=req.target,
                 rewind=bool(dbg_pol.rewind),
                 turn_id=turn_id,
                 headers=correlation_headers(

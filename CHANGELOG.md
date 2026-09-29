@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Session trace passes the turn target into `post_trace`. A beer-sample basic-auth turn mints `/v1/{bucket}/{scope}/auth/session` for that target. `DataTarget()` is no longer the trace login when the turn named a bucket. (ZDM-16)
+
 ---
 
 ## 2.4.1 — 2026-09-15

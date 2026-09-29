@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Union
 
 from zeus_client.adapters.zeus_http.session import HttpxSessionClient
+from zeus_client.config.models import DataTarget
 from zeus_client.domain.session import SessionHandle
 
 __all__ = [
@@ -471,6 +472,7 @@ async def project_session_trace(
     stamp: Mapping[str, Any] | None = None,
     mode: str = "analytics",
     headers: Mapping[str, str] | None = None,
+    target: DataTarget | None = None,
     rewind: bool = False,
     turn_id: str = "",
 ) -> SessionTraceProjectResult:
@@ -528,6 +530,7 @@ async def project_session_trace(
                 outcome=agg.outcome,
                 headers=headers,
                 mode=mode,
+                target=target,
                 rewind=rewind,
                 turn_id=turn_id,
             )
