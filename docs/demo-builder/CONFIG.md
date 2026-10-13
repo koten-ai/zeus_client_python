@@ -155,7 +155,7 @@ Generic placeholder template (other domains): [templates/config.example.json](te
 | Key | Purpose |
 |-----|---------|
 | `url` | Zeus Engine base URL (not the client UI). Overridden by `ZEUS_URL` at resolve time. |
-| `auth_mode` | `none`, `basic`, `bearer`, or `session` |
+| `auth_mode` | `none`, `basic`, `bearer`, `session`, or `pat` |
 | `username` / `password` | Global basic auth |
 | `bearer_token` | When `auth_mode` is `bearer` |
 | `session_id` | Reuse existing Zeus session when `auth_mode` is `session` |

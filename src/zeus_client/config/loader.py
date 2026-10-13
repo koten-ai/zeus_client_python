@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from zeus_client.config.models import (
+    AUTH_MODES,
     ClientIdentity,
     ClientSettings,
     DataTarget,
@@ -281,7 +282,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
     roles = _parse_llm_roles(llm.get("roles"), default_api_key_env=default_key_env)
 
     auth_mode = str(z.get("auth_mode", "none")).lower()
-    if auth_mode not in ("none", "basic", "bearer", "session", "certificate"):
+    if auth_mode not in AUTH_MODES:
         raise ConfigError(
             code=ErrorCode.ZEUS_AUTH_MODE_INVALID,
             component="config.loader",
@@ -439,7 +440,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             key_file=z.key_file,
             key_file_env=z.key_file_env,
         )
-        if z.auth_mode not in ("none", "basic", "bearer", "session", "certificate"):
+        if z.auth_mode not in AUTH_MODES:
             raise ConfigError(
                 code=ErrorCode.ZEUS_AUTH_MODE_INVALID,
                 component="config.loader",

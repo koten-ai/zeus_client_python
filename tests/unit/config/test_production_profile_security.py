@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from zeus_client.config.loader import load_runtime_config
 from zeus_client.config.models import RuntimeConfig, ZeusEndpointConfig
 from zeus_client.config.profiles import apply_profile
 from zeus_client.domain.errors import ConfigError, ErrorCode
@@ -23,6 +24,15 @@ def test_production_rejects_tls_verify_off() -> None:
         apply_profile(base, "production")
     assert ei.value.code is ErrorCode.CONFIG_INVALID
     assert "tls_verify" in ei.value.public_message
+
+
+def test_production_accepts_pat_with_tls() -> None:
+    base = RuntimeConfig(
+        zeus=ZeusEndpointConfig(auth_mode="pat", token_env="ZEUS_PAT", tls_verify=True)
+    )
+    out = apply_profile(base, "production")
+    assert out.profile == "production"
+    assert out.zeus.auth_mode == "pat"
 
 
 def test_production_accepts_basic_with_tls() -> None:
@@ -62,3 +72,8 @@ def test_ci_still_allows_auth_mode_none() -> None:
     out = apply_profile(base, "ci")
     assert out.profile == "ci"
     assert out.zeus.auth_mode == "none"
+
+
+def test_loader_accepts_auth_mode_pat() -> None:
+    cfg = load_runtime_config(env={"ZEUS_CLIENT_AUTH_MODE": "pat"})
+    assert cfg.zeus.auth_mode == "pat"

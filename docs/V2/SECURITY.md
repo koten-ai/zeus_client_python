@@ -111,6 +111,7 @@ flowchart LR
 | --- | --- | --- |
 | `none` | Local lab only | **Forbidden** in `production` profile validation |
 | `basic` → session mint | Common lab/prod | `POST /v1/{bucket}/{scope}/auth/session` with Basic; cache session token in memory |
+| `pat` → session mint | Machine without an IdP (CI, scripts) | Token from `token_env` (default `ZEUS_PAT`) must start with `zeus_pat_`. One `Authorization: Bearer` mint, then `X-Zeus-Session`. Non-PAT bearers are not sent. Mint `POST /v1/auth/tokens`, rotate by replacing the env value, revoke `DELETE /v1/auth/tokens/{id}`. Never commit the token |
 | Bearer / pre-supplied headers | Gateway pattern | Prefer injecting via `SecretStore` / header provider; never hardcode |
 | Proxy auth | Edge terminated | Merge proxy headers carefully; do not log them |
 

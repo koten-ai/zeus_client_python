@@ -268,7 +268,7 @@ Zeus settings live under a single top-level `zeus` object. Use `resolve_zeus_con
 | Key | Purpose |
 |-----|---------|
 | `url` | Zeus server base URL |
-| `auth_mode` | `none`, `basic`, `bearer`, or `session` |
+| `auth_mode` | `none`, `basic`, `bearer`, `session`, or `pat` |
 | `username` / `password` | Global basic auth (overridden per scope when `scope_credentials` is set) |
 | `bearer_token` | Static bearer token when `auth_mode` is `bearer` |
 | `session_id` | Reuse an existing Zeus session when `auth_mode` is `session` |
@@ -504,9 +504,18 @@ Inspect `trace` after `run_agent` for session drift, auth re-mint notes, and the
 | `HTTP 401 from an nginx reverse proxy …` | Reverse proxy rejected the request before it reached Zeus | Add `zeus.proxy_auth` (or `proxy_auth_username` / `proxy_auth_password`) for the proxy gate |
 | `Zeus login failed ({status}): …` | Wrong username/password, scope mismatch, or Zeus auth error | Confirm scope credentials in Zeus; check Zeus logs and response body |
 | `Zeus login returned no session_id` | Login returned 200 but body lacked `session_id` | Inspect Zeus `/v1/{bucket}/{scope}/auth/session` response; upgrade or repair Zeus |
-| `unknown auth mode: {mode}` | Invalid `zeus.auth_mode` | Use `none`, `basic`, `bearer`, or `session` |
+| `unknown auth mode: {mode}` | Invalid `zeus.auth_mode` | Use `none`, `basic`, `bearer`, `session`, or `pat` |
+| `pat mode selected but token env empty` | `auth_mode` is `pat` and `ZEUS_PAT` (or `token_env`) is unset | Export the env var named by `zeus.token_env`. Never put the token in config |
+| `pat token must start with zeus_pat_` | The env value is not a Zeus PAT | Mint a `zeus_pat_…` token. Other bearers are refused locally and are not sent |
+| `Zeus PAT login failed HTTP 401` | The PAT is revoked, expired, or unknown | Mint a new token or restore the previous one. Revoke with `DELETE /v1/auth/tokens/{id}` |
 
-**401 self-heal:** During tool dispatch, a `401` in basic mode triggers `invalidate_zeus_session` + forced re-login and one retry. Failure is noted in `trace["notes"]` as `auth: re-mint after 401 failed (…)`.
+**401 self-heal:** During tool dispatch, a `401` in basic or pat mode triggers a forced re-mint and one retry. Failure is noted in `trace["notes"]` as `auth: re-mint after 401 failed (…)`.
+
+### Personal access tokens (`auth_mode=pat`)
+
+Set `zeus.auth_mode` to `pat` and `zeus.token_env` to the env var that holds the token (default `ZEUS_PAT`). The value must start with `zeus_pat_`. The client posts `Authorization: Bearer` once to `POST /v1/{bucket}/{scope}/auth/session`, then sends `X-Zeus-Session` on later calls. A token without that prefix is refused locally and is not sent to Zeus, so it is not treated as an M2M JWT.
+
+Mint a token from a logged-in session with `POST /v1/auth/tokens`. Rotate by minting a replacement and updating the env var. Revoke with `DELETE /v1/auth/tokens/{id}`. Do not commit the plaintext token.
 
 ### Catalog loading
 

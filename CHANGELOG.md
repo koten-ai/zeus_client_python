@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `auth_mode=pat` mints a Zeus session from a `zeus_pat_…` token (`ZEUS_PAT` or `token_env`), then sends `X-Zeus-Session`. Tokens that do not start with `zeus_pat_` are not sent (ZCP-123).
+
 ---
 
 ## 2.4.1 — 2026-09-15

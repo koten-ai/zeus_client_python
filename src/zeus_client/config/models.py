@@ -27,9 +27,11 @@ __all__ = [
     "LoggingPolicy",
     "ClientIdentity",
     "RuntimeConfig",
+    "AUTH_MODES",
 ]
 
-AuthMode = Literal["none", "basic", "bearer", "session", "certificate"]
+AuthMode = Literal["none", "basic", "bearer", "session", "certificate", "pat"]
+AUTH_MODES = frozenset({"none", "basic", "bearer", "session", "certificate", "pat"})
 
 
 def _redact_repr_value(key: str, value: Any) -> Any:
