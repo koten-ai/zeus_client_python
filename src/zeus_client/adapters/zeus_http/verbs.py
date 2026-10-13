@@ -233,6 +233,7 @@ class HttpxZeusPort:
                 if int(resp.status_code) == 401 and (hop_endpoint.auth_mode or "") in {
                     "basic",
                     "pat",
+                    "m2m",
                 }:
                     auth = await self._auth_for(req, req.target, force=True)
                     headers = _headers(auth)

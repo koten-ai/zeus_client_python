@@ -31,7 +31,8 @@ def validate_production_security(cfg: RuntimeConfig) -> None:
             code=ErrorCode.CONFIG_INVALID,
             component="config.profiles",
             public_message=(
-                "production profile rejects zeus.auth_mode=none; use basic, bearer, session, or pat"
+                "production profile rejects zeus.auth_mode=none; "
+                "use basic, bearer, session, pat, or m2m"
             ),
         )
     if cfg.zeus.tls_verify is False:

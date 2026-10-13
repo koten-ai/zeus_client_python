@@ -18,6 +18,7 @@ from zeus_client.config.models import (
     LlmProviderConfig,
     LlmRoleConfig,
     LoggingPolicy,
+    M2MClientConfig,
     RateLimitPolicy,
     RedactionPolicy,
     RetryPolicy,
@@ -319,6 +320,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             cert_file=z.get("cert_file"),
             key_file=z.get("key_file"),
             key_file_env=z.get("key_file_env"),
+            m2m=_parse_m2m(z.get("m2m")),
         ),
         target=DataTarget(
             bucket=str(t.get("bucket", "yelp-data")),
@@ -424,6 +426,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             cert_file=z.cert_file,
             key_file=z.key_file,
             key_file_env=z.key_file_env,
+            m2m=z.m2m,
         )
     else:
         # partial field overrides
@@ -439,6 +442,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
             cert_file=z.cert_file,
             key_file=z.key_file,
             key_file_env=z.key_file_env,
+            m2m=z.m2m,
         )
         if z.auth_mode not in AUTH_MODES:
             raise ConfigError(
@@ -564,6 +568,19 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
         semantic_cache=semantic_cache,
     )
     return apply_profile(out, out.profile)
+
+
+def _parse_m2m(raw: Any) -> M2MClientConfig:
+    if not isinstance(raw, Mapping):
+        return M2MClientConfig()
+    return M2MClientConfig(
+        issuer=str(raw.get("issuer") or ""),
+        audience=str(raw.get("audience") or ""),
+        client_id=str(raw.get("client_id") or ""),
+        client_secret_env=str(raw.get("client_secret_env") or "ZEUS_M2M_CLIENT_SECRET"),
+        token_url=str(raw.get("token_url") or ""),
+        scope=str(raw.get("scope") or "zeus.read zeus.traverse"),
+    )
 
 
 def load_runtime_config(

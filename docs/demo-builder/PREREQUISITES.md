@@ -24,7 +24,7 @@
 <!-- TODO: health check steps, auth_mode options, scope credentials -->
 
 - Base URL (host vs Docker)
-- `auth_mode`: `none` | `basic` | `bearer` | `session` | `pat` (`zeus_pat_…` in `ZEUS_PAT` or `token_env`; mint then session)
+- `auth_mode`: `none` | `basic` | `bearer` | `session` | `pat` (`zeus_pat_…` in `ZEUS_PAT` or `token_env`; mint then session) | `m2m` (IdP client credentials; secret in `ZEUS_M2M_CLIENT_SECRET`)
 - Durable sessions: `/v2/session*` on current engines
 
 ---

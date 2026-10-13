@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from zeus_client.config.loader import load_runtime_config
-from zeus_client.config.models import RuntimeConfig, ZeusEndpointConfig
+from zeus_client.config.models import M2MClientConfig, RuntimeConfig, ZeusEndpointConfig
 from zeus_client.config.profiles import apply_profile
 from zeus_client.domain.errors import ConfigError, ErrorCode
 
@@ -24,6 +24,25 @@ def test_production_rejects_tls_verify_off() -> None:
         apply_profile(base, "production")
     assert ei.value.code is ErrorCode.CONFIG_INVALID
     assert "tls_verify" in ei.value.public_message
+
+
+def test_production_accepts_m2m_with_tls() -> None:
+    base = RuntimeConfig(
+        zeus=ZeusEndpointConfig(
+            auth_mode="m2m",
+            tls_verify=True,
+            m2m=M2MClientConfig(
+                issuer="https://idp.example/",
+                audience="https://zeus.example",
+                client_id="zeus-nightly",
+                client_secret_env="ZEUS_M2M_CLIENT_SECRET",
+            ),
+        )
+    )
+    out = apply_profile(base, "production")
+    assert out.profile == "production"
+    assert out.zeus.auth_mode == "m2m"
+    assert "s3cret" not in repr(out)
 
 
 def test_production_accepts_pat_with_tls() -> None:
@@ -77,3 +96,31 @@ def test_ci_still_allows_auth_mode_none() -> None:
 def test_loader_accepts_auth_mode_pat() -> None:
     cfg = load_runtime_config(env={"ZEUS_CLIENT_AUTH_MODE": "pat"})
     assert cfg.zeus.auth_mode == "pat"
+
+
+def test_loader_m2m_stores_secret_env_name_only(tmp_path) -> None:
+    import json
+
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "zeus": {
+                    "auth_mode": "m2m",
+                    "m2m": {
+                        "issuer": "https://idp.example/",
+                        "audience": "https://zeus.example",
+                        "client_id": "zeus-nightly",
+                        "client_secret_env": "ZEUS_M2M_CLIENT_SECRET",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = load_runtime_config(path, env={})
+    assert cfg.zeus.auth_mode == "m2m"
+    assert cfg.zeus.m2m.issuer == "https://idp.example/"
+    assert cfg.zeus.m2m.client_secret_env == "ZEUS_M2M_CLIENT_SECRET"
+    assert cfg.zeus.m2m.scope == "zeus.read zeus.traverse"
+    assert "s3cret" not in repr(cfg)
