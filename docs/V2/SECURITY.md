@@ -368,7 +368,7 @@ Metrics should count `rate_limited` decisions for visibility.
 | --- | --- |
 | Minimal runtime deps | `httpx` + small utilities; avoid heavy stacks in core |
 | Pin in lockfiles for apps | Library uses compatible ranges; apps pin |
-| `pip audit` / OSV in CI | Fail on known critical CVEs |
+| `pip audit` / OSV in CI | Non-blocking for 2.0.0 (ZCP-44). A failing gate is 2.0.1 ops on that story |
 | Prefer well-maintained HTTP stacks | httpx |
 | No shell-outs in core | Eliminate command injection class |
 | Review optional OTLP exporter deps | Extra extra; don’t force on all users |
@@ -538,7 +538,7 @@ If a history rewrite is required to purge sensitive blobs from this repo:
 - [ ] Header charset validation  (partial / adapter)  
 - [ ] Plugin capability deny-by-default for secrets  N/A (`plugins=no`)  
 - [ ] Support pack redaction tests  ✅ (detective/support path)  
-- [ ] `pip audit` in CI  deferred  
+- [ ] `pip audit` in CI  deferred — non-blocking for 2.0.0 (ZCP-44). Does not block T5/T8/T9. Blocking job is 2.0.1 on ZCP-44.
 - [ ] Session isolation: no implicit last-session  ✅  
 - [ ] Hub hydrate opt-in  ✅  
 - [ ] LIVE replay gated  ✅ 

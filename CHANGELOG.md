@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Record ZCP-44: `pip-audit` stays non-blocking for 2.0.0 and does not block T5/T8/T9. The failing CI job is 2.0.1.
+
 ---
 
 ## 2.4.1 — 2026-09-15

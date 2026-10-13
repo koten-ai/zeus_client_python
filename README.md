@@ -619,7 +619,7 @@ GitHub Actions (`.github/workflows/`):
 | `integration.yml` | manual | Lab-only (non-blocking stub) |
 
 Release (human): bump version clocks + CHANGELOG → merge → `git tag vX.Y.Z && git push origin vX.Y.Z`.  
-Do not self-award MATRIX / claim `supported` from CI green alone. `pip-audit` is non-blocking until ZCP-44.
+Do not self-award MATRIX / claim `supported` from CI green alone. `pip-audit` stays non-blocking for 2.0.0. ZCP-44 tracks the blocking job for 2.0.1 and does not block T5, T8, or T9.
 
 ## License
 
