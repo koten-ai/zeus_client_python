@@ -49,6 +49,8 @@ async def test_create_zeus_session_success_200(http_client):
     payload = json.loads(route.calls.last.request.content)
     assert payload["contract_id"] == "cid"
     assert payload["conversation"] == [{"role": "user", "content": "hi"}]
+    assert payload["bucket"] == "b"
+    assert payload["scope"] == "s"
 
 
 @pytest.mark.asyncio
@@ -183,6 +185,8 @@ async def test_continue_session_turn_success(http_client):
     payload = json.loads(route.calls.last.request.content)
     assert payload["round"] == 2
     assert payload["new_turns"] == [{"role": "assistant", "content": "ok"}]
+    assert "bucket" not in payload
+    assert "scope" not in payload
 
 
 @pytest.mark.asyncio
@@ -283,6 +287,8 @@ async def test_post_session_trace_success(http_client):
     assert payload["session_id"] == SID
     assert payload["round"] == 2
     assert payload["outcome"] == "ok"
+    assert "bucket" not in payload
+    assert "scope" not in payload
 
 
 @pytest.mark.asyncio
@@ -345,6 +351,38 @@ async def test_post_session_trace_http_error(http_client):
     assert json.loads(body)["error"] == "session_trace_failed"
     assert url == f"{ZEUS_URL}/v2/session/trace"
     assert req_id == ""
+
+
+@pytest.mark.asyncio
+async def test_session_payload_omits_partial_scope_and_sends_both(http_client):
+    create = respx.post(f"{ZEUS_URL}/v2/session").mock(
+        return_value=httpx.Response(201, json={"session_id": SID})
+    )
+    await create_zeus_session(ZEUS_URL, "yelp-demo", "", "c", "h", {}, [], HEADERS)
+    partial = json.loads(create.calls.last.request.content)
+    assert "bucket" not in partial
+    assert "scope" not in partial
+
+    turn = respx.post(f"{ZEUS_URL}/v2/session/{SID}/turn").mock(
+        return_value=httpx.Response(200, json={"round": 2})
+    )
+    await continue_session_turn(
+        ZEUS_URL, SID, 2, {}, [], HEADERS, bucket="yelp-demo", scope="_default"
+    )
+    turn_body = json.loads(turn.calls.last.request.content)
+    assert turn_body["bucket"] == "yelp-demo"
+    assert turn_body["scope"] == "_default"
+
+    trace = respx.post(f"{ZEUS_URL}/v2/session/trace").mock(
+        return_value=httpx.Response(201, json={"ok": True})
+    )
+    await post_session_trace(
+        ZEUS_URL, SID, 1, "req", "c", "h", {}, [], {}, "ok", HEADERS,
+        bucket="yelp-demo", scope="_default",
+    )
+    trace_body = json.loads(trace.calls.last.request.content)
+    assert trace_body["bucket"] == "yelp-demo"
+    assert trace_body["scope"] == "_default"
 
 
 @pytest.mark.asyncio

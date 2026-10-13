@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Union
 
 from zeus_client.adapters.zeus_http.session import HttpxSessionClient
+from zeus_client.config.models import DataTarget
 from zeus_client.domain.session import SessionHandle
 
 __all__ = [
@@ -473,6 +474,7 @@ async def project_session_trace(
     headers: Mapping[str, str] | None = None,
     rewind: bool = False,
     turn_id: str = "",
+    target: DataTarget | None = None,
 ) -> SessionTraceProjectResult:
     """POST identical multi-hop aggregate once per req_id (primary last).
 
@@ -530,6 +532,7 @@ async def project_session_trace(
                 mode=mode,
                 rewind=rewind,
                 turn_id=turn_id,
+                target=target,
             )
             if result.ok:
                 posts += 1

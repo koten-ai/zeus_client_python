@@ -323,6 +323,8 @@ async def commit_session_turn(
     chat_req, produced_delta, prior_turns, this_turn_reqs, trace, zeus_headers,
     layer_a=None,
     rewind=False,
+    bucket="",
+    scope="",
 ):
     """POST trace deltas and persist the turn shard.
 
@@ -393,6 +395,8 @@ async def commit_session_turn(
                     outcome=outcome,
                     zeus_headers=zeus_headers,
                     rewind=rewind,
+                    bucket=bucket,
+                    scope=scope,
                 )
                 if tr_status in (200, 201):
                     trace["notes"].append(f"trace {rid[:8]}… -> {tr_status}")
@@ -420,7 +424,8 @@ async def commit_session_turn(
             turn_turns = produced_delta
         if turn_turns:
             tu_status, _, tu_url, tu_req = await continue_session_turn(
-                zeus_url, sid, turn_round, chat_req, turn_turns, zeus_headers, rewind=rewind)
+                zeus_url, sid, turn_round, chat_req, turn_turns, zeus_headers,
+                rewind=rewind, bucket=bucket, scope=scope)
             trace["session_turn"] = {
                 "status": tu_status, "round": turn_round, "url": tu_url,
                 "req_id": tu_req, "turns": len(turn_turns),
