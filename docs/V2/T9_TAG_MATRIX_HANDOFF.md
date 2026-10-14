@@ -315,7 +315,7 @@ Not required to close ZCP-43 if GH Release artifacts are the lab distribution ch
 - Remove `compat.v1` if usage low  
 - demo_yelp: `zeus_client_v2` → `zeus_client` (silence warnings)  
 - ZCM-030/031/041–043 polish; ZCM-044+ post-GA  
-- `pip-audit` blocking CI — [ZCP-44](https://kotenai.atlassian.net/browse/ZCP-44)  
+- `pip-audit` blocking CI is 2.0.1, tracked by [ZCP-44](https://kotenai.atlassian.net/browse/ZCP-44). It does not block T5, T8, or T9.  
 - COMPAT triple authoring (chat_request owners)
 
 ---
