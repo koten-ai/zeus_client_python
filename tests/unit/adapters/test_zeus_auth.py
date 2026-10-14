@@ -13,6 +13,15 @@ from zeus_client.config.models import DataTarget, M2MClientConfig, ZeusEndpointC
 from zeus_client.domain.errors import AuthError, ErrorCode
 
 
+@pytest.fixture
+def enable_unreleased_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Opt a mint test in. Production leaves the set empty (ZCP-126)."""
+    monkeypatch.setattr(
+        "zeus_client.config.models.ENABLED_UNRELEASED_AUTH_MODES",
+        frozenset({"pat", "m2m"}),
+    )
+
+
 @pytest.mark.asyncio
 async def test_basic_mints_per_scope_session(caplog: pytest.LogCaptureFixture) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -70,7 +79,35 @@ async def test_bearer_does_not_log_token(caplog: pytest.LogCaptureFixture) -> No
 
 
 @pytest.mark.asyncio
-async def test_pat_mints_session_then_find_succeeds(caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize("mode", ["pat", "m2m"])
+async def test_unreleased_auth_mode_does_not_call_zeus(mode: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"disabled mode must not call the network: {request.url}")
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    resolver = ZeusAuthResolver(
+        endpoint=ZeusEndpointConfig(url="http://zeus.example", auth_mode=mode),
+        secrets=EnvSecretStore(
+            environ={"ZEUS_PAT": "zeus_pat_good", "ZEUS_M2M_CLIENT_SECRET": "s3cret-m2m"}
+        ),
+        client=http,
+    )
+    with pytest.raises(AuthError) as ei:
+        await resolver.resolve(DataTarget(bucket="lab", scope="security"))
+    assert ei.value.code == ErrorCode.FEATURE_DISABLED
+    ticket = "ZE-360" if mode == "pat" else "ZE-361"
+    assert ei.value.public_message == (
+        f"auth_mode={mode} is disabled until Zeus supports it ({ticket})"
+    )
+    assert "zeus_pat_good" not in ei.value.public_message
+    assert "s3cret-m2m" not in ei.value.public_message
+    await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_pat_mints_session_then_find_succeeds(
+    caplog: pytest.LogCaptureFixture, enable_unreleased_auth: None
+) -> None:
     """Valid PAT mints, then one V2 verb uses the session. dev_no_auth stays off."""
     from zeus_client.adapters.zeus_http.verbs import HttpxZeusPort
     from zeus_client.ports import VerbRequest
@@ -128,7 +165,7 @@ async def test_pat_mints_session_then_find_succeeds(caplog: pytest.LogCaptureFix
 
 
 @pytest.mark.asyncio
-async def test_pat_revoked_returns_401() -> None:
+async def test_pat_revoked_returns_401(enable_unreleased_auth: None) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/lab/security/auth/session"
         return httpx.Response(401, json={"error": "unauthenticated"})
@@ -151,7 +188,9 @@ async def test_pat_revoked_returns_401() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pat_rejects_non_pat_bearer_without_calling_zeus() -> None:
+async def test_pat_rejects_non_pat_bearer_without_calling_zeus(
+    enable_unreleased_auth: None,
+) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError(f"must not send non-PAT bearer: {request.url}")
 
@@ -185,7 +224,9 @@ def _m2m_endpoint(
 
 
 @pytest.mark.asyncio
-async def test_m2m_good_jwt_mints_and_verb_returns_200(caplog: pytest.LogCaptureFixture) -> None:
+async def test_m2m_good_jwt_mints_and_verb_returns_200(
+    caplog: pytest.LogCaptureFixture, enable_unreleased_auth: None
+) -> None:
     from zeus_client.adapters.zeus_http.verbs import HttpxZeusPort
     from zeus_client.ports import VerbRequest
 
@@ -246,7 +287,7 @@ async def test_m2m_good_jwt_mints_and_verb_returns_200(caplog: pytest.LogCapture
     "token",
     ["jwt-wrong-aud", "jwt-wrong-iss", "jwt-expired"],
 )
-async def test_m2m_rejected_jwt_returns_401(token: str) -> None:
+async def test_m2m_rejected_jwt_returns_401(token: str, enable_unreleased_auth: None) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/token":
             return httpx.Response(200, json={"access_token": token})
@@ -270,7 +311,7 @@ async def test_m2m_rejected_jwt_returns_401(token: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_m2m_unset_issuer_does_not_call_idp_or_zeus() -> None:
+async def test_m2m_unset_issuer_does_not_call_idp_or_zeus(enable_unreleased_auth: None) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError(f"unset issuer must not call the network: {request.url}")
 

@@ -13,8 +13,10 @@ award design-repo MATRIX `supported`. Claim level stays **candidate**.
 
 `v2.4.1` is the available client package (`git tag v2.4.1`, `pyproject.toml`
 version `2.4.1`). It does not contain PAT or M2M. Those modes are implemented
-and unreleased. The tag that carries basic, PAT, and M2M is the next package
-tag cut after those changes merge. This task does not cut that tag.
+and disabled until ZE-360 and ZE-361 (`ENABLED_UNRELEASED_AUTH_MODES` is empty).
+The tag that carries basic, PAT, and M2M is the next package tag cut after
+those Zeus tickets ship and the allow-list is opened. This task does not cut
+that tag.
 
 ## ZCP-1 leftover
 

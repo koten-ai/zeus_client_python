@@ -29,10 +29,31 @@ __all__ = [
     "M2MClientConfig",
     "RuntimeConfig",
     "AUTH_MODES",
+    "UNRELEASED_AUTH_MODES",
+    "ENABLED_UNRELEASED_AUTH_MODES",
+    "auth_mode_disabled_reason",
 ]
 
 AuthMode = Literal["none", "basic", "bearer", "session", "certificate", "pat", "m2m"]
 AUTH_MODES = frozenset({"none", "basic", "bearer", "session", "certificate", "pat", "m2m"})
+# pat and m2m stay in AUTH_MODES. They are closed until the matching Zeus ticket ships.
+_UNRELEASED_AUTH_TICKETS: dict[str, str] = {"pat": "ZE-360", "m2m": "ZE-361"}
+UNRELEASED_AUTH_MODES = frozenset(_UNRELEASED_AUTH_TICKETS)
+# Empty until ZE-360 (pat) and ZE-361 (m2m). No config key or env var bypasses this set.
+ENABLED_UNRELEASED_AUTH_MODES: frozenset[str] = frozenset()
+
+
+def auth_mode_disabled_reason(mode: str) -> str | None:
+    """Return a FEATURE_DISABLED message when ``mode`` is gated off.
+
+    Released modes and modes listed in ``ENABLED_UNRELEASED_AUTH_MODES`` return
+    ``None``. The caller raises; this function does not.
+    """
+    normalized = (mode or "").lower()
+    if normalized not in UNRELEASED_AUTH_MODES or normalized in ENABLED_UNRELEASED_AUTH_MODES:
+        return None
+    ticket = _UNRELEASED_AUTH_TICKETS[normalized]
+    return f"auth_mode={normalized} is disabled until Zeus supports it ({ticket})"
 
 
 def _redact_repr_value(key: str, value: Any) -> Any:

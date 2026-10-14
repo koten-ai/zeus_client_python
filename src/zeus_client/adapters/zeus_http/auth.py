@@ -9,7 +9,12 @@ from dataclasses import dataclass, field
 import httpx
 
 from zeus_client.adapters.secrets_env.store import EnvSecretStore
-from zeus_client.config.models import DataTarget, M2MClientConfig, ZeusEndpointConfig
+from zeus_client.config.models import (
+    DataTarget,
+    M2MClientConfig,
+    ZeusEndpointConfig,
+    auth_mode_disabled_reason,
+)
 from zeus_client.domain.errors import AuthError, ErrorCode
 from zeus_client.ports import AuthContext
 from zeus_client.ports.secrets import SecretStorePort
@@ -108,6 +113,13 @@ class ZeusAuthResolver:
             return AuthContext(headers={"X-Zeus-Session": sid}, mode="session")
         if mode == "basic":
             return await self._resolve_basic(target, force=force)
+        if reason := auth_mode_disabled_reason(mode):
+            raise AuthError(
+                code=ErrorCode.FEATURE_DISABLED,
+                component="adapters.zeus_http.auth",
+                public_message=reason,
+                details={"auth_mode": mode},
+            )
         if mode == "pat":
             return await self._resolve_pat(target, force=force)
         if mode == "m2m":

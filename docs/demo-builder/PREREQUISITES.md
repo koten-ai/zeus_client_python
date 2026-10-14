@@ -24,7 +24,7 @@
 <!-- TODO: health check steps, auth_mode options, scope credentials -->
 
 - Base URL (host vs Docker)
-- `auth_mode`: `none` | `basic` | `bearer` | `session` | `pat` (`zeus_pat_…` in `ZEUS_PAT` or `token_env`; mint then session) | `m2m` (IdP client credentials; secret in `ZEUS_M2M_CLIENT_SECRET`)
+- `auth_mode`: `none` | `basic` | `bearer` | `session`. `pat` and `m2m` are disabled until Zeus ships ZE-360 and ZE-361 (`FEATURE_DISABLED` before any token or client secret is read)
 - Durable sessions: `/v2/session*` on current engines
 
 ---

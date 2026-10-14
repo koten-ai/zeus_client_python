@@ -30,6 +30,7 @@ from zeus_client.config.models import (
     SemanticCacheRecallConfig,
     SemanticCacheWriteConfig,
     ZeusEndpointConfig,
+    auth_mode_disabled_reason,
 )
 from zeus_client.config.profiles import apply_profile
 from zeus_client.domain.errors import ConfigError, ErrorCode
@@ -289,6 +290,7 @@ def config_from_mapping(data: Mapping[str, Any], *, profile: str | None = None) 
             component="config.loader",
             public_message=f"zeus.auth_mode invalid: {auth_mode!r}",
         )
+    _reject_disabled_auth_mode(auth_mode)
 
     url = str(z.get("url") or z.get("base_url") or "http://127.0.0.1:8080").rstrip("/")
     if not url:
@@ -450,6 +452,7 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
                 component="config.loader",
                 public_message=f"zeus.auth_mode invalid: {z.auth_mode!r}",
             )
+        _reject_disabled_auth_mode(z.auth_mode)
 
     if (
         env.get("ZEUS_CLIENT_BUCKET")
@@ -568,6 +571,18 @@ def _apply_env(cfg: RuntimeConfig, env: Mapping[str, str]) -> RuntimeConfig:
         semantic_cache=semantic_cache,
     )
     return apply_profile(out, out.profile)
+
+
+def _reject_disabled_auth_mode(mode: str) -> None:
+    reason = auth_mode_disabled_reason(mode)
+    if reason is None:
+        return
+    raise ConfigError(
+        code=ErrorCode.FEATURE_DISABLED,
+        component="config.loader",
+        public_message=reason,
+        details={"auth_mode": mode},
+    )
 
 
 def _parse_m2m(raw: Any) -> M2MClientConfig:
