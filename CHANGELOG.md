@@ -6,6 +6,7 @@
 
 - `auth_mode=pat` mints a Zeus session from a `zeus_pat_…` token (`ZEUS_PAT` or `token_env`), then sends `X-Zeus-Session`. Tokens that do not start with `zeus_pat_` are not sent (ZCP-123).
 - `auth_mode=m2m` fetches an IdP JWT with client credentials and mints a Zeus session. The client secret stays in `ZEUS_M2M_CLIENT_SECRET` (ZCP-122).
+- Client authn matrix for basic, PAT, and M2M (ZCP-125). See `docs/V2/AUTHN_MATRIX.md`.
 
 ---
 
