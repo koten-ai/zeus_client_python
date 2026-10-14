@@ -504,6 +504,8 @@ async def run_agent(
         tc.contract_id, tc.contract_hash, tc.chat_req, produced_delta,
         prior_turns, tc.this_turn_reqs, tc.trace, tc.zeus_headers,
         rewind=effective_rewind(tc.settings, zcfg),
+        bucket=bucket,
+        scope=scope,
     )
     # Helios cheap spine on session_meta / trace
     if tc.settings:

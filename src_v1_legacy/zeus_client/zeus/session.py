@@ -7,6 +7,16 @@ from zeus_client.constants import TOOL_TIMEOUT
 from zeus_client.http_client import client
 from zeus_client.logging_setup import logger
 
+
+def _scope_payload(bucket, scope):
+    """Include bucket and scope only when both sides are non-empty."""
+    bucket = (bucket or "").strip()
+    scope = (scope or "").strip()
+    if bucket and scope:
+        return {"bucket": bucket, "scope": scope}
+    return {}
+
+
 async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_hash,
                               chat_request, initial_conversation, zeus_headers, rewind=False):
     """Phase C: open a durable session (round 1 head + shard). Returns
@@ -19,6 +29,7 @@ async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_has
         "contract_hash": contract_hash or "",
         "chat_request": chat_request or {},
         "conversation": initial_conversation or [],
+        **_scope_payload(bucket, scope),
     }
     if rewind:
         payload["rewind"] = True
@@ -47,7 +58,7 @@ async def create_zeus_session(zeus_url, bucket, scope, contract_id, contract_has
 
 
 async def continue_session_turn(zeus_url, session_id, client_round, chat_request,
-                                new_turns, zeus_headers, rewind=False):
+                                new_turns, zeus_headers, rewind=False, bucket="", scope=""):
     """Phase D4: persist a round shard (client_round must be server+1).
     new_turns are the delta turns (user + assistant/tool) for this user question."""
     if not session_id:
@@ -58,6 +69,7 @@ async def continue_session_turn(zeus_url, session_id, client_round, chat_request
         "round": int(client_round),
         "chat_request": chat_request or {},
         "new_turns": new_turns or [],
+        **_scope_payload(bucket, scope),
     }
     if rewind:
         payload["rewind"] = True
@@ -87,7 +99,8 @@ async def continue_session_turn(zeus_url, session_id, client_round, chat_request
 
 async def post_session_trace(zeus_url, session_id, client_round, req_id,
                              contract_id, contract_hash, chat_request,
-                             turns, zeus_response, outcome, zeus_headers, rewind=False):
+                             turns, zeus_response, outcome, zeus_headers, rewind=False,
+                             bucket="", scope=""):
     """Phase D5: post a per-round (or per-req) trace delta joined to req_id.
     Enables Detective /admin/debug/req/{req_id} to show external session
     panel + contract_status attribution (drift vs zeus_fault)."""
@@ -105,6 +118,7 @@ async def post_session_trace(zeus_url, session_id, client_round, req_id,
         "turns": turns or [],
         "zeus_response": zeus_response or {},
         "outcome": outcome or "ok",
+        **_scope_payload(bucket, scope),
     }
     if rewind:
         payload["rewind"] = True

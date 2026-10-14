@@ -25,7 +25,22 @@ from zeus_client.domain.stamps import product_stamp, resolve_client_ip
 from zeus_client.observability.logging import get_family_logger
 from zeus_client.ports.secrets import SecretStorePort
 
-__all__ = ["SessionHttpResult", "HttpxSessionClient"]
+__all__ = ["SessionHttpResult", "HttpxSessionClient", "scope_fields"]
+
+
+def scope_fields(target: DataTarget | None) -> dict[str, str]:
+    """Bucket and scope for a session JSON body.
+
+    Both sides must be non-empty. A missing target is omitted so the
+    ``DataTarget`` default (``yelp-data`` / ``_default``) is never invented.
+    """
+    if target is None:
+        return {}
+    bucket = (target.bucket or "").strip()
+    scope = (target.scope or "").strip()
+    if not bucket or not scope:
+        return {}
+    return {"bucket": bucket, "scope": scope}
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +138,7 @@ class HttpxSessionClient:
             "chat_request": dict(chat_request or {}),
             "conversation": list(conversation or []),
             **self._sink_stamp(),
+            **scope_fields(target),
         }
         if rewind:
             payload["rewind"] = True
@@ -198,6 +214,7 @@ class HttpxSessionClient:
             "round": int(client_round),
             "chat_request": dict(chat_request or {}),
             "new_turns": list(new_turns or []),
+            **scope_fields(target),
         }
         if rewind:
             payload["rewind"] = True
@@ -249,6 +266,7 @@ class HttpxSessionClient:
             "zeus_response": zresp,
             "outcome": outcome or "ok",
             **stamp,
+            **scope_fields(target),
         }
         tid = (turn_id or "").strip()
         if tid:
