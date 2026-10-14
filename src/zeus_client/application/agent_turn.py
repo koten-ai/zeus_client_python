@@ -692,7 +692,7 @@ async def run_agent_turn(
                                 brief_sha12=brief_sha12,
                                 mini_sha12=mini_sha12,
                             ),
-                            target=getattr(session_lifecycle, "target", None),
+                            target=req.target,
                         )
                     except Exception as join_exc:  # noqa: BLE001
                         notes.append(f"session_trace_failed: {join_exc}")
@@ -1033,7 +1033,7 @@ async def run_agent_turn(
                     brief_sha12=post_brief,
                     mini_sha12=post_mini,
                 ),
-                target=getattr(session_lifecycle, "target", None),
+                target=req.target,
             )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"session_trace_failed: {exc}")
