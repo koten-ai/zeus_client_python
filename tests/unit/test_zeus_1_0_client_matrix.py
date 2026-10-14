@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from zeus_client.config.models import UNRELEASED_AUTH_MODES
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -18,8 +20,7 @@ def test_zeus_1_0_row_names_the_available_tag() -> None:
     assert row["available_tag"] == f"v{version}"
     assert row["matrix_ticket"] == "ZE-77"
     assert row["auth_modes_on_tag"] == ["basic", "bearer", "session"]
-    assert "pat" in row["auth_modes_unreleased"]
-    assert "m2m" in row["auth_modes_unreleased"]
+    assert frozenset(row["auth_modes_unreleased"]) == UNRELEASED_AUTH_MODES
     text = (ROOT / "docs/V2/ZEUS_1_0_CLIENT_MATRIX.md").read_text(encoding="utf-8")
     assert row["available_tag"] in text
     assert "ZCP-1" in text

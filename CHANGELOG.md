@@ -7,6 +7,7 @@
 - Session trace passes the turn target into `post_trace`. A beer-sample basic-auth turn mints `/v1/{bucket}/{scope}/auth/session` for that target. `DataTarget()` is no longer the trace login when the turn named a bucket. (ZDM-16)
 ### Changed
 
+- `auth_mode=pat` and `auth_mode=m2m` stay in the config vocabulary but are disabled until ZE-360 and ZE-361. The loader and auth resolver raise `FEATURE_DISABLED` (`000008`) and do not read a token or client secret (ZCP-126).
 - Record ZCP-44: `pip-audit` stays non-blocking for 2.0.0 and does not block T5/T8/T9. The failing CI job is 2.0.1.
 ### Added
 

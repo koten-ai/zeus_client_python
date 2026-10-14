@@ -93,14 +93,51 @@ def test_ci_still_allows_auth_mode_none() -> None:
     assert out.zeus.auth_mode == "none"
 
 
-def test_loader_accepts_auth_mode_pat() -> None:
+@pytest.mark.parametrize(
+    ("auth_mode", "via_env"),
+    [("pat", True), ("m2m", True), ("pat", False), ("m2m", False)],
+)
+def test_loader_rejects_unreleased_auth_modes(tmp_path, auth_mode: str, via_env: bool) -> None:
+    import json
+
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps({"zeus": {"auth_mode": "basic", "username": "u"}}),
+        encoding="utf-8",
+    )
+    if via_env:
+        with pytest.raises(ConfigError) as ei:
+            load_runtime_config(path, env={"ZEUS_CLIENT_AUTH_MODE": auth_mode})
+    else:
+        path.write_text(
+            json.dumps({"zeus": {"auth_mode": auth_mode}}),
+            encoding="utf-8",
+        )
+        with pytest.raises(ConfigError) as ei:
+            load_runtime_config(path, env={"ZEUS_URL": "http://zeus.example:8080"})
+    ticket = "ZE-360" if auth_mode == "pat" else "ZE-361"
+    assert ei.value.code is ErrorCode.FEATURE_DISABLED
+    assert ei.value.public_message == (
+        f"auth_mode={auth_mode} is disabled until Zeus supports it ({ticket})"
+    )
+
+
+def test_loader_accepts_pat_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "zeus_client.config.models.ENABLED_UNRELEASED_AUTH_MODES",
+        frozenset({"pat"}),
+    )
     cfg = load_runtime_config(env={"ZEUS_CLIENT_AUTH_MODE": "pat"})
     assert cfg.zeus.auth_mode == "pat"
 
 
-def test_loader_m2m_stores_secret_env_name_only(tmp_path) -> None:
+def test_loader_m2m_stores_secret_env_name_only(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     import json
 
+    monkeypatch.setattr(
+        "zeus_client.config.models.ENABLED_UNRELEASED_AUTH_MODES",
+        frozenset({"m2m"}),
+    )
     path = tmp_path / "config.json"
     path.write_text(
         json.dumps(
