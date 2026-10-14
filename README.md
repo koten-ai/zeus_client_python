@@ -523,6 +523,10 @@ Set `zeus.auth_mode` to `m2m` and `zeus.m2m` to the IdP settings. The client fet
 
 An unset issuer is refused before any network call. Zeus returns HTTP 401 when the JWT has the wrong audience, the wrong issuer, or is expired, and when Zeus itself has an empty `auth.m2m.issuer`. Do not put the client secret in config.
 
+### Zeus 1.0.0 client tag (ZCP-124)
+
+The available package tag for the Zeus 1.0.0 row is `v2.4.1` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and are not in `v2.4.1`. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
+
 ### Catalog loading
 
 | Message / code | Likely cause | Fix |

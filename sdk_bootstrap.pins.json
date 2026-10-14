@@ -64,6 +64,16 @@
     "comment": "Lab only. Production: bearer|session|basic per deploy."
   },
 
+  "zeus_1_0_client": {
+    "ticket": "ZCP-124",
+    "matrix_ticket": "ZE-77",
+    "package": "kotenai-zeus-client",
+    "available_tag": "v2.4.1",
+    "auth_modes_on_tag": ["basic", "bearer", "session"],
+    "auth_modes_unreleased": ["pat", "m2m"],
+    "zcp1_leftover": "ZCP-1 remains In Review; no open child blocks Done"
+  },
+
   "stamps": {
     "user": "zeus_client",
     "version_from": "package_semver"
