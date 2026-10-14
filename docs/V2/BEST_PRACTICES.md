@@ -367,10 +367,12 @@ Implemented by **`make ci`** and **`.github/workflows/ci.yml`** (PR/push). Relea
 ruff check/format
 typecheck (public + domain + config; application/compat incremental)
 pytest -q -m "not integration"
-pip audit / safety (non-blocking warn → blocking on ZCP-44)
+pip audit / safety (non-blocking for 2.0.0; blocking job is 2.0.1 on ZCP-44)
 coverage report (fail under threshold; COV_FAIL_UNDER=75)
 build sdist/wheel + twine check
 ```
+
+Decision for 2.0.0 (ZCP-44): `pip-audit` stays a non-blocking note. It does not block T5, T8, or T9, and `make ci` does not fail on it. The job that fails the build on known CVEs is 2.0.1 ops and stays on ZCP-44. T2 only hard-rejects production `auth_mode=none` and TLS verify off.
 
 ### 11.2 Nightly / manual
 

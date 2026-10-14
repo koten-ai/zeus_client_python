@@ -146,7 +146,7 @@ Optional OTLP: `zeus_client_v2.adapters.otlp.try_build_otlp_exporter` — no-op 
 | 1 | Full `pytest -q` green | **Met** — package **238** (V1 oracles → `tests/legacy_v1`) |
 | 2 | Conformance offline required | **Met** (candidate) |
 | 3 | Production-shaped demo BFF | **Met** — Travel ZD-8, sample ZC-56, yelp ZD-20 |
-| 4 | SECURITY §23 | **Met** — prod rejects auth_mode=none + tls_verify off; pip audit = ZCP-44 |
+| 4 | SECURITY §23 | **Met** — prod rejects auth_mode=none + tls_verify off. pip audit is a non-blocking 2.0.0 note (ZCP-44); it does not block T5/T8/T9 |
 | 5 | Versions **2.0.0** | **Met** — `c123f52` |
 | 6 | Design MATRIX `supported` | **B1 Met** — candidate honesty PR design #13; **B2 `supported` deferred** (human) |
 
@@ -188,7 +188,7 @@ Ship **2.0.0** with claim **candidate** (T9 B1). Family MATRIX `supported` / pin
 | Hub hydrate opt-in | **done** |
 | LIVE replay gated | **done** |
 | Prod rejects `auth_mode=none` | **done** (ZCP-36 — production profile + `tls_verify`) |
-| `pip audit` in CI | **deferred** (ops) |
+| `pip audit` in CI | **deferred** — non-blocking for 2.0.0; blocking job is 2.0.1 on ZCP-44 |
 | Plugins deny-by-default secrets | N/A (plugins=no) |
 | OTLP optional | **stub** (opt-in factory) |
 

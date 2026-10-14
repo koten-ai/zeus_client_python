@@ -111,10 +111,23 @@ flowchart LR
 | --- | --- | --- |
 | `none` | Local lab only | **Forbidden** in `production` profile validation |
 | `basic` → session mint | Common lab/prod | `POST /v1/{bucket}/{scope}/auth/session` with Basic; cache session token in memory |
+| `pat` → session mint | Machine without an IdP (CI, scripts) | Token from `token_env` (default `ZEUS_PAT`) must start with `zeus_pat_`. One `Authorization: Bearer` mint, then `X-Zeus-Session`. Non-PAT bearers are not sent. Mint `POST /v1/auth/tokens`, rotate by replacing the env value, revoke `DELETE /v1/auth/tokens/{id}`. Never commit the token |
+| `m2m` → session mint | Service account with an IdP | Client-credentials against `m2m.issuer`. Audience is the Zeus API. Secret stays in `m2m.client_secret_env` (default `ZEUS_M2M_CLIENT_SECRET`). Bearer JWT once on `POST /v1/{bucket}/{scope}/auth/session`, then `X-Zeus-Session`. Request scope `zeus.read zeus.traverse` (service principal, not Hub admin). Empty issuer is refused locally. Zeus returns 401 for a wrong `aud`, wrong `iss`, expired JWT, or when its own `auth.m2m.issuer` is empty |
 | Bearer / pre-supplied headers | Gateway pattern | Prefer injecting via `SecretStore` / header provider; never hardcode |
 | Proxy auth | Edge terminated | Merge proxy headers carefully; do not log them |
 
 **Reasoning:** Session mint reduces password exposure on every tool hop. Scoped mint path is required by Zeus (non-scoped username/password often rejected).
+
+Example `m2m` block. The client secret is an env var name, never the secret:
+
+```json
+"m2m": {
+  "issuer": "https://idp.example/",
+  "audience": "https://zeus.example",
+  "client_id": "zeus-nightly",
+  "client_secret_env": "ZEUS_M2M_CLIENT_SECRET"
+}
+```
 
 ### 3.2 LLM authentication
 
@@ -368,7 +381,7 @@ Metrics should count `rate_limited` decisions for visibility.
 | --- | --- |
 | Minimal runtime deps | `httpx` + small utilities; avoid heavy stacks in core |
 | Pin in lockfiles for apps | Library uses compatible ranges; apps pin |
-| `pip audit` / OSV in CI | Fail on known critical CVEs |
+| `pip audit` / OSV in CI | Non-blocking for 2.0.0 (ZCP-44). A failing gate is 2.0.1 ops on that story |
 | Prefer well-maintained HTTP stacks | httpx |
 | No shell-outs in core | Eliminate command injection class |
 | Review optional OTLP exporter deps | Extra extra; don’t force on all users |
@@ -538,7 +551,7 @@ If a history rewrite is required to purge sensitive blobs from this repo:
 - [ ] Header charset validation  (partial / adapter)  
 - [ ] Plugin capability deny-by-default for secrets  N/A (`plugins=no`)  
 - [ ] Support pack redaction tests  ✅ (detective/support path)  
-- [ ] `pip audit` in CI  deferred  
+- [ ] `pip audit` in CI  deferred — non-blocking for 2.0.0 (ZCP-44). Does not block T5/T8/T9. Blocking job is 2.0.1 on ZCP-44.
 - [ ] Session isolation: no implicit last-session  ✅  
 - [ ] Hub hydrate opt-in  ✅  
 - [ ] LIVE replay gated  ✅ 

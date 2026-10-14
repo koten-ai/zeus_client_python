@@ -5,6 +5,14 @@
 ### Fixed
 
 - Session trace passes the turn target into `post_trace`. A beer-sample basic-auth turn mints `/v1/{bucket}/{scope}/auth/session` for that target. `DataTarget()` is no longer the trace login when the turn named a bucket. (ZDM-16)
+### Changed
+
+- Record ZCP-44: `pip-audit` stays non-blocking for 2.0.0 and does not block T5/T8/T9. The failing CI job is 2.0.1.
+### Added
+
+- `auth_mode=pat` mints a Zeus session from a `zeus_pat_…` token (`ZEUS_PAT` or `token_env`), then sends `X-Zeus-Session`. Tokens that do not start with `zeus_pat_` are not sent (ZCP-123).
+- `auth_mode=m2m` fetches an IdP JWT with client credentials and mints a Zeus session. The client secret stays in `ZEUS_M2M_CLIENT_SECRET` (ZCP-122).
+- Name `kotenai-zeus-client` tag `v2.4.1` as the available Zeus 1.0.0 client package. PAT and M2M are not in that tag (ZCP-124).
 
 ---
 

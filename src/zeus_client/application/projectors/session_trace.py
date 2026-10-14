@@ -475,6 +475,7 @@ async def project_session_trace(
     target: DataTarget | None = None,
     rewind: bool = False,
     turn_id: str = "",
+    target: DataTarget | None = None,
 ) -> SessionTraceProjectResult:
     """POST identical multi-hop aggregate once per req_id (primary last).
 
@@ -533,6 +534,7 @@ async def project_session_trace(
                 target=target,
                 rewind=rewind,
                 turn_id=turn_id,
+                target=target,
             )
             if result.ok:
                 posts += 1
