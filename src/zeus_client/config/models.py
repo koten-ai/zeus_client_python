@@ -26,10 +26,13 @@ __all__ = [
     "RateLimitPolicy",
     "LoggingPolicy",
     "ClientIdentity",
+    "M2MClientConfig",
     "RuntimeConfig",
+    "AUTH_MODES",
 ]
 
-AuthMode = Literal["none", "basic", "bearer", "session", "certificate"]
+AuthMode = Literal["none", "basic", "bearer", "session", "certificate", "pat", "m2m"]
+AUTH_MODES = frozenset({"none", "basic", "bearer", "session", "certificate", "pat", "m2m"})
 
 
 def _redact_repr_value(key: str, value: Any) -> Any:
@@ -37,6 +40,19 @@ def _redact_repr_value(key: str, value: Any) -> Any:
     if any(s in lk for s in ("password", "token", "secret", "api_key", "authorization")):
         return "***"
     return value
+
+
+@dataclass(frozen=True, slots=True)
+class M2MClientConfig:
+    """IdP client-credentials settings. The secret stays in the named env var."""
+
+    issuer: str = ""
+    audience: str = ""
+    client_id: str = ""
+    client_secret_env: str = "ZEUS_M2M_CLIENT_SECRET"
+    token_url: str = ""
+    # Least privilege for a service principal. Not Hub admin.
+    scope: str = "zeus.read zeus.traverse"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +70,7 @@ class ZeusEndpointConfig:
     cert_file: str | None = None
     key_file: str | None = None
     key_file_env: str | None = None  # env var name only
+    m2m: M2MClientConfig = field(default_factory=M2MClientConfig)
 
     def __repr__(self) -> str:
         return (
@@ -378,6 +395,14 @@ class RuntimeConfig:
                 "tls_verify": self.zeus.tls_verify,
                 "cert_file": self.zeus.cert_file,
                 "key_file_env": self.zeus.key_file_env,
+                "m2m": {
+                    "issuer": self.zeus.m2m.issuer,
+                    "audience": self.zeus.m2m.audience,
+                    "client_id": self.zeus.m2m.client_id,
+                    "client_secret_env": self.zeus.m2m.client_secret_env,
+                    "token_url": self.zeus.m2m.token_url,
+                    "scope": self.zeus.m2m.scope,
+                },
             },
             "target": {
                 "bucket": self.target.bucket,

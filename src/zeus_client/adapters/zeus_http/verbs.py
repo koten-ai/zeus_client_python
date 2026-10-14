@@ -230,7 +230,11 @@ class HttpxZeusPort:
             status = 0
             try:
                 resp = await client.post(url, headers=headers, json=payload, params=params or None)
-                if int(resp.status_code) == 401 and (hop_endpoint.auth_mode or "") == "basic":
+                if int(resp.status_code) == 401 and (hop_endpoint.auth_mode or "") in {
+                    "basic",
+                    "pat",
+                    "m2m",
+                }:
                     auth = await self._auth_for(req, req.target, force=True)
                     headers = _headers(auth)
                     if req.pre_mint_req_id and not any(
