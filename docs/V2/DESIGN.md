@@ -532,6 +532,8 @@ Preserve the proven join technique, but drive it from the journal:
 4. POST identical body to `/v2/session/trace` for **each** hop `req_id`, **primary last**.
 5. Record projector outcomes in the journal.
 
+Create, turn, and trace JSON include `bucket` and `scope` only when the turn `DataTarget` has both sides non-empty. The trace projector passes that same target into the post, including the auth mint. A missing target leaves those two fields off the JSON. Auth resolution with no target still uses `DataTarget()` (`yelp-data` / `_default`).
+
 #### 4.8.4 Detective projector
 
 Pure function over journal (+ optional Hub snapshots):
@@ -668,6 +670,7 @@ Design choices:
 - **Profiles:** `development` (verbose journal, force_trace optional), `production` (redaction strict, minimal logs), `ci` (fake clocks, deterministic ids).
 - **Separate secret material** from config snapshots used in journals (config export redacts).
 - **Target binding:** `DataTarget(bucket, scope, collection, mode)` explicit on calls; config supplies defaults only.
+- **Auth modes:** `none`, `basic`, `bearer`, and `session` resolve. `certificate` raises `NOT_IMPLEMENTED` (`000002`) before any request. `pat` and `m2m` stay in `AUTH_MODES` and raise `FEATURE_DISABLED` (`000008`) from the loader and `ZeusAuthResolver.resolve` until ZE-360 and ZE-361. `ENABLED_UNRELEASED_AUTH_MODES` is empty. No config key or environment variable opens them. Production rejects `auth_mode=none` and `tls_verify=false`. The production modes are `basic`, `bearer`, and `session`.
 - **No silent cross-scope catalog rglob.** Resolution order: scope dir → non-scope general files → bundled. Missing file errors loudly.
 
 ### 4.13 Extension / plugin architecture
@@ -845,6 +848,7 @@ Migration is covered in [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md).
 | [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) | Phased build plan |
 | [SECURITY.md](./SECURITY.md) | Threat model and controls |
 | [BEST_PRACTICES.md](./BEST_PRACTICES.md) | Engineering standards |
+| [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md) | Zeus 1.0.0 Python row: tag `v2.5.1`, claim stays candidate |
 
 ---
 

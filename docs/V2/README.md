@@ -12,10 +12,11 @@ Design documentation for **Version 2** of `kotenai-zeus-client`, rebuilt from fi
 | [MIGRATION.md](./MIGRATION.md) | V1→V2 map, compat shims, demo_yelp notes, cutover gate |
 | [MULTI_AGENT.md](./MULTI_AGENT.md) | Pattern B jobs/units seam; claim `docs` not `demo` |
 | [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) | Human gate: tag `v2.0.0`, GH Release, design MATRIX, pins |
+| [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md) | Zeus 1.0.0 Python row: available tag `v2.5.1`; `pat` and `m2m` disabled until ZE-360 and ZE-361 |
 
 ## Status
 
-**GA cutover code on `main`** — package **2.0.0**, default `import zeus_client` → **ZeusRuntime** tree; temporary `zeus_client_v2` alias (deprecated). Claim level remains **`candidate`** per `sdk_bootstrap.pins.json` until human MATRIX. Epic [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33); remaining **T9** = [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) ([ZCP-43](https://kotenai.atlassian.net/browse/ZCP-43)).
+**GA cutover is on `main`.** Default `import zeus_client` is the **ZeusRuntime** tree. The `zeus_client_v2` alias is deprecated. The released package is **2.5.1** (`kotenai-zeus-client`). Claim level remains **`candidate`**. The Zeus 1.0.0 client row is [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md). In this release, `auth_mode=pat` and `auth_mode=m2m` raise `FEATURE_DISABLED` until ZE-360 and ZE-361. Session create, turn, and trace JSON include `bucket` and `scope` only when the turn target has both. Epic [ZCP-33](https://kotenai.atlassian.net/browse/ZCP-33) T9 handoff: [T9_TAG_MATRIX_HANDOFF.md](./T9_TAG_MATRIX_HANDOFF.md) ([ZCP-43](https://kotenai.atlassian.net/browse/ZCP-43)).
 
 ## Selected architecture (one paragraph)
 

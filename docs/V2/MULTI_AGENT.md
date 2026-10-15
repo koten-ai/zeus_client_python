@@ -157,7 +157,7 @@ Mode 1 `rt.agent.run_turn` **ignores** `roles` unless a product opts in. `units.
 | goal / pack / budgets / unit map | `rt.jobs.run(goal, pack=, budgets=, units=)` |
 | `llm.roles` resolvable | `config.llm.roles.*` + `jobs.run(models=)` |
 | per-unit id / kind / isolation | `UnitConfig` + `validate_unit_map` |
-| Zeus URL / scope triple / auth | `zeus_url`, `bucket/scope/collection`, `auth_mode` + `password_env`/`token_env`/`username` **names**. Applied on every hop this process executes. |
+| Zeus URL / scope triple / auth | `zeus_url`, `bucket/scope/collection`, `auth_mode` (`none`, `basic`, `bearer`, `session`) plus `password_env` / `token_env` / `username` **names**. `pat` and `m2m` raise `FEATURE_DISABLED` until ZE-360 and ZE-361. Applied on every hop this process executes. Session create, turn, and trace copy `bucket` and `scope` only when that target has both. |
 | agent catalog + pin + inject | `base_id` / `catalog_mode` / `chat_request`; missing → `130011` / `130012`. Live brief borrow is **process Zeus only**; a different `zeus_url` must already carry `## SCOPE BRIEF` or MINI-SCHEMA. |
 | worker LLM | `roles.worker` ∪ `unit.llm` ∪ job models |
 | Never simple Q&A via jobs | `rt.agent.run_turn` |

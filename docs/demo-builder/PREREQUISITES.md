@@ -24,8 +24,8 @@
 <!-- TODO: health check steps, auth_mode options, scope credentials -->
 
 - Base URL (host vs Docker)
-- `auth_mode`: `none` | `basic` | `bearer` | `session`. `pat` and `m2m` are disabled until Zeus ships ZE-360 and ZE-361 (`FEATURE_DISABLED` before any token or client secret is read)
-- Durable sessions: `/v2/session*` on current engines
+- `auth_mode`: `none` | `basic` | `bearer` | `session`. `pat` and `m2m` are disabled until Zeus ships ZE-360 and ZE-361 (`FEATURE_DISABLED` before any token or client secret is read). `certificate` raises `NOT_IMPLEMENTED`
+- Durable sessions: `/v2/session*` on current engines. Create, turn, and trace JSON include `bucket` and `scope` only when the sample target has both. The trace post uses that target for the auth mint
 
 ---
 

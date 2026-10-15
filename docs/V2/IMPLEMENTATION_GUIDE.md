@@ -976,7 +976,7 @@ Parallelism: A+B from Phase 1â€“5; C starts Phase 6 when ports stable; all on 7â
 | V1 | V2 |
 | --- | --- |
 | `zeus.url` | `RuntimeConfig.zeus.url` |
-| `zeus.auth_mode` | `RuntimeConfig.zeus.auth_mode` |
+| `zeus.auth_mode` | `RuntimeConfig.zeus.auth_mode`. `none`, `basic`, `bearer`, and `session` resolve. `certificate` raises `NOT_IMPLEMENTED`. `pat` and `m2m` raise `FEATURE_DISABLED` until ZE-360 and ZE-361 |
 | `samples.*` | `RuntimeConfig.samples` / `DataTarget` |
 | `default_mode` | `RuntimeConfig.defaults.mode` |
 | `default_api_version` | fixed v2 primary; v1 tools compat only |

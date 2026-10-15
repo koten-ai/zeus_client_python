@@ -7,16 +7,17 @@ award design-repo MATRIX `supported`. Claim level stays **candidate**.
 | --- | --- |
 | Zeus | 1.0.0 |
 | Package | `kotenai-zeus-client` |
-| Available tag | `v2.4.1` |
+| Available tag | `v2.5.1` |
 | Auth on that tag | `basic`, `bearer`, `session`. Production profile rejects `auth_mode=none`. |
-| Auth not in that tag | `pat` ([ZCP-123](https://kotenai.atlassian.net/browse/ZCP-123)), `m2m` ([ZCP-122](https://kotenai.atlassian.net/browse/ZCP-122)) |
+| Auth not released on that tag | `pat` ([ZCP-123](https://kotenai.atlassian.net/browse/ZCP-123)), `m2m` ([ZCP-122](https://kotenai.atlassian.net/browse/ZCP-122)) |
 
-`v2.4.1` is the available client package (`git tag v2.4.1`, `pyproject.toml`
-version `2.4.1`). It does not contain PAT or M2M. Those modes are implemented
-and disabled until ZE-360 and ZE-361 (`ENABLED_UNRELEASED_AUTH_MODES` is empty).
-The tag that carries basic, PAT, and M2M is the next package tag cut after
-those Zeus tickets ship and the allow-list is opened. This task does not cut
-that tag.
+`v2.5.1` is the available client package (`git tag v2.5.1`, `pyproject.toml`
+version `2.5.1`). `v2.4.1` is the previous tag and has `basic`, `bearer`, and
+`session` only. This tag contains the PAT and M2M mint code and keeps both
+modes disabled until ZE-360 and ZE-361 (`ENABLED_UNRELEASED_AUTH_MODES` is
+empty). The tag that enables PAT and M2M is the next package tag cut after
+those Zeus tickets ship and the allow-list is opened. This release does not
+open that allow-list.
 
 ## ZCP-1 leftover
 

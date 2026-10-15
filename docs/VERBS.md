@@ -32,7 +32,7 @@ Constant: `EXPOSED_V2_VERBS` (tuple, pipeline stripped from `V2_DOCS_VERB_ORDER`
 
 ## Auth
 
-Same as the rest of the client: pass minted `zeus_headers` **or** `zcfg` → `resolve_zeus_auth`. Default `X-Zeus-Mode: analytics` when unset.
+Same resolver as the rest of the client: pass minted `zeus_headers` **or** `zcfg` → `resolve_zeus_auth`. Usable modes are `none`, `basic`, `bearer`, and `session`. `pat` and `m2m` raise `FEATURE_DISABLED` (`000008`) until ZE-360 and ZE-361. `certificate` raises `NOT_IMPLEMENTED` (`000002`). Default `X-Zeus-Mode: analytics` when unset.
 
 ## Correlation headers (external hops)
 
@@ -47,6 +47,9 @@ can join client turns to Hub debug views:
 | `X-Zeus-Brief-Sha12` / `X-Zeus-Mini-Sha12` | Optional inject-slice proofs when brief/mini text is present |
 
 `POST /v2/session/trace` JSON also includes `turn_id` (same value as `X-Zeus-Turn-Id`).
+Create, turn, and trace JSON include `bucket` and `scope` only when the caller
+passed a target and both sides are non-empty. A missing target leaves those
+fields off the body. The trace post uses that same target for the auth mint.
 Never set `X-Zeus-Req-Id` (Zeus mints per hop). Never reuse auth `X-Zeus-Session`
 outside `POST /v1/.../auth/session`.
 

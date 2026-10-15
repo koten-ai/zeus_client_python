@@ -372,7 +372,7 @@ coverage report (fail under threshold; COV_FAIL_UNDER=75)
 build sdist/wheel + twine check
 ```
 
-Decision for 2.0.0 (ZCP-44): `pip-audit` stays a non-blocking note. It does not block T5, T8, or T9, and `make ci` does not fail on it. The job that fails the build on known CVEs is 2.0.1 ops and stays on ZCP-44. T2 only hard-rejects production `auth_mode=none` and TLS verify off.
+Decision for 2.0.0 (ZCP-44): `pip-audit` stays a non-blocking note. It does not block T5, T8, or T9, and `make ci` does not fail on it. The job that fails the build on known CVEs is 2.0.1 ops and stays on ZCP-44. T2 only hard-rejects production `auth_mode=none` and TLS verify off. `pat` and `m2m` are closed on every profile: the loader raises `FEATURE_DISABLED` before the production check (ZCP-126, ZE-360 / ZE-361). Production modes are `basic`, `bearer`, and `session`.
 
 ### 11.2 Nightly / manual
 

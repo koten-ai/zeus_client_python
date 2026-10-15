@@ -1,6 +1,6 @@
 {
   "build_version": "",
-  "_comment": "Demo Builder Kit template. Travel values match demo_travel_sample/config.example.json. For other domains replace bucket/mode/schema via DOMAIN_CUSTOMIZATION.md. Never commit secrets.",
+  "_comment": "Demo Builder Kit template. Travel values match demo_travel_sample/config.example.json. For other domains replace bucket/mode/schema via DOMAIN_CUSTOMIZATION.md. Never commit secrets. auth_mode is none, basic, bearer, or session. pat and m2m are disabled until ZE-360 and ZE-361. certificate raises NOT_IMPLEMENTED.",
 
   "zeus": {
     "url": "http://host.docker.internal:8080",

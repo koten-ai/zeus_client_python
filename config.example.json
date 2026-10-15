@@ -1,6 +1,7 @@
 {
   "profile": "development",
   "zeus": {
+    "_comment": "auth_mode: none, basic, bearer, or session. pat and m2m raise FEATURE_DISABLED until ZE-360 and ZE-361. certificate raises NOT_IMPLEMENTED.",
     "url": "http://127.0.0.1:8080",
     "auth_mode": "none",
     "username": null,

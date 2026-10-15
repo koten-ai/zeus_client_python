@@ -1,7 +1,7 @@
 # Zeus Client V2 — Migration Guide
 
-**Status:** **GA cutover landed** — package **2.4.1**, claim still **`candidate`** until human MATRIX  
-**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.4.1**)  
+**Status:** **GA cutover landed** — package **2.5.1**, claim still **`candidate`** until human MATRIX  
+**Default import:** `import zeus_client` → Runtime tree under `src/zeus_client/` (**2.5.1**)  
 **Deprecated alias:** `import zeus_client_v2` → re-exports `zeus_client` with `DeprecationWarning` (removal still deferred)  
 **V1 archive:** `src_v1_legacy/` (not installed); free functions via `zeus_client.compat.v1` only
 
@@ -11,8 +11,8 @@
 
 | Package | Path | Version clock |
 | --- | --- | --- |
-| `zeus_client` | `src/zeus_client/` | **2.4.1** (default) |
-| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.4.1** (deprecated alias; remove ≤2.3.0) |
+| `zeus_client` | `src/zeus_client/` | **2.5.1** (default) |
+| `zeus_client_v2` | `src/zeus_client_v2_alias/` | **2.5.1** (deprecated alias; remove ≤2.3.0) |
 | V1 free functions | `src_v1_legacy/` | archive only |
 
 ---
@@ -36,13 +36,17 @@
 | V1 | V2 |
 | --- | --- |
 | `zeus.url` | `RuntimeConfig.zeus.url` |
-| `zeus.auth_mode` | `RuntimeConfig.zeus.auth_mode` |
+| `zeus.auth_mode` | `RuntimeConfig.zeus.auth_mode` (`none`, `basic`, `bearer`, `session` resolve; `certificate` is `NOT_IMPLEMENTED`; `pat` and `m2m` raise `FEATURE_DISABLED` until ZE-360 and ZE-361) |
 | `samples.*` | `RuntimeConfig.target` / `DataTarget` |
 | `default_mode` | `RuntimeConfig.settings.mode` |
 | `COUCHBASE_*` | reserved / opt-in (no implicit `:8093`) |
 | — | `session.semantic_cache` (2.3.0 · ZF-WISH-001; default **off**; `rt.session.semantic_cache.write`) |
 
 See also IG Appendix A.
+
+`auth_mode=pat` and `auth_mode=m2m` stay in the vocabulary. The loader and `ZeusAuthResolver.resolve` raise `FEATURE_DISABLED` (`000008`) before a token or client secret is read (ZCP-126). `ENABLED_UNRELEASED_AUTH_MODES` is empty. No config key or environment variable opens them. `certificate` raises `NOT_IMPLEMENTED` (`000002`).
+
+Session create, turn, and trace JSON include `bucket` and `scope` only when the turn target has both (ZCP-120). A missing target leaves those fields off the body. The trace post uses the turn target for that JSON and for the auth mint (ZDM-16). Auth resolution with no target still uses `DataTarget()` (`yelp-data` / `_default`).
 
 ### Semantic agent cache (2.3.0)
 
@@ -188,6 +192,7 @@ Ship **2.0.0** with claim **candidate** (T9 B1). Family MATRIX `supported` / pin
 | Hub hydrate opt-in | **done** |
 | LIVE replay gated | **done** |
 | Prod rejects `auth_mode=none` | **done** (ZCP-36 — production profile + `tls_verify`) |
+| `pat` / `m2m` closed until Zeus ships them | **done** (ZCP-126 — `FEATURE_DISABLED` before the secret is read) |
 | `pip audit` in CI | **deferred** — non-blocking for 2.0.0; blocking job is 2.0.1 on ZCP-44 |
 | Plugins deny-by-default secrets | N/A (plugins=no) |
 | OTLP optional | **stub** (opt-in factory) |

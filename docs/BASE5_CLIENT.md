@@ -114,7 +114,7 @@ Family [CHECKLIST.md](../../zeus_client_design/CHECKLIST.md) §A–C records the
 
 ### B. Agent loop
 
-- [x] Auth stubs: `none` / per-scope `basic` mint / `bearer` / `session`; `certificate` documented + `NOT_IMPLEMENTED` — `tests/unit/adapters/test_zeus_auth.py`
+- [x] Auth: `none` / per-scope `basic` mint / `bearer` / `session`; `certificate` raises `NOT_IMPLEMENTED`; `pat` and `m2m` stay in the vocabulary and raise `FEATURE_DISABLED` until ZE-360 and ZE-361 (ZCP-126) — `tests/unit/adapters/test_zeus_auth.py`
 - [x] Never log bearer tokens or passwords — `test_zeus_auth.py`
 - [x] Multi-round LLM → Zeus V2 verbs → append results — `tests/unit/application/test_agent_turn.py`
 - [x] Bags A–D append `messages[]` (user text unchanged) — `test_control_plane_and_tool_path_inject_into_system`
@@ -122,7 +122,7 @@ Family [CHECKLIST.md](../../zeus_client_design/CHECKLIST.md) §A–C records the
 - [x] Force final return when budget / `max_rounds` low (logged) — `test_force_return_nudge_before_last_rounds`
 - [x] Setting `ai_process_result` default **false** — `test_ai_process_result_package_default_false`; profile `hub` is True
 - [x] `ignore_user_tool_path_hints` default **true**; soft inject; user message unchanged — `test_control_plane_and_tool_path_inject_into_system`, `test_tool_path_honor_polarity_keeps_user_text`
-- [x] Durable sessions `/v2/session*` rehydrate id + round — `tests/unit/application/test_session_lifecycle.py`, `test_agent_turn_session_join.py`
+- [x] Durable sessions `/v2/session*` rehydrate id + round; create, turn, and trace send `bucket` and `scope` only when both are set (ZCP-120) — `tests/unit/application/test_session_lifecycle.py`, `test_agent_turn_session_join.py`, `tests/unit/adapters/test_session_scope.py`
 - [x] `agent.tool_trail`: record, inject, expose on result — `test_tool_trail_injects_after_409`
 - [x] Trail entries `ok` + `error_class` + `req_id`; no secret dumps — same test
 

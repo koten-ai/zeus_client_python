@@ -155,13 +155,13 @@ Generic placeholder template (other domains): [templates/config.example.json](te
 | Key | Purpose |
 |-----|---------|
 | `url` | Zeus Engine base URL (not the client UI). Overridden by `ZEUS_URL` at resolve time. |
-| `auth_mode` | `none`, `basic`, `bearer`, or `session`. `pat` and `m2m` are disabled until ZE-360 and ZE-361 |
+| `auth_mode` | `none`, `basic`, `bearer`, or `session`. `pat` and `m2m` are disabled until ZE-360 and ZE-361 (`FEATURE_DISABLED` before any token or client secret is read). `certificate` raises `NOT_IMPLEMENTED` |
 | `username` / `password` | Global basic auth |
 | `bearer_token` | When `auth_mode` is `bearer` |
 | `session_id` | Reuse existing Zeus session when `auth_mode` is `session` |
 | `scope_credentials` | Per-scope basic auth, keyed by `bucket/scope` (e.g. `travel-sample/_default`) |
 | `scope_contracts` | Per-scope contract bindings (see below) |
-| `enable_durable_sessions` | Create/rehydrate `/v2/session` across agent turns |
+| `enable_durable_sessions` | Create/rehydrate `/v2/session` across agent turns. Create, turn, and trace JSON include `bucket` and `scope` only when the target has both. A missing target leaves those fields off the body |
 
 ### `scope_contracts` shapes
 

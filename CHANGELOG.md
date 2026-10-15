@@ -2,18 +2,25 @@
 
 ## Unreleased
 
+---
+
+## 2.5.1 — 2026-10-15
+
 ### Fixed
 
 - Session trace passes the turn target into `post_trace`. A beer-sample basic-auth turn mints `/v1/{bucket}/{scope}/auth/session` for that target. `DataTarget()` is no longer the trace login when the turn named a bucket. (ZDM-16)
+- Session create, turn, and trace JSON include `bucket` and `scope` only when a target is passed and both sides are non-empty. A missing target leaves those fields off the body. (ZCP-120)
+
 ### Changed
 
 - `auth_mode=pat` and `auth_mode=m2m` stay in the config vocabulary but are disabled until ZE-360 and ZE-361. The loader and auth resolver raise `FEATURE_DISABLED` (`000008`) and do not read a token or client secret (ZCP-126).
+- The available Zeus 1.0.0 client package is `kotenai-zeus-client` tag `v2.5.1`. `v2.4.1` is the previous tag. Auth on `v2.5.1` is `basic`, `bearer`, and `session`. PAT and M2M stay disabled (ZCP-124).
 - Record ZCP-44: `pip-audit` stays non-blocking for 2.0.0 and does not block T5/T8/T9. The failing CI job is 2.0.1.
+
 ### Added
 
-- `auth_mode=pat` mints a Zeus session from a `zeus_pat_…` token (`ZEUS_PAT` or `token_env`), then sends `X-Zeus-Session`. Tokens that do not start with `zeus_pat_` are not sent (ZCP-123).
-- `auth_mode=m2m` fetches an IdP JWT with client credentials and mints a Zeus session. The client secret stays in `ZEUS_M2M_CLIENT_SECRET` (ZCP-122).
-- Name `kotenai-zeus-client` tag `v2.4.1` as the available Zeus 1.0.0 client package. PAT and M2M are not in that tag (ZCP-124).
+- `auth_mode=pat` mints a Zeus session from a `zeus_pat_…` token (`ZEUS_PAT` or `token_env`), then sends `X-Zeus-Session`. Tokens that do not start with `zeus_pat_` are not sent (ZCP-123). The mode is disabled until ZE-360.
+- `auth_mode=m2m` fetches an IdP JWT with client credentials and mints a Zeus session. The client secret stays in `ZEUS_M2M_CLIENT_SECRET` (ZCP-122). The mode is disabled until ZE-361.
 
 ---
 

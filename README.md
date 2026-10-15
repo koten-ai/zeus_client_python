@@ -2,13 +2,13 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
-> **2.4.1** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
+> **2.5.1** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
 
 ## Claim (family honesty)
 
 | Field | Value |
 | --- | --- |
-| **package** | `kotenai-zeus-client` **2.4.1** |
+| **package** | `kotenai-zeus-client` **2.5.1** |
 | **claim_level** | **candidate** (not `supported`) |
 | **client_floor** | `client-floor-5` |
 | **modes** | `agent`, `direct` (optional Mode 3 `jobs`/`units` seam) |
@@ -96,11 +96,11 @@ flowchart LR
   E --> F[Audit]
 ```
 
-1. **Auth** — `resolve_zeus_auth` mints or reuses Zeus session headers (per scope when configured).
+1. **Auth** — `resolve_zeus_auth` mints or reuses Zeus session headers (per scope when configured). Usable modes are `none`, `basic`, `bearer`, and `session`. `pat` and `m2m` stay in the config vocabulary and raise `FEATURE_DISABLED` (`000008`) until ZE-360 and ZE-361. `certificate` raises `NOT_IMPLEMENTED` (`000002`).
 2. **Load catalog** — `rt.catalog.load(mode, base_id=...)` resolves a stamped `chat_request` (scope dir → general → bundled; lineage files `chat_request_{mode}_{base_id}.json`). Brief / mini-schema inject is hash-excluded.
-3. **Contract + session** — `rt.catalog.contract.bind` uses the published stamp (never invents a hash). Durable sessions create or rehydrate `/v2/session`; a **mode switch** starts a new session.
+3. **Contract + session** — `rt.catalog.contract.bind` uses the published stamp (never invents a hash). Durable sessions create or rehydrate `/v2/session`; a **mode switch** starts a new session. Create, turn, and trace JSON include `bucket` and `scope` only when the turn target has both. A missing target leaves those fields off the body.
 4. **LLM rounds** — multi-round tool loop: provider chat completion → Zeus dispatch (V2 verbs) → `SecurityHooks` + `tool_trail` inject. Force-return when the round budget is nearly exhausted.
-5. **Commit turn** — multi-hop session-trace aggregate via `post_session_trace` (same rich body per tool `req_id` so every hop joins Detective; preferred hop last) plus a turn shard via `continue_session_turn`. Agent dispatches stamp `X-Zeus-Mode` (and optional `X-Zeus-Trace: 1`).
+5. **Commit turn** — multi-hop session-trace aggregate via `post_session_trace` (same rich body per tool `req_id` so every hop joins Detective; preferred hop last) plus a turn shard via `continue_session_turn`. The trace post uses the turn target for that JSON and for the auth mint. Agent dispatches stamp `X-Zeus-Mode` (and optional `X-Zeus-Trace: 1`).
 6. **Audit** — runtime contract checks appended to `trace["notes"]`.
 
 Pass `zeus_session_id` and `zeus_round` from the prior turn's `session_meta` to continue a durable session across questions.
@@ -268,13 +268,13 @@ Zeus settings live under a single top-level `zeus` object. Use `resolve_zeus_con
 | Key | Purpose |
 |-----|---------|
 | `url` | Zeus server base URL |
-| `auth_mode` | `none`, `basic`, `bearer`, or `session`. `pat` and `m2m` are disabled until Zeus ships ZE-360 and ZE-361 |
+| `auth_mode` | `none`, `basic`, `bearer`, or `session`. `pat` and `m2m` are disabled until Zeus ships ZE-360 and ZE-361. `certificate` raises `NOT_IMPLEMENTED` |
 | `username` / `password` | Global basic auth (overridden per scope when `scope_credentials` is set) |
 | `bearer_token` | Static bearer token when `auth_mode` is `bearer` |
 | `session_id` | Reuse an existing Zeus session when `auth_mode` is `session` |
 | `scope_credentials` | Per-scope basic auth, keyed by `bucket/scope` |
 | `scope_contracts` | Per-scope contract bindings (`contract_id`, `contract_hash`, mode keys) |
-| `enable_durable_sessions` | Create/rehydrate `/v2/session` across agent turns |
+| `enable_durable_sessions` | Create/rehydrate `/v2/session` across agent turns. Create, turn, and trace JSON include `bucket` and `scope` only when the target has both |
 
 Runtime URL override (not written back to `config.json`):
 
@@ -505,13 +505,14 @@ Inspect `trace` after `run_agent` for session drift, auth re-mint notes, and the
 | `Zeus login failed ({status}): …` | Wrong username/password, scope mismatch, or Zeus auth error | Confirm scope credentials in Zeus; check Zeus logs and response body |
 | `Zeus login returned no session_id` | Login returned 200 but body lacked `session_id` | Inspect Zeus `/v1/{bucket}/{scope}/auth/session` response; upgrade or repair Zeus |
 | `unknown auth mode: {mode}` | Invalid `zeus.auth_mode` | Use `none`, `basic`, `bearer`, or `session` |
+| `certificate/mTLS auth_mode is documented but not implemented` | `auth_mode` is `certificate` | Use `basic`, `bearer`, or `session`. The SDK has no mTLS mint |
 | `auth_mode=pat is disabled until Zeus supports it (ZE-360)` | `pat` is selected while ZE-360 is still closed | Keep `basic`, `bearer`, or `session` until that Zeus ticket ships |
 | `auth_mode=m2m is disabled until Zeus supports it (ZE-361)` | `m2m` is selected while ZE-361 is still closed | Keep `basic`, `bearer`, or `session` until that Zeus ticket ships |
-| `pat mode selected but token env empty` | `auth_mode` is `pat` and `ZEUS_PAT` (or `token_env`) is unset | Export the env var named by `zeus.token_env`. Never put the token in config |
-| `pat token must start with zeus_pat_` | The env value is not a Zeus PAT | Mint a `zeus_pat_…` token. Other bearers are refused locally and are not sent |
-| `Zeus PAT login failed HTTP 401` | The PAT is revoked, expired, or unknown | Mint a new token or restore the previous one. Revoke with `DELETE /v1/auth/tokens/{id}` |
+| `pat mode selected but token env empty` | After ZE-360 opens `pat`: `ZEUS_PAT` (or `token_env`) is unset | Export the env var named by `zeus.token_env`. Never put the token in config |
+| `pat token must start with zeus_pat_` | After ZE-360 opens `pat`: the env value is not a Zeus PAT | Mint a `zeus_pat_…` token. Other bearers are refused locally and are not sent |
+| `Zeus PAT login failed HTTP 401` | After ZE-360 opens `pat`: the token is revoked, expired, or unknown | Mint a new token or restore the previous one. Revoke with `DELETE /v1/auth/tokens/{id}` |
 
-**401 self-heal:** During tool dispatch, a `401` in basic or pat mode triggers a forced re-mint and one retry. Failure is noted in `trace["notes"]` as `auth: re-mint after 401 failed (…)`.
+**401 self-heal:** During tool dispatch, a `401` in `basic` mode forces one re-mint and one retry. `pat` and `m2m` use that same retry after ZE-360 and ZE-361 open them. Failure is noted in `trace["notes"]` as `auth: re-mint after 401 failed (…)`.
 
 ### Personal access tokens (`auth_mode=pat`)
 
@@ -531,7 +532,7 @@ An unset issuer is refused before any network call. Zeus returns HTTP 401 when t
 
 ### Zeus 1.0.0 client tag (ZCP-124)
 
-The available package tag for the Zeus 1.0.0 row is `v2.4.1` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and disabled until ZE-360 and ZE-361, and they are not in `v2.4.1`. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
+The available package tag for the Zeus 1.0.0 row is `v2.5.1` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and disabled until ZE-360 and ZE-361. `v2.4.1` is the previous tag and does not contain those modes. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
 
 ### Catalog loading
 
@@ -573,7 +574,7 @@ Returned as JSON when `httpx` fails (status `0`). Zeus HTTP `4xx`/`5xx` return t
 | `contract_mismatch` / `Session tracking failed` (server text) | Bound contract drifted from server expectation | Sync fresh stamped catalog; update `scope_contracts`; see runtime audit in `trace["notes"]` |
 | Rehydrate failed (note only) | `GET /v2/session/{id}` empty or error | Session may have expired; omit `zeus_session_id` to create a new session |
 
-Set `zeus.enable_durable_sessions: false` to skip session APIs when the server lacks session support.
+Set `zeus.enable_durable_sessions: false` to skip session APIs when the server lacks session support. Create, turn, and trace JSON include `bucket` and `scope` when the turn target has both. A missing target leaves those fields off the body. The trace post uses that same target for the auth mint.
 
 ### LLM provider errors
 
@@ -640,7 +641,7 @@ GitHub Actions (`.github/workflows/`):
 | Workflow | Trigger | Role |
 | --- | --- | --- |
 | `ci.yml` | PR / push `main` | Required offline gate |
-| `release.yml` | tag `v*` | Build, GitHub Release, optional PyPI |
+| `release.yml` | tag `v*` | Build, GitHub Release, PyPI Trusted Publishing |
 | `integration.yml` | manual | Lab-only (non-blocking stub) |
 
 Release (human): bump version clocks + CHANGELOG → merge → `git tag vX.Y.Z && git push origin vX.Y.Z`.  

@@ -25,7 +25,8 @@
 
 | Asset | Sensitivity | Where it appears |
 | --- | --- | --- |
-| Zeus Basic/session tokens | Critical | Auth adapter, HTTP headers. `auth_mode=basic` mints per-scope `POST /v1/{bucket}/{scope}/auth/session` (instance cache; never log the password). `auth_mode=certificate` is documented (`cert_file` / `key_file_env`) but raises `NOT_IMPLEMENTED`. |
+| Zeus Basic/session tokens | Critical | Auth adapter, HTTP headers. `auth_mode=basic` mints per-scope `POST /v1/{bucket}/{scope}/auth/session` (instance cache; never log the password). `auth_mode=certificate` is documented (`cert_file` / `key_file_env`) but raises `NOT_IMPLEMENTED` (`000002`). |
+| PAT and M2M secrets | Critical | Not read while the modes are disabled. The loader and auth resolver raise `FEATURE_DISABLED` (`000008`) before `ZEUS_PAT` or `ZEUS_M2M_CLIENT_SECRET` is opened (ZE-360, ZE-361). |
 | LLM API keys | Critical | LLM adapter, env/config |
 | Couchbase credentials | Critical | Optional N1QL hydrate |
 | User prompts & answers | High | Agent messages, journals |
@@ -113,12 +114,13 @@ flowchart LR
 | `basic` → session mint | Common lab/prod | `POST /v1/{bucket}/{scope}/auth/session` with Basic; cache session token in memory |
 | `pat` → session mint | Machine without an IdP (CI, scripts) | Disabled until ZE-360. The loader and auth resolver raise `FEATURE_DISABLED` before the token is read. When enabled: token from `token_env` (default `ZEUS_PAT`) must start with `zeus_pat_`. One `Authorization: Bearer` mint, then `X-Zeus-Session`. Non-PAT bearers are not sent. Mint `POST /v1/auth/tokens`, rotate by replacing the env value, revoke `DELETE /v1/auth/tokens/{id}`. Never commit the token |
 | `m2m` → session mint | Service account with an IdP | Disabled until ZE-361. The loader and auth resolver raise `FEATURE_DISABLED` before the client secret is read. When enabled: client-credentials against `m2m.issuer`. Audience is the Zeus API. Secret stays in `m2m.client_secret_env` (default `ZEUS_M2M_CLIENT_SECRET`). Bearer JWT once on `POST /v1/{bucket}/{scope}/auth/session`, then `X-Zeus-Session`. Request scope `zeus.read zeus.traverse` (service principal, not Hub admin). Empty issuer is refused locally. Zeus returns 401 for a wrong `aud`, wrong `iss`, expired JWT, or when its own `auth.m2m.issuer` is empty |
+| `certificate` | mTLS | Documented shape (`cert_file` / `key_file_env`). The resolver raises `NOT_IMPLEMENTED` (`000002`) before any request |
 | Bearer / pre-supplied headers | Gateway pattern | Prefer injecting via `SecretStore` / header provider; never hardcode |
 | Proxy auth | Edge terminated | Merge proxy headers carefully; do not log them |
 
 **Reasoning:** Session mint reduces password exposure on every tool hop. Scoped mint path is required by Zeus (non-scoped username/password often rejected).
 
-Example `m2m` block. The client secret is an env var name, never the secret:
+Example `m2m` block for when ZE-361 opens the mode. Until then the loader rejects `auth_mode=m2m` before this block is used. The client secret is an env var name, never the secret:
 
 ```json
 "m2m": {
@@ -395,7 +397,8 @@ Metrics should count `rate_limited` decisions for visibility.
 
 | Setting | Production default | Dev default |
 | --- | --- | --- |
-| `zeus.auth_mode` | must not be `none` | `none` allowed |
+| `zeus.auth_mode` | `basic`, `bearer`, or `session`. `none` is rejected. `pat` and `m2m` raise `FEATURE_DISABLED` | `none` allowed. `pat` and `m2m` still raise `FEATURE_DISABLED` |
+| `certificate` | `NOT_IMPLEMENTED` | `NOT_IMPLEMENTED` |
 | TLS verify | **true** | true (override explicit) |
 | Redaction | **strict** | standard |
 | Full prompt in journal | **false** | true |
@@ -440,6 +443,7 @@ Controls:
 | Distinct `chat_id` per product surface | App |
 | `SessionHandle` not global singleton in library | Library |
 | Runtime refuses implicit “last session” reuse | Library |
+| Session create, turn, and trace copy `bucket` and `scope` only when the turn target set both. The trace post uses that target for the auth mint | Library |
 | Document demo isolation patterns | Docs / demo-builder |
 
 **Reasoning:** Many “retrieval bugs” are session isolation bugs. The library must not paper over app mistakes with hidden globals.
@@ -545,6 +549,7 @@ If a history rewrite is required to purge sensitive blobs from this repo:
 - [ ] `SecretStorePort` + no secrets in config export  ✅  
 - [ ] Redactor on journal append and exports  ✅  
 - [ ] Prod profile rejects `auth_mode=none` and TLS verify off  ✅ (ZCP-36 cutover)  
+- [x] `pat` and `m2m` raise `FEATURE_DISABLED` before a token or client secret is read  ✅ (ZCP-126, ZE-360 / ZE-361)  
 - [ ] Tool retries default off  ✅  
 - [ ] Typeahead rate limiter  ✅ (ZCP-22)  
 - [x] Jailbreak attempt catalog (ZCP-101): multi-surface hooks score + pre-LLM refuse + untrusted tool JSON  ✅
