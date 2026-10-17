@@ -307,7 +307,7 @@ LLM settings live under a single top-level `llm_provider` object. Use `resolve_l
 | `api_key` | Provider API key |
 | `models` | Model IDs to choose from; pass `models[0]` (or another entry) to `run_agent` |
 
-Any OpenAI-compatible endpoint works — point `base_url` and `api_key` at your provider and list the model IDs you want to use.
+Any OpenAI-compatible endpoint works — point `base_url` and `api_key` at your provider and list the model IDs you want to use. Before the request is sent, stock tool schemas gain the `type` keys OpenAI requires. `strict` is left unset so map fields still send.
 
 ### Catalog sync
 
