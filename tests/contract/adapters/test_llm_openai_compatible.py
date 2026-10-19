@@ -118,6 +118,8 @@ async def test_complete_happy_path_and_no_key_in_journal() -> None:
     req = route.calls.last.request
     assert req.headers["Authorization"] == f"Bearer {KEY}"
     assert req.headers.get("x-grok-conv-id") == "chat-abc"
+    sent = json.loads(req.content)
+    assert sent["temperature"] == 0.0
     assert resp.content == "hello"
     assert len(resp.tool_calls) == 1
     assert resp.tool_calls[0]["function"]["name"] == "find"
@@ -281,3 +283,92 @@ async def test_complete_gpt56_omits_temperature_and_renames_max_tokens() -> None
     assert "temperature" not in sent
     assert sent["max_completion_tokens"] == 32
     assert "max_tokens" not in sent
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_complete_omits_sampling_for_claude_opus_5_5() -> None:
+    anthropic = "https://api.anthropic.com/v1"
+    route = respx.post(f"{anthropic}/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"role": "assistant", "content": "ok"}}]},
+        )
+    )
+    cfg = LlmProviderConfig(
+        provider="anthropic",
+        base_url=anthropic,
+        model="claude-opus-5-5",
+        api_key_env="ANTHROPIC_API_KEY",
+        timeout_s=5.0,
+    )
+    client = OpenAICompatibleLlmClient(
+        config=cfg,
+        secrets=EnvSecretStore(environ={"ANTHROPIC_API_KEY": KEY}),
+        retry=RetryPolicy(max_attempts=0, base_delay_ms=1, jitter=False),
+        budget=RetryBudget(max_attempts=0),
+    )
+    try:
+        resp = await client.complete(
+            LlmRequest(
+                messages=({"role": "user", "content": "hi"},),
+                temperature=0.0,
+                tools=({"type": "function", "function": {"name": "find"}},),
+            )
+        )
+    finally:
+        await client.aclose()
+
+    assert resp.content == "ok"
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["model"] == "claude-opus-5-5"
+    assert sent["tool_choice"] == "auto"
+    assert "temperature" not in sent
+    assert "top_p" not in sent
+    assert "top_k" not in sent
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_rejected_claude_request_keeps_provider_sentence() -> None:
+    anthropic = "https://api.anthropic.com/v1"
+    sentence = "messages.1: the thinking block is missing"
+    respx.post(f"{anthropic}/chat/completions").mock(
+        return_value=httpx.Response(
+            400,
+            json={"error": {"type": "invalid_request_error", "message": sentence}},
+        )
+    )
+    journal = InMemoryJournal()
+    cfg = LlmProviderConfig(
+        provider="anthropic",
+        base_url=anthropic,
+        model="claude-opus-5-5",
+        api_key_env="ANTHROPIC_API_KEY",
+        timeout_s=5.0,
+    )
+    client = OpenAICompatibleLlmClient(
+        config=cfg,
+        secrets=EnvSecretStore(environ={"ANTHROPIC_API_KEY": KEY}),
+        retry=RetryPolicy(max_attempts=0, base_delay_ms=1, jitter=False),
+        budget=RetryBudget(max_attempts=0),
+        journal=journal,
+    )
+    try:
+        with pytest.raises(LlmError) as ei:
+            await client.complete(
+                LlmRequest(
+                    messages=({"role": "user", "content": "hi"},),
+                    temperature=0.0,
+                )
+            )
+    finally:
+        await client.aclose()
+
+    assert ei.value.code is ErrorCode.LLM_INVALID_REQUEST
+    assert ei.value.public_message == f"llm invalid request: {sentence}"
+    assert ei.value.details["llm.message_preview"] == sentence
+    events = [e for e in journal.events() if e.type == EVENT_LLM_ROUND]
+    assert len(events) == 1
+    assert sentence not in json.dumps(events[0].data)
+    assert "temperature" not in json.loads(respx.calls.last.request.content)

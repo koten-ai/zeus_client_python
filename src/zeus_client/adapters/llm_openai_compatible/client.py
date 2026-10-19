@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -17,7 +18,7 @@ import httpx
 
 from zeus_client.adapters.llm_openai_compatible.tool_schema import repair_openai_tool_schemas
 from zeus_client.config.models import LlmProviderConfig, RetryPolicy
-from zeus_client.domain.errors import ErrorCode, LlmError
+from zeus_client.domain.errors import ErrorCode, LlmError, public_message_for
 from zeus_client.domain.journal.events import EVENT_LLM_ROUND, JournalEvent
 from zeus_client.domain.journal.journal import InMemoryJournal
 from zeus_client.domain.llm_classify import (
@@ -34,8 +35,10 @@ __all__ = [
     "build_chat_payload",
     "cache_hints",
     "cached_tokens_of",
+    "omits_sampling_params",
     "omits_temperature",
     "parse_completion_response",
+    "public_message_for_llm_failure",
 ]
 
 COMPONENT = "adapters.llm_openai_compatible"
@@ -88,6 +91,61 @@ def omits_temperature(model: str | None) -> bool:
     return tail == "gpt-5.6" or tail.startswith(("gpt-5.6-", "gpt-5.6:"))
 
 
+# Minor is one or two digits so a snapshot date is not Claude 4.7+. Dotted
+# minors and a trailing variant such as ``-fast`` count.
+# ``omits_sampling_params`` strips a provider prefix with ``rfind`` first.
+_CLAUDE_NEW_ID = re.compile(
+    r"claude-(?:opus|sonnet|haiku|fable)-(\d+)"
+    r"(?:[.-](\d{1,2}))?"
+    r"(?:-\d{8})?"
+    r"(?:-v\d+)?"
+    r"(?::\d+)?"
+    r"(?:-[a-z]+)?"
+)
+_CLAUDE_MYTHOS = re.compile(r"claude-mythos(?:-preview)?")
+_SAMPLING_KEYS = ("temperature", "top_p", "top_k")
+_SECRET_IN_PROVIDER_TEXT = re.compile(
+    r"(?i)(?:sk-[A-Za-z0-9_\-]{8,}|zeus_pat_[A-Za-z0-9_\-]+|bearer\s+\S+)"
+)
+
+
+def omits_sampling_params(model: str | None) -> bool:
+    """Claude 4.7 and later reject temperature, top_p, and top_k.
+
+    Includes Opus 5.5 (``claude-opus-5-5`` and ``claude-opus-5.5``) and
+    Claude Mythos Preview. Claude 4.6 and earlier still accept temperature.
+    """
+    text = (model or "").strip().lower()
+    idx = text.rfind("claude-")
+    if idx < 0:
+        return False
+    tail = text[idx:]
+    if _CLAUDE_MYTHOS.fullmatch(tail):
+        return True
+    match = _CLAUDE_NEW_ID.fullmatch(tail)
+    if match is None:
+        return False
+    major = int(match.group(1))
+    minor = int(match.group(2)) if match.group(2) is not None else 0
+    return major > 4 or (major == 4 and minor >= 7)
+
+
+def public_message_for_llm_failure(cls: LlmClassification) -> str:
+    """Stable public text. HTTP 400/422 keeps a capped provider sentence.
+
+    Other statuses stay on the catalog string. The family log line stays
+    generic. Common key shapes in the sentence are redacted.
+    """
+    base = public_message_for(cls.code)
+    if cls.http_status not in (400, 422):
+        return base
+    preview = " ".join((cls.message_preview or "").split())
+    preview = _SECRET_IN_PROVIDER_TEXT.sub("[redacted]", preview).strip()
+    if not preview:
+        return base
+    return f"{base}: {preview[:200]}"
+
+
 def build_chat_payload(
     *,
     model: str,
@@ -101,11 +159,12 @@ def build_chat_payload(
         "model": model,
         "messages": [dict(m) for m in messages],
     }
-    # gpt-5.6 rejects temperature other than the default, and rejects
-    # max_tokens in favor of max_completion_tokens. Pop after body_extra so
-    # a caller cannot put temperature or max_tokens back on that generation.
+    # gpt-5.6 rejects a non-default temperature and max_tokens. Claude 4.7+
+    # rejects temperature, top_p, and top_k. Pop after body_extra so a caller
+    # cannot put those fields back.
     gpt56 = omits_temperature(model)
-    if temperature is not None and not gpt56:
+    omit_sampling = omits_sampling_params(model)
+    if temperature is not None and not gpt56 and not omit_sampling:
         payload["temperature"] = temperature
     if max_tokens is not None:
         if gpt56:
@@ -127,6 +186,9 @@ def build_chat_payload(
             payload.pop("max_tokens", None)
         elif "max_tokens" in payload:
             payload["max_completion_tokens"] = payload.pop("max_tokens")
+    if omit_sampling:
+        for key in _SAMPLING_KEYS:
+            payload.pop(key, None)
     return payload
 
 
@@ -235,6 +297,7 @@ class OpenAICompatibleLlmClient:
             code=cls.code,
             component=COMPONENT,
             retryable=cls.retryable,
+            public_message=public_message_for_llm_failure(cls),
             details=details,
         )
 
