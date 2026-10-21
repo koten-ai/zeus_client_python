@@ -7,6 +7,7 @@ from zeus_client.adapters.llm_openai_compatible.client import (
     build_chat_payload,
     cache_hints,
     cached_tokens_of,
+    omits_temperature,
     parse_completion_response,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "build_chat_payload",
     "cache_hints",
     "cached_tokens_of",
+    "omits_temperature",
     "parse_completion_response",
 ]

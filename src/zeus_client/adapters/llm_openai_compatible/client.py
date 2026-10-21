@@ -34,6 +34,7 @@ __all__ = [
     "build_chat_payload",
     "cache_hints",
     "cached_tokens_of",
+    "omits_temperature",
     "parse_completion_response",
 ]
 
@@ -75,6 +76,18 @@ def cached_tokens_of(resp: Any) -> int | None:
     return None
 
 
+def omits_temperature(model: str | None) -> bool:
+    """gpt-5.6 accepts only the default temperature and rejects 0.
+
+    Omitting the field lets the provider use 1. Matches ``gpt-5.6``, route
+    suffixes such as ``gpt-5.6-sol``, and a provider prefix
+    (``openai/gpt-5.6``). ``gpt-5.5`` and ``gpt-5.60`` still send temperature.
+    The same ids also reject ``max_tokens``; see ``build_chat_payload``.
+    """
+    tail = (model or "").strip().lower().rsplit("/", 1)[-1]
+    return tail == "gpt-5.6" or tail.startswith(("gpt-5.6-", "gpt-5.6:"))
+
+
 def build_chat_payload(
     *,
     model: str,
@@ -88,10 +101,17 @@ def build_chat_payload(
         "model": model,
         "messages": [dict(m) for m in messages],
     }
-    if temperature is not None:
+    # gpt-5.6 rejects temperature other than the default, and rejects
+    # max_tokens in favor of max_completion_tokens. Pop after body_extra so
+    # a caller cannot put temperature or max_tokens back on that generation.
+    gpt56 = omits_temperature(model)
+    if temperature is not None and not gpt56:
         payload["temperature"] = temperature
     if max_tokens is not None:
-        payload["max_tokens"] = max_tokens
+        if gpt56:
+            payload["max_completion_tokens"] = max_tokens
+        else:
+            payload["max_tokens"] = max_tokens
     if tools:
         # Deep-copied repair (ZCP-127). OpenAI rejects catalog nodes that have
         # no type. strict stays off so additionalProperties maps still send.
@@ -101,6 +121,12 @@ def build_chat_payload(
     # providers 400 with "tool_choice was set but no tools were specified").
     if body_extra:
         payload.update(dict(body_extra))
+    if gpt56:
+        payload.pop("temperature", None)
+        if "max_completion_tokens" in payload:
+            payload.pop("max_tokens", None)
+        elif "max_tokens" in payload:
+            payload["max_completion_tokens"] = payload.pop("max_tokens")
     return payload
 
 

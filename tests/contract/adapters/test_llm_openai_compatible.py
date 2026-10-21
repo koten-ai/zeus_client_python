@@ -249,3 +249,35 @@ async def test_missing_api_key() -> None:
     finally:
         await client.aclose()
     assert ei.value.code is ErrorCode.LLM_API_KEY_MISSING
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_complete_gpt56_omits_temperature_and_renames_max_tokens() -> None:
+    route = respx.post(f"{BASE}/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "model": "gpt-5.6-sol",
+                "choices": [{"message": {"role": "assistant", "content": "ok"}}],
+            },
+        )
+    )
+    client = _client()
+    try:
+        await client.complete(
+            LlmRequest(
+                messages=({"role": "user", "content": "ipa"},),
+                model="gpt-5.6",
+                temperature=0.0,
+                max_tokens=32,
+            )
+        )
+    finally:
+        await client.aclose()
+
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["model"] == "gpt-5.6"
+    assert "temperature" not in sent
+    assert sent["max_completion_tokens"] == 32
+    assert "max_tokens" not in sent
