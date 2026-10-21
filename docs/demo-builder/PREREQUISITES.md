@@ -44,7 +44,7 @@
 
 <!-- TODO: xAI / OpenAI examples -->
 
-Any OpenAI-compatible chat completions endpoint.
+Any OpenAI-compatible chat completions endpoint. `gpt-5.6` omits `temperature` and sends `max_completion_tokens` when a cap is set.
 
 ---
 
