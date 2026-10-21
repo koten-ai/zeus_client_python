@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from zeus_client.adapters.llm_openai_compatible.tool_schema import repair_openai_tool_schemas
 from zeus_client.config.models import LlmProviderConfig, RetryPolicy
 from zeus_client.domain.errors import ErrorCode, LlmError
 from zeus_client.domain.journal.events import EVENT_LLM_ROUND, JournalEvent
@@ -92,7 +93,9 @@ def build_chat_payload(
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
     if tools:
-        payload["tools"] = [dict(t) for t in tools]
+        # Deep-copied repair (ZCP-127). OpenAI rejects catalog nodes that have
+        # no type. strict stays off so additionalProperties maps still send.
+        payload["tools"] = repair_openai_tool_schemas(tools)
         payload["tool_choice"] = "auto"
     # When there are no tools we must NOT set tool_choice (OpenAI-compatible
     # providers 400 with "tool_choice was set but no tools were specified").

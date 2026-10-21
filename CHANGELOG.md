@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- OpenAI Chat Completions accepts stock catalog tools. `build_chat_payload` fills schema nodes that have no `type` (description-only `narrow_to`, empty array `items`, nested `set` inputs) on a copy of the tools. `strict` stays unset, so `additionalProperties: true` and boolean maps still send. xAI keeps accepting the same payload. (ZCP-127)
+
 ---
 
 ## 2.5.1 — 2026-10-15
