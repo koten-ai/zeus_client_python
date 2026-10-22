@@ -2,10 +2,18 @@
 
 ## Unreleased
 
+---
+
+## 2.5.2 — 2026-10-22
+
 ### Fixed
 
 - `gpt-5.6` no longer receives `temperature` on the chat-completions body. Every turn was sending `temperature: 0`, and `gpt-5.6` answered with HTTP 400 (`050017`, `llm invalid request`). Omitting the field uses the provider default of 1. The same ids (`gpt-5.6-sol` and a provider prefix) send `max_completion_tokens` instead of `max_tokens` when a cap is set. Other models still send `temperature: 0` and `max_tokens`. (ZCP-129)
 - OpenAI Chat Completions accepts stock catalog tools. `build_chat_payload` fills schema nodes that have no `type` (description-only `narrow_to`, empty array `items`, nested `set` inputs) on a copy of the tools. `strict` stays unset, so `additionalProperties: true` and boolean maps still send. xAI keeps accepting the same payload. (ZCP-127)
+
+### Changed
+
+- The available Zeus 1.0.0 client package is `kotenai-zeus-client` tag `v2.5.2`. `v2.5.1` is the previous tag. Auth on `v2.5.2` is `basic`, `bearer`, and `session`. PAT and M2M stay disabled (ZCP-124).
 
 ---
 
