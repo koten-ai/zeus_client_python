@@ -28,7 +28,7 @@ _OTHER = (
     "gpt-5.60",
     "gpt-5.6extra",
     "grok-4.5-latest",
-    "claude-opus-5-5",
+    "claude-opus-4-6",
 )
 
 

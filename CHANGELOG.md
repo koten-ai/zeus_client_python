@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Claude 4.7 and later no longer receive `temperature`, `top_p`, or `top_k` on the chat-completions body. Every turn was sending `temperature: 0`, and Claude Opus 5.5 (`claude-opus-5-5`) answered with HTTP 400 (`050017`, `llm invalid request`). Claude 4.6 and earlier still send `temperature: 0`. A rejected request (HTTP 400 or 422) keeps the provider sentence on the public error. (ZCP-128)
+
 ---
 
 ## 2.5.2 — 2026-10-22
