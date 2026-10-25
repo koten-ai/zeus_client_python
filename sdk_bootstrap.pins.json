@@ -68,7 +68,7 @@
     "ticket": "ZCP-124",
     "matrix_ticket": "ZE-77",
     "package": "kotenai-zeus-client",
-    "available_tag": "v2.5.2",
+    "available_tag": "v2.5.3",
     "auth_modes_on_tag": ["basic", "bearer", "session"],
     "auth_modes_unreleased": ["pat", "m2m"],
     "runtime_gate": "Not read at runtime. ENABLED_UNRELEASED_AUTH_MODES in config/models.py is empty. pat and m2m raise FEATURE_DISABLED until ZE-360 and ZE-361 (ZCP-126).",

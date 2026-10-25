@@ -2,13 +2,13 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
-> **2.5.2** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
+> **2.5.3** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
 
 ## Claim (family honesty)
 
 | Field | Value |
 | --- | --- |
-| **package** | `kotenai-zeus-client` **2.5.2** |
+| **package** | `kotenai-zeus-client` **2.5.3** |
 | **claim_level** | **candidate** (not `supported`) |
 | **client_floor** | `client-floor-5` |
 | **modes** | `agent`, `direct` (optional Mode 3 `jobs`/`units` seam) |
@@ -532,7 +532,7 @@ An unset issuer is refused before any network call. Zeus returns HTTP 401 when t
 
 ### Zeus 1.0.0 client tag (ZCP-124)
 
-The available package tag for the Zeus 1.0.0 row is `v2.5.2` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and disabled until ZE-360 and ZE-361. `v2.5.1` is the previous tag and keeps those modes disabled. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
+The available package tag for the Zeus 1.0.0 row is `v2.5.3` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and disabled until ZE-360 and ZE-361. `v2.5.2` is the previous tag and keeps those modes disabled. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
 
 ### Catalog loading
 

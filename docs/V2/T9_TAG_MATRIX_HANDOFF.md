@@ -20,7 +20,7 @@
 **Claim ladder (charter):** package may ship **2.0.0** while pins stay **`candidate`**.  
 `supported` is a **separate** human decision after suite + MATRIX (+ usually COMPAT).
 
-Later than this gate: the released package is `v2.5.2`, which is the Zeus 1.0.0 client row in [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and raise `FEATURE_DISABLED` until ZE-360 and ZE-361. `v2.5.1` is the previous tag. This checklist does not cut a new tag.
+Later than this gate: the released package is `v2.5.3`, which is the Zeus 1.0.0 client row in [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and raise `FEATURE_DISABLED` until ZE-360 and ZE-361. `v2.5.2` is the previous tag. This checklist does not cut a new tag.
 
 ```text
 [package 2.0.0 on main]  →  tag v2.0.0 + GH Release

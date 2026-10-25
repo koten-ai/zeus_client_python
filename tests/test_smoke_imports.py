@@ -37,7 +37,7 @@ def test_public_exports():
 
 
 def test_version_is_2_0_0():
-    assert zeus_client.__version__ == "2.5.2"
+    assert zeus_client.__version__ == "2.5.3"
 
 
 def test_runtime_importable():

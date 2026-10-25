@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_zeus_1_0_row_names_the_available_tag() -> None:
     pins = json.loads((ROOT / "sdk_bootstrap.pins.json").read_text(encoding="utf-8"))
     row = pins["zeus_1_0_client"]
-    version = "2.5.2"
+    version = "2.5.3"
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert f'version = "{version}"' in pyproject
     assert row["package"] == "kotenai-zeus-client"
