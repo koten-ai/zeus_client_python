@@ -67,7 +67,10 @@ class AgentAPI:
                 cr = loaded.body
                 pack_schema = loaded.response_output_schema
                 extra_notes.append(f"chat_request: {loaded.source}")
-            except ZeusClientError:
+            except ZeusClientError as exc:
+                # A missing catalog must not become an ungrounded answer.
+                if exc.code == ErrorCode.CATALOG_NOT_FOUND:
+                    raise
                 cr = None
         else:
             merged = await self._rt.catalog.ensure_scope_brief(cr, target=tgt, mode=cs.mode)

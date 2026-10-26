@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- `AgentAPI.run_turn` raises `CATALOG_NOT_FOUND` (`030001`) when `chat_request` is omitted and the analytics catalog is not on disk. The turn does not call the model with no tools and empty `req_ids`. (ZDM-44)
+
 ---
 
 ## 2.5.3 — 2026-10-25

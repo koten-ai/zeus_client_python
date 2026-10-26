@@ -201,7 +201,10 @@ async def test_mode1_run_turn_ignores_llm_roles() -> None:
     llm = ScriptedLlm()
     zeus = RecordingZeus()
     async with _runtime(llm, zeus) as rt:
-        await rt.agent.run_turn("hello")
+        await rt.agent.run_turn(
+            "hello",
+            chat_request={"messages": [{"role": "system", "content": "locked"}]},
+        )
     assert llm.calls
     assert llm.calls[0].model == "default-model"
 
