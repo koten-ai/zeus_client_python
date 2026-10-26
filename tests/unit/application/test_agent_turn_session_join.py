@@ -264,7 +264,11 @@ async def test_agent_api_enable_sessions_uses_injected_lifecycle() -> None:
     svc.llm = llm
     svc.session_lifecycle = life  # type: ignore[attr-defined]
     api = AgentAPI(ZeusRuntime(cfg, services=svc))
-    result = await api.run_turn("hi", enable_sessions=True)
+    result = await api.run_turn(
+        "hi",
+        enable_sessions=True,
+        chat_request={"messages": [{"role": "system", "content": "locked"}]},
+    )
     assert result.status is TurnStatus.OK
     assert life.setups
     assert result.session is not None
