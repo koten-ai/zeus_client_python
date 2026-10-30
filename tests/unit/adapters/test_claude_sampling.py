@@ -1,4 +1,4 @@
-"""Claude 4.7+ sampling omit and public LLM rejection text (ZCP-128)."""
+"""Claude 4.7+ sampling omit and public LLM rejection text (ZCP-128, ZCP-132)."""
 
 from __future__ import annotations
 
@@ -27,6 +27,11 @@ _OMIT = (
     "us.anthropic.claude-opus-5-5",
     "anthropic.claude-opus-4-7:0",
     "claude-mythos-preview",
+    "claude-mythos-5",
+    "claude-mythos-5-1",
+    "claude-mythos-5.1",
+    "anthropic.claude-mythos-5-1",
+    "us.anthropic.claude-mythos-5-1",
     "claude-opus-4.7",
     "Claude-Opus-4.7",
     "anthropic/claude-opus-4.7",
@@ -127,6 +132,28 @@ def test_opus_5_5_keeps_max_tokens() -> None:
     assert "temperature" not in payload
     assert payload["max_tokens"] == 12
     assert "max_completion_tokens" not in payload
+
+
+def test_mythos_5_1_strips_sampling_keeps_max_tokens_and_tool_choice() -> None:
+    payload = build_chat_payload(
+        model="claude-mythos-5-1",
+        messages=[{"role": "user", "content": "hi"}],
+        tools=({"type": "function", "function": {"name": "find"}},),
+        temperature=0.0,
+        max_tokens=12,
+        body_extra={
+            "temperature": 0.2,
+            "top_p": 0.99,
+            "top_k": 5,
+        },
+    )
+    assert payload["model"] == "claude-mythos-5-1"
+    assert "temperature" not in payload
+    assert "top_p" not in payload
+    assert "top_k" not in payload
+    assert payload["max_tokens"] == 12
+    assert "max_completion_tokens" not in payload
+    assert payload["tool_choice"] == "auto"
 
 
 def test_opus_5_5_still_sends_tool_choice_auto() -> None:
