@@ -2,10 +2,19 @@
 
 ## Unreleased
 
+---
+
+## 2.5.4 — 2026-10-30
+
 ### Fixed
 
 - `AgentAPI.run_turn` raises `CATALOG_NOT_FOUND` (`030001`) when `chat_request` is omitted and the analytics catalog is not on disk. The turn does not call the model with no tools and empty `req_ids`. (ZDM-44)
-- GPT tool turns on `/v1/chat/completions` send `reasoning_effort: none` for models that reason by default. `gpt-5.6-sol` (and `gpt-5.6`, `gpt-5.6-terra`, `gpt-5.6-luna`, dated snapshots, and a provider prefix) was answering HTTP 400 because the default effort is `medium`, and that endpoint rejects function tools unless the effort is `none`. The same field is set for `gpt-5.5`, `gpt-6-sol`, and `gpt-6-luna`. Turns with no tools leave the field unset. `gpt-4o`, `gpt-4.1`, `gpt-5`, `gpt-5.1`, `gpt-5.2`, and `gpt-5.4` are unchanged. `gpt-6-astra`, `gpt-6.1-sol`, and `gpt-6.1-terra` still need `/v1/responses` for function tools. `gpt-5.5` and `gpt-6-sol` / `gpt-6-luna` omit `temperature` while reasoning stays on. `gpt-5.6` still omits `temperature` on every turn.
+- GPT tool turns on `/v1/chat/completions` send `reasoning_effort: none` for models that reason by default. `gpt-5.6-sol` (and `gpt-5.6`, `gpt-5.6-terra`, `gpt-5.6-luna`, dated snapshots, and a provider prefix) was answering HTTP 400 because the default effort is `medium`, and that endpoint rejects function tools unless the effort is `none`. The same field is set for `gpt-5.5`, `gpt-6-sol`, and `gpt-6-luna`. Turns with no tools leave the field unset. `gpt-4o`, `gpt-4.1`, `gpt-5`, `gpt-5.1`, `gpt-5.2`, and `gpt-5.4` are unchanged. `gpt-6-astra`, `gpt-6.1-sol`, and `gpt-6.1-terra` still need `/v1/responses` for function tools. `gpt-5.5` and `gpt-6-sol` / `gpt-6-luna` omit `temperature` while reasoning stays on. `gpt-5.6` still omits `temperature` on every turn. (ZCP-131)
+- Claude Mythos 5 and 5.1 (`claude-mythos-5`, `claude-mythos-5-1`, `claude-mythos-5.1`, and a provider prefix) no longer receive `temperature`, `top_p`, or `top_k`. Those ids were still sending `temperature: 0` after the Claude 4.7 omission. `claude-mythos-preview` still omits those fields. Claude 4.6 and earlier still send `temperature: 0`. (ZCP-132)
+
+### Changed
+
+- The available Zeus 1.0.0 client package is `kotenai-zeus-client` tag `v2.5.4`. `v2.5.3` is the previous tag. Auth on `v2.5.4` is `basic`, `bearer`, and `session`. PAT and M2M stay disabled (ZCP-124).
 
 ---
 

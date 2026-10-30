@@ -2,13 +2,13 @@
 
 Python client library for Zeus AI data servers. Orchestrates LLM agents that call Zeus tools — catalog sync, auth, contracts, durable sessions, and the full agent loop — without any web UI.
 
-> **2.5.3** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
+> **2.5.4** — default `import zeus_client` is the journaled hexagonal **ZeusRuntime** tree. Temporary `import zeus_client_v2` alias (deprecated). Claim remains **candidate** until human MATRIX. `multi_agent` is **docs** (CHECKLIST F). See [docs/V2/](docs/V2/), [MIGRATION.md](docs/V2/MIGRATION.md), [CHANGELOG.md](CHANGELOG.md), [MULTI_AGENT.md](docs/V2/MULTI_AGENT.md).
 
 ## Claim (family honesty)
 
 | Field | Value |
 | --- | --- |
-| **package** | `kotenai-zeus-client` **2.5.3** |
+| **package** | `kotenai-zeus-client` **2.5.4** |
 | **claim_level** | **candidate** (not `supported`) |
 | **client_floor** | `client-floor-5` |
 | **modes** | `agent`, `direct` (optional Mode 3 `jobs`/`units` seam) |
@@ -307,7 +307,7 @@ LLM settings live under a single top-level `llm_provider` object. Use `resolve_l
 | `api_key` | Provider API key |
 | `models` | Model IDs to choose from; pass `models[0]` (or another entry) to `run_agent` |
 
-Any OpenAI-compatible endpoint works — point `base_url` and `api_key` at your provider and list the model IDs you want to use. Before the request is sent, stock tool schemas gain the `type` keys OpenAI requires. `strict` is left unset so map fields still send. `gpt-5.6` (including `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, and the same generation) rejects `temperature` other than the default, so that field is omitted. When a request sets `max_tokens` for those ids, the body sends `max_completion_tokens`. Those ids, plus `gpt-5.5`, `gpt-6-sol`, and `gpt-6-luna`, default to `reasoning_effort: medium`. Chat Completions rejects function tools at that default, so a turn that sends tools also sends `reasoning_effort: none`. A turn with no tools leaves the field unset. `gpt-5.5`, `gpt-6-sol`, and `gpt-6-luna` omit `temperature` while reasoning stays on, and keep `temperature: 0` when the tool turn sets effort to `none`. `gpt-4o`, `gpt-4.1`, `gpt-5`, `gpt-5.1`, `gpt-5.2`, and `gpt-5.4` are unchanged. `gpt-6-astra`, `gpt-6.1-sol`, and `gpt-6.1-terra` need `/v1/responses` for function tools; this client posts Chat Completions only. Claude 4.7 and later (`claude-opus-4-7`, `claude-opus-5-5`, and the same generation) reject `temperature`, `top_p`, and `top_k`, so those fields are omitted. Other models still send `temperature: 0`. If the provider still rejects the request, the public error keeps the provider sentence (`llm invalid request: …`).
+Any OpenAI-compatible endpoint works — point `base_url` and `api_key` at your provider and list the model IDs you want to use. Before the request is sent, stock tool schemas gain the `type` keys OpenAI requires. `strict` is left unset so map fields still send. `gpt-5.6` (including `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, and the same generation) rejects `temperature` other than the default, so that field is omitted. When a request sets `max_tokens` for those ids, the body sends `max_completion_tokens`. Those ids, plus `gpt-5.5`, `gpt-6-sol`, and `gpt-6-luna`, default to `reasoning_effort: medium`. Chat Completions rejects function tools at that default, so a turn that sends tools also sends `reasoning_effort: none`. A turn with no tools leaves the field unset. `gpt-5.5`, `gpt-6-sol`, and `gpt-6-luna` omit `temperature` while reasoning stays on, and keep `temperature: 0` when the tool turn sets effort to `none`. `gpt-4o`, `gpt-4.1`, `gpt-5`, `gpt-5.1`, `gpt-5.2`, and `gpt-5.4` are unchanged. `gpt-6-astra`, `gpt-6.1-sol`, and `gpt-6.1-terra` need `/v1/responses` for function tools; this client posts Chat Completions only. Claude 4.7 and later (`claude-opus-4-7`, `claude-opus-5-5`, and the same generation) and Claude Mythos 5 (`claude-mythos-5`, `claude-mythos-5-1`, and `claude-mythos-5.1`) reject `temperature`, `top_p`, and `top_k`, so those fields are omitted. Other models still send `temperature: 0`. If the provider still rejects the request, the public error keeps the provider sentence (`llm invalid request: …`).
 
 ### Catalog sync
 
@@ -532,7 +532,7 @@ An unset issuer is refused before any network call. Zeus returns HTTP 401 when t
 
 ### Zeus 1.0.0 client tag (ZCP-124)
 
-The available package tag for the Zeus 1.0.0 row is `v2.5.3` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and disabled until ZE-360 and ZE-361. `v2.5.2` is the previous tag and keeps those modes disabled. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
+The available package tag for the Zeus 1.0.0 row is `v2.5.4` (`kotenai-zeus-client`). That tag has `basic`, `bearer`, and `session`. `pat` and `m2m` are implemented and disabled until ZE-360 and ZE-361. `v2.5.3` is the previous tag and keeps those modes disabled. [ZCP-1](https://kotenai.atlassian.net/browse/ZCP-1) is still In Review; no open child blocks Done. Details: [docs/V2/ZEUS_1_0_CLIENT_MATRIX.md](docs/V2/ZEUS_1_0_CLIENT_MATRIX.md). This row is what [ZE-77](https://kotenai.atlassian.net/browse/ZE-77) publishes. It does not award MATRIX `supported`.
 
 ### Catalog loading
 

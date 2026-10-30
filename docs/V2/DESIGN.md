@@ -848,7 +848,7 @@ Migration is covered in [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md).
 | [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) | Phased build plan |
 | [SECURITY.md](./SECURITY.md) | Threat model and controls |
 | [BEST_PRACTICES.md](./BEST_PRACTICES.md) | Engineering standards |
-| [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md) | Zeus 1.0.0 Python row: tag `v2.5.3`, claim stays candidate |
+| [ZEUS_1_0_CLIENT_MATRIX.md](./ZEUS_1_0_CLIENT_MATRIX.md) | Zeus 1.0.0 Python row: tag `v2.5.4`, claim stays candidate |
 
 ---
 
