@@ -133,13 +133,14 @@ def _chat_tools_need_reasoning_none(model: str | None) -> bool:
 # minors and a trailing variant such as ``-fast`` count.
 # ``omits_sampling_params`` strips a provider prefix with ``rfind`` first.
 _CLAUDE_NEW_ID = re.compile(
-    r"claude-(?:opus|sonnet|haiku|fable)-(\d+)"
+    r"claude-(?:opus|sonnet|haiku|fable|mythos)-(\d+)"
     r"(?:[.-](\d{1,2}))?"
     r"(?:-\d{8})?"
     r"(?:-v\d+)?"
     r"(?::\d+)?"
     r"(?:-[a-z]+)?"
 )
+# Preview has no major.minor. Mythos 5 and 5.1 match ``_CLAUDE_NEW_ID``.
 _CLAUDE_MYTHOS = re.compile(r"claude-mythos(?:-preview)?")
 _SAMPLING_KEYS = ("temperature", "top_p", "top_k")
 _SECRET_IN_PROVIDER_TEXT = re.compile(
@@ -150,8 +151,10 @@ _SECRET_IN_PROVIDER_TEXT = re.compile(
 def omits_sampling_params(model: str | None) -> bool:
     """Claude 4.7 and later reject temperature, top_p, and top_k.
 
-    Includes Opus 5.5 (``claude-opus-5-5`` and ``claude-opus-5.5``) and
-    Claude Mythos Preview. Claude 4.6 and earlier still accept temperature.
+    Includes Opus 5.5 (``claude-opus-5-5`` and ``claude-opus-5.5``),
+    Mythos 5 and 5.1 (``claude-mythos-5``, ``claude-mythos-5-1``, and
+    ``claude-mythos-5.1``), and Claude Mythos Preview. Claude 4.6 and
+    earlier still accept temperature.
     """
     text = (model or "").strip().lower()
     idx = text.rfind("claude-")
