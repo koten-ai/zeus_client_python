@@ -283,6 +283,40 @@ async def test_complete_gpt56_omits_temperature_and_renames_max_tokens() -> None
     assert "temperature" not in sent
     assert sent["max_completion_tokens"] == 32
     assert "max_tokens" not in sent
+    assert "reasoning_effort" not in sent
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_complete_gpt56_sol_tools_send_reasoning_effort_none() -> None:
+    route = respx.post(f"{BASE}/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "model": "gpt-5.6-sol",
+                "choices": [{"message": {"role": "assistant", "content": "ok"}}],
+            },
+        )
+    )
+    client = _client()
+    try:
+        await client.complete(
+            LlmRequest(
+                messages=({"role": "user", "content": "find ipa"},),
+                model="gpt-5.6-sol",
+                tools=({"type": "function", "function": {"name": "find"}},),
+                temperature=0.0,
+            )
+        )
+    finally:
+        await client.aclose()
+
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["model"] == "gpt-5.6-sol"
+    assert sent["reasoning_effort"] == "none"
+    assert "temperature" not in sent
+    assert sent["tool_choice"] == "auto"
+    assert sent["tools"][0]["function"]["name"] == "find"
 
 
 @pytest.mark.asyncio

@@ -79,16 +79,54 @@ def cached_tokens_of(resp: Any) -> int | None:
     return None
 
 
+def _model_tail(model: str | None) -> str:
+    """Bare model id. A provider prefix (``openai/gpt-5.6-sol``) is stripped."""
+    return (model or "").strip().lower().rsplit("/", 1)[-1]
+
+
+def _is_gpt56(model: str | None) -> bool:
+    """gpt-5.6 family id, including snapshots and a provider prefix.
+
+    ``gpt-5.60`` and ``gpt-5.6extra`` do not match. This is membership only.
+    Temperature and tool-call effort are separate rules below.
+    """
+    tail = _model_tail(model)
+    return tail == "gpt-5.6" or tail.startswith(("gpt-5.6-", "gpt-5.6:"))
+
+
 def omits_temperature(model: str | None) -> bool:
     """gpt-5.6 accepts only the default temperature and rejects 0.
 
     Omitting the field lets the provider use 1. Matches ``gpt-5.6``, route
     suffixes such as ``gpt-5.6-sol``, and a provider prefix
-    (``openai/gpt-5.6``). ``gpt-5.5`` and ``gpt-5.60`` still send temperature.
-    The same ids also reject ``max_tokens``; see ``build_chat_payload``.
+    (``openai/gpt-5.6``). The same ids reject ``max_tokens``.
+
+    This helper is only that always-omit rule. ``gpt-5.5`` and ``gpt-6-sol`` /
+    ``gpt-6-luna`` are false here. They drop temperature only while
+    ``reasoning_effort`` is not ``none``, inside ``build_chat_payload``.
     """
-    tail = (model or "").strip().lower().rsplit("/", 1)[-1]
-    return tail == "gpt-5.6" or tail.startswith(("gpt-5.6-", "gpt-5.6:"))
+    return _is_gpt56(model)
+
+
+# Dated snapshots use a hyphen or a colon (``gpt-5.5-2026-04-23``).
+# ``gpt-5.5-pro`` does not match. GPT-6 Astra and GPT-6.1 do not match:
+# they reject ``none`` or require ``/v1/responses``.
+_DATE_SUFFIX = r"(?:[:\-]\d{4}-\d{2}-\d{2})?"
+_DEFAULT_REASONING_ACCEPTS_NONE = re.compile(
+    rf"^(?:gpt-5\.5{_DATE_SUFFIX}|gpt-6-(?:sol|luna){_DATE_SUFFIX})$"
+)
+
+
+def _chat_tools_need_reasoning_none(model: str | None) -> bool:
+    """Chat Completions accepts function tools on these ids only at effort none.
+
+    They default to ``medium``. The gpt-5.6 family is included by id, not by
+    calling ``omits_temperature``. ``gpt-5``, the gpt-4 ids, ``gpt-5.1``,
+    ``gpt-5.2``, ``gpt-5.4``, ``gpt-6-astra``, and ``gpt-6.1`` stay out.
+    """
+    if _is_gpt56(model):
+        return True
+    return _DEFAULT_REASONING_ACCEPTS_NONE.fullmatch(_model_tail(model)) is not None
 
 
 # Minor is one or two digits so a snapshot date is not Claude 4.7+. Dotted
@@ -159,18 +197,10 @@ def build_chat_payload(
         "model": model,
         "messages": [dict(m) for m in messages],
     }
-    # gpt-5.6 rejects a non-default temperature and max_tokens. Claude 4.7+
-    # rejects temperature, top_p, and top_k. Pop after body_extra so a caller
-    # cannot put those fields back.
-    gpt56 = omits_temperature(model)
-    omit_sampling = omits_sampling_params(model)
-    if temperature is not None and not gpt56 and not omit_sampling:
+    if temperature is not None:
         payload["temperature"] = temperature
     if max_tokens is not None:
-        if gpt56:
-            payload["max_completion_tokens"] = max_tokens
-        else:
-            payload["max_tokens"] = max_tokens
+        payload["max_tokens"] = max_tokens
     if tools:
         # Deep-copied repair (ZCP-127). OpenAI rejects catalog nodes that have
         # no type. strict stays off so additionalProperties maps still send.
@@ -180,13 +210,22 @@ def build_chat_payload(
     # providers 400 with "tool_choice was set but no tools were specified").
     if body_extra:
         payload.update(dict(body_extra))
-    if gpt56:
-        payload.pop("temperature", None)
+    # One pass after body_extra, so a caller cannot put a rejected field back.
+    # Token cap, then tool-call effort, then temperature from that final effort.
+    if _is_gpt56(model):
         if "max_completion_tokens" in payload:
             payload.pop("max_tokens", None)
         elif "max_tokens" in payload:
             payload["max_completion_tokens"] = payload.pop("max_tokens")
-    if omit_sampling:
+    tools_need_none = _chat_tools_need_reasoning_none(model)
+    if payload.get("tools") and tools_need_none:
+        payload["reasoning_effort"] = "none"
+    # gpt-5.6 rejects a non-default temperature even at effort none.
+    # gpt-5.5 and gpt-6-sol / gpt-6-luna reject it only while effort is not none.
+    # Claude 4.7+ rejects temperature, top_p, and top_k on every turn.
+    if omits_temperature(model) or (tools_need_none and payload.get("reasoning_effort") != "none"):
+        payload.pop("temperature", None)
+    if omits_sampling_params(model):
         for key in _SAMPLING_KEYS:
             payload.pop(key, None)
     return payload

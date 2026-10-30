@@ -24,7 +24,6 @@ _OTHER = (
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-5",
-    "gpt-5.5",
     "gpt-5.60",
     "gpt-5.6extra",
     "grok-4.5-latest",

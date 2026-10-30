@@ -44,7 +44,7 @@
 
 <!-- TODO: xAI / OpenAI examples -->
 
-Any OpenAI-compatible chat completions endpoint. `gpt-5.6` omits `temperature` and sends `max_completion_tokens` when a cap is set. Claude 4.7 and later omit `temperature`, `top_p`, and `top_k`.
+Any OpenAI-compatible chat completions endpoint. `gpt-5.6` omits `temperature` and sends `max_completion_tokens` when a cap is set. Tool turns for `gpt-5.5`, `gpt-5.6` (including `gpt-5.6-sol`), `gpt-6-sol`, and `gpt-6-luna` send `reasoning_effort: none`. Claude 4.7 and later omit `temperature`, `top_p`, and `top_k`.
 
 ---
 
