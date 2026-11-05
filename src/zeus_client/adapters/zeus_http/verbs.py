@@ -28,6 +28,7 @@ from zeus_client.domain.ids import new_zeus_req_id
 from zeus_client.domain.journal.events import EVENT_ZEUS_HOP, JournalEvent
 from zeus_client.domain.journal.journal import InMemoryJournal
 from zeus_client.domain.llm_classify import RetryBudget
+from zeus_client.domain.pipeline_bindings import rewrite_fts_ids_to_doc_keys
 from zeus_client.observability.logging import get_family_logger
 from zeus_client.ports import AuthContext, VerbHopResult, VerbRequest
 from zeus_client.ports.secrets import SecretStorePort
@@ -212,6 +213,13 @@ class HttpxZeusPort:
         body: dict[str, Any] = {}
         err: str | None = None
         payload = verb_body_without_rewind(req.body)
+        if verb == "pipeline":
+            payload, fts_steps = rewrite_fts_ids_to_doc_keys(payload)
+            if fts_steps:
+                get_family_logger().info(
+                    "zeus_client.pipeline.fts_doc_keys",
+                    steps=list(fts_steps),
+                )
         params = rewind_query_params(bool(req.rewind))
         scope = (
             f"{req.target.bucket}/{req.target.scope}"
