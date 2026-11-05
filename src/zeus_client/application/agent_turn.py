@@ -95,6 +95,7 @@ from zeus_client.domain.messages import (
     TurnResult,
     TurnStatus,
 )
+from zeus_client.domain.pipeline_bindings import rewrite_fts_ids_to_doc_keys
 from zeus_client.domain.policy import decide_policy
 from zeus_client.domain.session import SessionHandle
 from zeus_client.domain.stamps import product_stamp, resolve_client_ip
@@ -1275,6 +1276,8 @@ async def _execute_tool_calls(
             )
             continue
 
+        if name == "pipeline":
+            tc_args, _fts_steps = rewrite_fts_ids_to_doc_keys(tc_args)
         t_tool = time.perf_counter()
         hop = await zeus.call_verb(
             VerbRequest(
